@@ -1,0 +1,16 @@
+node_modules
+.vercel
+
+# Environment files
+.env
+.env.production
+.env.*
+!.env.example
+
+# Build artifacts
+dist/
+dev-dist/
+
+# Runtime logs
+logs/*
+!logs/.gitkeep

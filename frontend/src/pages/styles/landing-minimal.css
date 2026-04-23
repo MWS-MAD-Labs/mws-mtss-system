@@ -1,0 +1,225 @@
+/* ═══════════════════════════════════════════════════
+   Landing Page — Minimal Design
+   1 full background photo + 2 cutout figures
+   ═══════════════════════════════════════════════════ */
+
+/* Shell — warm gradient base */
+.lm-shell {
+    background:
+        radial-gradient(1200px circle at 12% 8%, rgba(246, 195, 122, 0.15), transparent 58%),
+        radial-gradient(980px circle at 88% 78%, rgba(206, 174, 119, 0.1), transparent 62%),
+        linear-gradient(160deg, #fff9f2 0%, #fdf2e7 44%, #fff9f4 100%);
+}
+
+html.dark .lm-shell {
+    background:
+        radial-gradient(1100px circle at 14% 10%, rgba(218, 170, 105, 0.08), transparent 56%),
+        radial-gradient(920px circle at 82% 76%, rgba(169, 147, 111, 0.06), transparent 60%),
+        linear-gradient(160deg, #101528 0%, #13192f 48%, #111a30 100%);
+}
+
+/* ── Photo layer ── */
+.lm-photo-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1;
+}
+
+/* ── Full background photo ── */
+.lm-bg {
+    position: absolute;
+    inset: -5%;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.18;
+    filter: saturate(0.85) contrast(0.9) blur(1.5px);
+    transform: scale(1.06);
+    will-change: opacity;
+    transition: opacity 0.8s ease;
+}
+
+html.dark .lm-bg {
+    opacity: 0.12;
+    filter: saturate(0.7) contrast(0.8) blur(2px);
+}
+
+/* Soft overlay to keep content readable */
+.lm-bg-overlay {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(700px circle at 50% 40%, rgba(255, 255, 255, 0.15), transparent 60%),
+        linear-gradient(180deg,
+            rgba(255, 249, 241, 0.7) 0%,
+            rgba(255, 246, 235, 0.75) 35%,
+            rgba(255, 250, 243, 0.85) 100%);
+}
+
+html.dark .lm-bg-overlay {
+    background:
+        radial-gradient(700px circle at 50% 40%, rgba(255, 255, 255, 0.03), transparent 60%),
+        linear-gradient(180deg,
+            rgba(12, 20, 40, 0.78) 0%,
+            rgba(11, 19, 38, 0.82) 35%,
+            rgba(12, 20, 39, 0.9) 100%);
+}
+
+/* ── Cutout figures ── */
+.lm-cutout {
+    position: absolute;
+    bottom: 0;
+    z-index: 2;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+}
+
+.lm-cutout img {
+    display: block;
+    max-height: 70vh;
+    width: auto;
+    object-fit: contain;
+    object-position: bottom center;
+    filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.15));
+    /* Fade-in on load — avoids pop-in and hides Cloudinary processing delay */
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+.lm-cutout img.lm-img--loaded {
+    opacity: 1;
+}
+
+html.dark .lm-cutout img {
+    filter: drop-shadow(0 8px 28px rgba(0, 0, 0, 0.4));
+}
+
+/* Left cutout — teacher/staff side */
+.lm-cutout--left {
+    left: -20px;
+    max-width: 280px;
+}
+
+.lm-cutout--left img {
+    max-height: 60vh;
+}
+
+/* Right cutout — student side */
+.lm-cutout--right {
+    right: -20px;
+    max-width: 280px;
+}
+
+.lm-cutout--right img {
+    max-height: 60vh;
+}
+
+/* ── Responsive ── */
+
+/* Large screens — cutouts wider */
+@media (min-width: 1400px) {
+    .lm-cutout--left {
+        left: 20px;
+        max-width: 340px;
+    }
+
+    .lm-cutout--right {
+        right: 20px;
+        max-width: 340px;
+    }
+
+    .lm-cutout img {
+        max-height: 72vh;
+    }
+}
+
+/* Tablets — smaller cutouts */
+@media (max-width: 1120px) {
+    .lm-cutout--left {
+        left: -40px;
+        max-width: 220px;
+    }
+
+    .lm-cutout--right {
+        right: -40px;
+        max-width: 220px;
+    }
+
+    .lm-cutout img {
+        max-height: 50vh;
+    }
+}
+
+/* Mobile — reposition cutouts to top area (flanking title) */
+@media (max-width: 767px) {
+    .lm-bg {
+        opacity: 0.14;
+        filter: saturate(0.8) blur(2px);
+    }
+
+    html.dark .lm-bg {
+        opacity: 0.1;
+    }
+
+    /* Switch from bottom-anchored to top-anchored on mobile */
+    .lm-cutout {
+        bottom: auto;
+        top: 0;
+    }
+
+    .lm-cutout--left {
+        left: -24px;
+        max-width: 100px;
+        opacity: 0.55;
+    }
+
+    .lm-cutout--left img {
+        max-height: 22vh;
+        object-position: top center;
+    }
+
+    .lm-cutout--right {
+        right: -24px;
+        max-width: 100px;
+        opacity: 0.55;
+    }
+
+    .lm-cutout--right img {
+        max-height: 22vh;
+        object-position: top center;
+    }
+}
+
+/* Very small screens (< 400px) */
+@media (max-width: 400px) {
+    .lm-cutout--left {
+        left: -30px;
+        max-width: 80px;
+        opacity: 0.45;
+    }
+
+    .lm-cutout--left img {
+        max-height: 18vh;
+    }
+
+    .lm-cutout--right {
+        right: -30px;
+        max-width: 80px;
+        opacity: 0.45;
+    }
+
+    .lm-cutout--right img {
+        max-height: 18vh;
+    }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+    .lm-cutout,
+    .lm-bg {
+        animation: none !important;
+        transition: none !important;
+    }
+}
