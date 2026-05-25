@@ -67,6 +67,9 @@ export const uploadEvidence = (files, onProgress) =>
                 try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error('Invalid response')); }
             } else {
                 let message = `Upload failed (${xhr.status})`;
+                if (xhr.status === 413) {
+                    message = 'Upload is larger than the server limit. Please upload files up to 5 MB each, max 5 files.';
+                }
                 try {
                     const payload = JSON.parse(xhr.responseText);
                     message = payload?.message || payload?.errors?.join?.(', ') || message;
