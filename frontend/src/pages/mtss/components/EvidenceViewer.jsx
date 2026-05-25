@@ -4,7 +4,7 @@ import EvidenceLightbox from "./EvidenceLightbox";
 import { downloadEvidenceFile } from "./evidenceDownloadUtils";
 
 const IMAGE_EXTS = new Set(["image/jpeg", "image/png", "image/webp"]);
-const isImage = (ev) => ev.resourceType === "image" || IMAGE_EXTS.has(ev.fileType);
+const isImage = (ev) => ev.resourceType === "image" || (!ev.resourceType && IMAGE_EXTS.has(ev.fileType));
 
 const EvidenceViewer = memo(({ evidence = [] }) => {
     const [lightbox, setLightbox] = useState(null);
