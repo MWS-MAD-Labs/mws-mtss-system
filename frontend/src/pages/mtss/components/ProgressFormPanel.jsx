@@ -1,8 +1,9 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ClipboardCheck, Loader2 } from "lucide-react";
 import { getProgressAssignmentOptions } from "../utils/editPlanAccess";
 import { SKIP_REASONS } from "../config/interventionFormConfig";
+import EvidenceUploader from "./EvidenceUploader";
 
 const readonlyField =
     "px-4 py-3 rounded-2xl bg-white/70 dark:bg-white/10 border border-primary/10 text-sm text-muted-foreground";
@@ -65,6 +66,7 @@ const formatSubjectLabel = (option) => {
 
 const ProgressFormPanel = memo(
     ({ formState, onChange, onSubmit, baseFieldClass, textareaClass, students = [], submitting = false }) => {
+        const [evidenceFiles, setEvidenceFiles] = useState([]);
         const selectedStudent = useMemo(
             () => students.find((student) => student.id === formState.studentId),
             [students, formState.studentId],
@@ -108,6 +110,11 @@ const ProgressFormPanel = memo(
 
         const isValid = Boolean(formState.studentId && formState.date && formState.scoreValue !== "");
 
+        const handleSubmit = (event) => {
+            event.preventDefault();
+            onSubmit?.(event, evidenceFiles, () => setEvidenceFiles([]));
+        };
+
         return (
             <motion.section
                 className="mtss-theme rounded-[32px] border border-white/40 bg-white/90 dark:bg-slate-900/40 shadow-[0_25px_80px_rgba(15,23,42,0.12)] p-6 space-y-6"
@@ -121,7 +128,7 @@ const ProgressFormPanel = memo(
                         Share check-in data, SEL notes, and small wins to keep the MTSS trail fresh.
                     </p>
                 </header>
-                <form className="space-y-5" onSubmit={onSubmit}>
+                <form className="space-y-5" onSubmit={handleSubmit}>
                     <div className="grid md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
@@ -317,6 +324,17 @@ const ProgressFormPanel = memo(
                             placeholder="Describe student's progress, challenges, or celebrations..."
                             value={formState.notes}
                             onChange={(e) => onChange("notes", e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <label className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                            Evidence Upload
+                        </label>
+                        <EvidenceUploader
+                            files={evidenceFiles}
+                            setFiles={setEvidenceFiles}
+                            uploading={submitting}
                         />
                     </div>
 

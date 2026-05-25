@@ -35,11 +35,27 @@ export const createMentorAssignment = (payload, config = {}) =>
 export const updateMentorAssignment = (id, payload, config = {}) =>
     api.put(`/mtss/mentor-assignments/${id}`, payload, config).then(withData);
 
+export const normalizeEvidenceFiles = (files = []) =>
+    files
+        .map((entry) => entry?.file || entry)
+        .filter(Boolean);
+
+export const getUploadedEvidence = (uploadResult = {}) =>
+    uploadResult?.data?.evidence ||
+    uploadResult?.data?.data?.evidence ||
+    uploadResult?.evidence ||
+    [];
+
 export const uploadEvidence = (files, onProgress) =>
     new Promise((resolve, reject) => {
+        const normalizedFiles = normalizeEvidenceFiles(files);
+        if (!normalizedFiles.length) {
+            reject(new Error('No readable evidence files selected'));
+            return;
+        }
         const xhr = new XMLHttpRequest();
         const fd = new FormData();
-        files.forEach((f) => fd.append('evidence', f));
+        normalizedFiles.forEach((f) => fd.append('evidence', f));
         xhr.open('POST', `${import.meta.env.VITE_API_BASE || '/api/v1'}/mtss/upload-evidence`);
         const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -49,11 +65,28 @@ export const uploadEvidence = (files, onProgress) =>
         xhr.onload = () => {
             if (xhr.status >= 200 && xhr.status < 300) {
                 try { resolve(JSON.parse(xhr.responseText)); } catch { reject(new Error('Invalid response')); }
-            } else { reject(new Error(`Upload failed (${xhr.status})`)); }
+            } else {
+                let message = `Upload failed (${xhr.status})`;
+                try {
+                    const payload = JSON.parse(xhr.responseText);
+                    message = payload?.message || payload?.errors?.join?.(', ') || message;
+                } catch { /* use default message */ }
+                reject(new Error(message));
+            }
         };
         xhr.onerror = () => reject(new Error('Network error'));
         xhr.send(fd);
     });
+
+export const uploadEvidenceAttachments = async (files = [], onProgress) => {
+    if (!files.length) return [];
+    const uploadResult = await uploadEvidence(files, onProgress);
+    const evidence = getUploadedEvidence(uploadResult);
+    if (!evidence.length) {
+        throw new Error('Evidence upload completed without saved files. Please try again.');
+    }
+    return evidence;
+};
 
 export default {
     fetchMentorAssignments,
@@ -68,4 +101,5 @@ export default {
     createMentorAssignment,
     updateMentorAssignment,
     uploadEvidence,
+    uploadEvidenceAttachments,
 };

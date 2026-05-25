@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { updateMentorAssignment, uploadEvidence } from "@/services/mtssService";
+import { updateMentorAssignment, uploadEvidenceAttachments } from "@/services/mtssService";
 import { canUserSubmitProgressForAssignment } from "../utils/editPlanAccess";
 
 const useTeacherDashboardActions = ({
@@ -13,8 +13,8 @@ const useTeacherDashboardActions = ({
     onCloseQuickUpdate,
 }) => {
     const handleProgressSubmitForm = useCallback(
-        async (event) => {
-            event.preventDefault();
+        async (event, evidenceFiles = [], resetEvidenceFiles) => {
+            event?.preventDefault?.();
             if (!progressForm.studentId || !progressForm.date || progressForm.scoreValue === "") {
                 toast({
                     title: "Complete the required fields",
@@ -56,6 +56,7 @@ const useTeacherDashboardActions = ({
                 const trimmedNotes = progressForm.notes?.trim() || "";
                 const parsedScoreValue = progressForm.scoreValue !== "" ? Number(progressForm.scoreValue) : undefined;
                 setSubmittingProgress(true);
+                const evidencePayload = await uploadEvidenceAttachments(evidenceFiles);
                 await updateMentorAssignment(assignmentId, {
                     checkIns: [
                         {
@@ -67,14 +68,18 @@ const useTeacherDashboardActions = ({
                             performed: progressForm.performed === "yes",
                             skipReason: progressForm.performed !== "yes" ? (progressForm.skipReason || undefined) : undefined,
                             skipReasonNote: progressForm.performed !== "yes" && progressForm.skipReason === "other" ? (progressForm.skipReasonNote || undefined) : undefined,
+                            evidence: evidencePayload?.length ? evidencePayload : undefined,
                         },
                     ],
                 });
                 toast({
                     title: "Progress saved",
-                    description: `${selectedStudent.name}'s update is now on the dashboard.`,
+                    description: evidencePayload?.length
+                        ? `${selectedStudent.name}'s update is now on the dashboard with ${evidencePayload.length} evidence file${evidencePayload.length === 1 ? "" : "s"}.`
+                        : `${selectedStudent.name}'s update is now on the dashboard.`,
                 });
                 resetProgressForm();
+                resetEvidenceFiles?.();
                 refresh();
             } catch (error) {
                 toast({
@@ -113,12 +118,7 @@ const useTeacherDashboardActions = ({
             }
             setSavingQuickUpdate(true);
             try {
-                let evidencePayload;
-                if (evidenceFiles.length > 0) {
-                    const rawFiles = evidenceFiles.map((f) => f.file);
-                    const uploadResult = await uploadEvidence(rawFiles);
-                    evidencePayload = uploadResult?.data?.evidence;
-                }
+                const evidencePayload = await uploadEvidenceAttachments(evidenceFiles);
 
                 const trimmedNotes = formState.notes?.trim() || "";
                 const parsedScoreValue = formState.scoreValue !== "" ? Number(formState.scoreValue) : undefined;
@@ -141,7 +141,9 @@ const useTeacherDashboardActions = ({
                 });
                 toast({
                     title: "Progress update saved",
-                    description: `${student.name}'s update was recorded!`,
+                    description: evidencePayload?.length
+                        ? `${student.name}'s update was recorded with ${evidencePayload.length} evidence file${evidencePayload.length === 1 ? "" : "s"}.`
+                        : `${student.name}'s update was recorded!`,
                 });
                 onCloseQuickUpdate();
                 refresh();

@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import PilotTaskHintBanner from "./PilotTaskHintBanner";
 import StudentsTable from "./StudentsTable";
 import QuickUpdateModal from "./QuickUpdateModal";
-import { updateMentorAssignment, uploadEvidence } from "@/services/mtssService";
+import { updateMentorAssignment, uploadEvidenceAttachments } from "@/services/mtssService";
 import { canUserSubmitProgressForAssignment } from "../utils/editPlanAccess";
 import { ensureStudentInterventions, getMostCriticalForDisplay } from "../utils/interventionUtils";
 import { FilterBar, RosterHeader, LoadMore, STUDENTS_PANEL_BATCH } from "./StudentsPanelParts";
@@ -117,12 +117,7 @@ const StudentsPanel = memo(({ students, TierPill, ProgressBadge, onRefresh, onEd
             }
             setSavingUpdate(true);
             try {
-                let evidencePayload;
-                if (evidenceFiles.length > 0) {
-                    const rawFiles = evidenceFiles.map((f) => f.file);
-                    const uploadResult = await uploadEvidence(rawFiles);
-                    evidencePayload = uploadResult?.data?.evidence;
-                }
+                const evidencePayload = await uploadEvidenceAttachments(evidenceFiles);
 
                 const trimmedNotes = formState.notes?.trim() || "";
                 const parsedScoreValue = formState.scoreValue !== "" ? Number(formState.scoreValue) : undefined;
@@ -145,7 +140,9 @@ const StudentsPanel = memo(({ students, TierPill, ProgressBadge, onRefresh, onEd
                 });
                 toast({
                     title: "Progress update saved",
-                    description: `${student.name}'s update was recorded!`,
+                    description: evidencePayload?.length
+                        ? `${student.name}'s update was recorded with ${evidencePayload.length} evidence file${evidencePayload.length === 1 ? "" : "s"}.`
+                        : `${student.name}'s update was recorded!`,
                 });
                 handleClose();
                 onRefresh?.();
