@@ -36,11 +36,13 @@ if (token && user) {
 // Service worker registration is handled by Vite PWA plugin
 if ('serviceWorker' in navigator) {
     let refreshedForServiceWorker = false;
+
     navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (refreshedForServiceWorker) return;
         refreshedForServiceWorker = true;
         window.location.reload();
     });
+
     navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data?.type === 'LEGACY_SW_UNREGISTERED') {
             window.location.reload();
