@@ -22,7 +22,7 @@ const buildMergedInterventions = (student) => {
     const { interventionDetails = [] } = student;
     const allInterventions = ensureStudentInterventions(student.interventions);
 
-    return allInterventions.map((intervention) => {
+    const merged = allInterventions.map((intervention) => {
         const detail = interventionDetails.find((item) =>
             item.type?.toUpperCase() === intervention.type?.toUpperCase(),
         );
@@ -50,6 +50,40 @@ const buildMergedInterventions = (student) => {
             hasRealData: false,
         };
     });
+    const mergedDetailIds = new Set(merged.map((intervention) => intervention.id).filter(Boolean));
+    const detailOnlyInterventions = interventionDetails
+        .filter((detail) => detail?.id && !mergedDetailIds.has(detail.id))
+        .map((detail) => ({ ...detail, hasRealData: true }));
+
+    return [...merged, ...detailOnlyInterventions];
+};
+
+const buildAttendanceContext = (interventions = []) => {
+    const histories = interventions.flatMap((intervention) =>
+        (Array.isArray(intervention.history) ? intervention.history : []).map((entry) => ({
+            ...entry,
+            interventionLabel: intervention.label || intervention.focusArea || intervention.type,
+        })),
+    );
+    const absenceEntries = histories
+        .filter((entry) => entry.performed === false && entry.skipReason === "student_absent")
+        .sort((left, right) => new Date(right.timestamp || right.date || 0) - new Date(left.timestamp || left.date || 0));
+    const attendanceIntervention = interventions.find((intervention) =>
+        /attendance|absence|present/i.test(`${intervention.label || ""} ${intervention.focusArea || ""} ${intervention.type || ""}`),
+    );
+    const rateValue = attendanceIntervention?.current ?? attendanceIntervention?.baseline;
+    const unit = attendanceIntervention?.progressUnit || "%";
+    const lastAbsenceRaw = absenceEntries[0]?.timestamp || absenceEntries[0]?.date || null;
+    const lastAbsenceDate = lastAbsenceRaw
+        ? formatDate(lastAbsenceRaw, { month: "short", day: "numeric", year: "numeric" })
+        : "No absence logged";
+
+    return {
+        rate: hasValue(rateValue) ? `${rateValue}${unit === "%" ? "%" : ` ${unit}`}` : "Not recorded",
+        missedMtssSessions: absenceEntries.length,
+        lastAbsenceDate,
+        lastAbsenceSubject: absenceEntries[0]?.interventionLabel || null,
+    };
 };
 
 export const buildStudentProfileView = (student, selectedIntervention) => {
@@ -63,6 +97,8 @@ export const buildStudentProfileView = (student, selectedIntervention) => {
             durationLabel: null,
             frequencyLabel: null,
             mentorLabel: null,
+            pairingLabel: null,
+            studentSubjectMentorPair: null,
             goalLabel: null,
             monitoringMethodLabel: null,
             startDateLabel: null,
@@ -73,6 +109,7 @@ export const buildStudentProfileView = (student, selectedIntervention) => {
 
     const { profile = {} } = student;
     const mergedInterventions = buildMergedInterventions(student);
+    const attendanceContext = buildAttendanceContext(mergedInterventions);
 
     const sortedInterventions = [...mergedInterventions].sort((a, b) => {
         const tierOrder = { tier3: 0, tier2: 1, tier1: 2 };
@@ -89,7 +126,7 @@ export const buildStudentProfileView = (student, selectedIntervention) => {
 
     const strategyLabel = currentIntervention?.strategyName || currentIntervention?.focusArea || null;
     const durationLabel = currentIntervention?.duration || null;
-    let frequencyLabel = currentIntervention?.monitoringFrequency || currentIntervention?.monitoringMethod || null;
+    let frequencyLabel = currentIntervention?.monitoringFrequency || null;
     if (frequencyLabel === "Custom" && Array.isArray(currentIntervention?.customFrequencyDays) && currentIntervention.customFrequencyDays.length > 0) {
         const dayAbbr = currentIntervention.customFrequencyDays.map((d) => d.slice(0, 3));
         frequencyLabel = `Custom — ${dayAbbr.join(", ")}`;
@@ -100,6 +137,14 @@ export const buildStudentProfileView = (student, selectedIntervention) => {
         username: currentIntervention?.mentorUsername || profile?.mentorUsername || student.mentorUsername,
         gender: currentIntervention?.mentorGender || profile?.mentorGender || student.mentorGender,
     });
+    const pairingSubject = currentIntervention?.studentSubjectMentorPair?.subject
+        || currentIntervention?.focusArea
+        || currentIntervention?.label
+        || currentIntervention?.type
+        || null;
+    const pairingLabel = currentIntervention?.pairingLabel
+        || currentIntervention?.studentSubjectMentorPair?.pairingLabel
+        || [student.name, pairingSubject, mentorLabel].filter(Boolean).join(" - ");
     const goalLabel = resolveGoalLabel(currentIntervention) || null;
     const monitoringMethodLabel = currentIntervention?.monitoringMethod || currentIntervention?.monitorMethod || null;
     const startDateLabel = currentIntervention?.startDate
@@ -108,7 +153,10 @@ export const buildStudentProfileView = (student, selectedIntervention) => {
     const notesLabel = hasValue(currentIntervention?.notes) ? currentIntervention.notes : null;
 
     return {
-        profile,
+            profile: {
+                ...profile,
+                attendanceContext,
+            },
         highlight,
         sortedInterventions,
         currentIntervention,
@@ -116,6 +164,8 @@ export const buildStudentProfileView = (student, selectedIntervention) => {
         durationLabel,
         frequencyLabel,
         mentorLabel,
+        pairingLabel,
+        studentSubjectMentorPair: currentIntervention?.studentSubjectMentorPair || null,
         goalLabel,
         monitoringMethodLabel,
         startDateLabel,

@@ -64,6 +64,9 @@ const formatSubjectLabel = (option) => {
     return `${focus} - ${tier}`;
 };
 
+const getTodayInputValue = () => new Date().toISOString().slice(0, 10);
+const isLateProgressDate = (dateValue, todayValue) => Boolean(dateValue && todayValue && dateValue < todayValue);
+
 const ProgressFormPanel = memo(
     ({ formState, onChange, onSubmit, baseFieldClass, textareaClass, students = [], submitting = false }) => {
         const [evidenceFiles, setEvidenceFiles] = useState([]);
@@ -108,7 +111,13 @@ const ProgressFormPanel = memo(
             onChange("scoreUnit", option?.metricLabel || "score");
         };
 
-        const isValid = Boolean(formState.studentId && formState.date && formState.scoreValue !== "");
+            const skipReasonValid =
+                formState.performed === "yes" ||
+                Boolean(formState.skipReason && (formState.skipReason !== "other" || formState.skipReasonNote?.trim()));
+            const todayValue = getTodayInputValue();
+            const lateSubmission = isLateProgressDate(formState.date, todayValue);
+            const lateReasonValid = !lateSubmission || Boolean(formState.lateReason?.trim());
+            const isValid = Boolean(formState.studentId && formState.date && formState.scoreValue !== "" && skipReasonValid && lateReasonValid);
 
         const handleSubmit = (event) => {
             event.preventDefault();
@@ -222,13 +231,30 @@ const ProgressFormPanel = memo(
                             <label className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
                                 Date of Update
                             </label>
-                            <input
-                                type="date"
-                                className={baseFieldClass}
-                                value={formState.date}
-                                onChange={(e) => onChange("date", e.target.value)}
-                            />
-                        </div>
+                                <input
+                                    type="date"
+                                    className={baseFieldClass}
+                                    value={formState.date}
+                                    onChange={(e) => {
+                                        const nextDate = e.target.value;
+                                        onChange("date", nextDate);
+                                        if (!isLateProgressDate(nextDate, todayValue)) onChange("lateReason", "");
+                                    }}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Use the actual date the support happened. Late entries require a reason.
+                                </p>
+                                {lateSubmission && (
+                                    <input
+                                        type="text"
+                                        className={baseFieldClass}
+                                        placeholder="Reason for late submission"
+                                        value={formState.lateReason || ""}
+                                        onChange={(e) => onChange("lateReason", e.target.value)}
+                                        required
+                                    />
+                                )}
+                            </div>
                         <div className="flex flex-col gap-2">
                             <label className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
                                 Intervention Performed?
@@ -238,9 +264,12 @@ const ProgressFormPanel = memo(
                                 value={formState.performed}
                                 onChange={(e) => onChange("performed", e.target.value)}
                             >
-                                <option value="yes">Yes</option>
-                                <option value="no">No</option>
+                                <option value="yes">Yes — session happened</option>
+                                <option value="no">Skipped — session did not happen</option>
                             </select>
+                            <p className="text-xs text-muted-foreground">
+                                Choose <strong>Skipped</strong> if the session did not take place — e.g. student was absent, had a scheduled test, or there was a last-minute schedule conflict. A reason is required.
+                            </p>
                         </div>
                     </div>
 
@@ -250,6 +279,9 @@ const ProgressFormPanel = memo(
                                 <label className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-700 dark:text-amber-400">
                                     Reason Not Performed
                                 </label>
+                                <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
+                                    Use Skipped when the planned support did not happen, for example student absent, schedule conflict, or assessment window.
+                                </p>
                                 <select
                                     className={baseFieldClass}
                                     value={formState.skipReason}

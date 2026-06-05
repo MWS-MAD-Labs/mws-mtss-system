@@ -1,9 +1,18 @@
-import { memo, useCallback, useRef, useEffect } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Upload, X, FileText, File, ImageIcon } from "lucide-react";
 
 const ACCEPT = ".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx";
 const MAX_SIZE = 5 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_TYPES = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "pdf", "doc", "docx"]);
 
 const formatBytes = (bytes) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -12,28 +21,58 @@ const formatBytes = (bytes) => {
 };
 
 const FileIcon_ = ({ type }) => {
-    if (IMAGE_TYPES.has(type)) return <ImageIcon className="w-4 h-4 text-blue-500" />;
-    if (type === "application/pdf") return <FileText className="w-4 h-4 text-red-500" />;
-    return <File className="w-4 h-4 text-slate-500" />;
+    if (IMAGE_TYPES.has(type)) return <ImageIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" />;
+    if (type === "application/pdf") return <FileText className="w-4 h-4 text-red-500 dark:text-red-400" />;
+    return <File className="w-4 h-4 text-slate-500 dark:text-slate-400" />;
 };
+
+const getExtension = (name = "") => name.split(".").pop()?.toLowerCase() || "";
+
+const isAllowedFile = (file) => ALLOWED_TYPES.has(file.type) || ALLOWED_EXTENSIONS.has(getExtension(file.name));
 
 const EvidenceUploader = memo(({ files = [], setFiles, maxFiles = 5, uploading = false, uploadProgress = 0 }) => {
     const inputRef = useRef(null);
+    const filesRef = useRef(files);
+    const [status, setStatus] = useState(null);
 
     useEffect(() => {
-        return () => files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
+        filesRef.current = files;
+    }, [files]);
+
+    useEffect(() => {
+        return () => filesRef.current.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
     }, []);
 
     const addFiles = useCallback(
         (incoming) => {
             const valid = [];
+            const rejected = [];
             for (const file of incoming) {
-                if (files.length + valid.length >= maxFiles) break;
-                if (file.size > MAX_SIZE) continue;
+                if (files.length + valid.length >= maxFiles) {
+                    rejected.push(`${file.name}: maximum ${maxFiles} files`);
+                    continue;
+                }
+                if (!isAllowedFile(file)) {
+                    rejected.push(`${file.name}: unsupported file type`);
+                    continue;
+                }
+                if (file.size > MAX_SIZE) {
+                    rejected.push(`${file.name}: larger than ${formatBytes(MAX_SIZE)}`);
+                    continue;
+                }
                 const preview = IMAGE_TYPES.has(file.type) ? URL.createObjectURL(file) : null;
                 valid.push({ file, preview, name: file.name, size: file.size, type: file.type });
             }
-            if (valid.length) setFiles((prev) => [...prev, ...valid]);
+            if (valid.length && setFiles) {
+                setFiles((prev) => [...prev, ...valid]);
+            }
+            if (rejected.length) {
+                setStatus({ type: "error", text: rejected.slice(0, 2).join(". ") });
+                return;
+            }
+            if (valid.length) {
+                setStatus({ type: "success", text: `${valid.length} file${valid.length === 1 ? "" : "s"} selected and ready to save.` });
+            }
         },
         [files.length, maxFiles, setFiles],
     );
@@ -63,6 +102,7 @@ const EvidenceUploader = memo(({ files = [], setFiles, maxFiles = 5, uploading =
                 if (removed?.preview) URL.revokeObjectURL(removed.preview);
                 return next;
             });
+            setStatus(null);
         },
         [setFiles],
     );
@@ -84,9 +124,22 @@ const EvidenceUploader = memo(({ files = [], setFiles, maxFiles = 5, uploading =
                         Tap to browse or drag files here
                     </p>
                     <p className="text-[9px] text-muted-foreground/60">
-                        JPG, PNG, PDF, DOC — max {formatBytes(MAX_SIZE)} each
+                        Allowed: JPG, PNG, WEBP, PDF, DOC, DOCX. Max {formatBytes(MAX_SIZE)} each. Max {maxFiles} files.
                     </p>
                     <input ref={inputRef} type="file" multiple accept={ACCEPT} onChange={handleSelect} className="hidden" />
+                </div>
+            )}
+
+            {status && (
+                <div
+                    className={`rounded-lg border px-3 py-2 text-[10px] sm:text-xs ${
+                        status.type === "error"
+                            ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+                            : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300"
+                    }`}
+                    role={status.type === "error" ? "alert" : "status"}
+                >
+                    {status.text}
                 </div>
             )}
 
@@ -113,8 +166,8 @@ const EvidenceUploader = memo(({ files = [], setFiles, maxFiles = 5, uploading =
                                 <p className="text-[9px] text-muted-foreground">{formatBytes(f.size)}</p>
                             </div>
                             {!uploading && (
-                                <button onClick={() => removeFile(idx)} className="p-0.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
-                                    <X className="w-3.5 h-3.5 text-red-500" />
+                                <button type="button" onClick={() => removeFile(idx)} className="p-0.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                                    <X className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
                                 </button>
                             )}
                         </div>

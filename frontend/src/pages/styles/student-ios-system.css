@@ -42,7 +42,7 @@
     animation: studentGridShift 30s linear infinite;
 }
 
-.student-shell > * {
+.student-shell > :not(.absolute):not(.fixed) {
     position: relative;
     z-index: 1;
 }

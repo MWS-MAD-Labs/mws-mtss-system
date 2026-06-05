@@ -1,4 +1,5 @@
 import { isAssignmentTargetMet } from "./adminDashboardStats";
+import { getAssignmentSupportUnitCount } from "./supportUnitUtils";
 
 export const formatDateLabel = (value) => {
     if (!value) return "-";
@@ -91,6 +92,7 @@ export const buildTrendData = (assignments = []) => {
     const buckets = new Map();
 
     assignments.forEach((assignment) => {
+        const supportUnitCount = getAssignmentSupportUnitCount(assignment);
         collectAssignmentSnapshots(assignment).forEach((snapshot) => {
             const date = new Date(snapshot.date);
             const key = getWeekKey(date);
@@ -99,11 +101,11 @@ export const buildTrendData = (assignments = []) => {
             }
 
             const bucket = buckets.get(key);
-            bucket.total += 1;
+            bucket.total += supportUnitCount;
             if (snapshot.onTrack) {
-                bucket.met += 1;
+                bucket.met += supportUnitCount;
             } else {
-                bucket.support += 1;
+                bucket.support += supportUnitCount;
             }
         });
     });

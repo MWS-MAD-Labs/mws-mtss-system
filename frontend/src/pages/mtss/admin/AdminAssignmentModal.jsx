@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { createMentorAssignment } from "@/services/mtssService";
@@ -32,8 +32,12 @@ const AdminAssignmentModal = ({ open, onClose, students = [], mentors = [], onAs
     const [notes, setNotes] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
-    const studentIds = useMemo(() => students.map((student) => student.id || student._id), [students]);
-    const disableSubmit = studentIds.length < 2 || !mentorId || submitting;
+    const studentIds = useMemo(
+        () => Array.from(new Set(students.map((student) => student.baseStudentId || student._id || student.id).filter(Boolean))),
+        [students],
+    );
+    const focusRequired = !focusInput.trim();
+    const disableSubmit = studentIds.length < 2 || !mentorId || focusRequired || submitting;
 
     useEffect(() => {
         if (!availableMentors?.length) {
@@ -46,15 +50,23 @@ const AdminAssignmentModal = ({ open, onClose, students = [], mentors = [], onAs
         }
     }, [availableMentors, mentorId]);
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-        if (disableSubmit) return;
-        setSubmitting(true);
-        try {
-            const focusAreas = focusInput
-                ? focusInput.split(",").map((item) => item.trim()).filter(Boolean)
-                : ["Targeted Support"];
-            await createMentorAssignment({
+        const handleSubmit = async (event) => {
+            event.preventDefault();
+            if (disableSubmit) return;
+            setSubmitting(true);
+            try {
+                const focusAreas = focusInput
+                    ? focusInput.split(",").map((item) => item.trim()).filter(Boolean)
+                    : [];
+                if (!focusAreas.length) {
+                    toast({
+                        title: "Focus area required",
+                        description: "Add at least one focus area, such as Math, English, Behavior, or Attendance.",
+                        variant: "destructive",
+                    });
+                    return;
+                }
+                await createMentorAssignment({
                 mentorId,
                 studentIds,
                 tier,
@@ -136,14 +148,18 @@ const AdminAssignmentModal = ({ open, onClose, students = [], mentors = [], onAs
                     </div>
 
                     <label className="space-y-2 text-sm font-semibold text-foreground dark:text-white">
-                        <span>Focus areas (comma separated)</span>
-                        <input
-                            value={focusInput}
-                            onChange={(event) => setFocusInput(event.target.value)}
-                            placeholder="Fluency boost, SEL routines"
-                            className="w-full rounded-2xl border border-border/60 bg-white/80 dark:bg-white/10 px-4 py-3"
-                        />
-                    </label>
+                            <span>Focus areas (comma separated) <span className="text-rose-500">Required</span></span>
+                            <input
+                                value={focusInput}
+                                onChange={(event) => setFocusInput(event.target.value)}
+                                placeholder="Math, English, Behavior, Attendance"
+                                required
+                                className="w-full rounded-2xl border border-border/60 bg-white/80 dark:bg-white/10 px-4 py-3"
+                            />
+                            <span className="block text-xs font-normal text-muted-foreground">
+                                Use a subject or focus area so mentor ownership stays clear.
+                            </span>
+                        </label>
 
                     <label className="space-y-2 text-sm font-semibold text-foreground dark:text-white">
                         <span>Notes</span>

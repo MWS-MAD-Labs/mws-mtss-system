@@ -69,12 +69,21 @@ const EditInterventionPanel = memo(({
     };
 
     const isValid = validateInterventionForm(formState);
+    const contextItems = useMemo(() => [
+        { label: "Subject", value: editingPlan?.subject || editingPlan?.focusLabel || "Focused Support" },
+        { label: "Owner", value: editingPlan?.owner || "Unassigned" },
+        { label: "Goal", value: editingPlan?.goal || "Not set" },
+        { label: "Baseline", value: editingPlan?.baseline || "Not set" },
+        { label: "Target", value: editingPlan?.target || "Not set" },
+        { label: "Last Progress", value: editingPlan?.lastProgressUpdate || "No progress yet" },
+        { label: "Status", value: editingPlan?.status || "Active" },
+    ], [editingPlan]);
 
     if (!editingPlan?.assignmentId) {
         return (
             <section className="mtss-theme relative overflow-hidden rounded-[36px] border border-white/50 dark:border-white/10 bg-white/75 dark:bg-slate-900/50 shadow-[0_30px_90px_rgba(15,23,42,0.18)] p-6 sm:p-8 space-y-5 backdrop-blur-2xl">
                 <header className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-50/80 border border-amber-200/60 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-amber-700">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-50/80 dark:bg-amber-900/30 border border-amber-200/60 dark:border-amber-700/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-amber-700 dark:text-amber-300">
                         <ShieldAlert className="w-4 h-4" />
                         Edit Workspace
                     </div>
@@ -119,10 +128,25 @@ const EditInterventionPanel = memo(({
                     <p className="text-sm text-slate-600 dark:text-slate-200 max-w-2xl">
                         This workspace is dedicated for plan updates only, separate from create flow to avoid confusion.
                     </p>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/60 bg-cyan-50/80 px-3 py-1 text-xs font-semibold text-cyan-700 dark:border-cyan-500/40 dark:bg-cyan-900/30 dark:text-cyan-200">
-                        Editing: {editingPlan?.studentName || "Student"} {editingPlan?.focusLabel ? `(${editingPlan.focusLabel})` : ""}
-                    </div>
-                </header>
+                        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/60 bg-cyan-50/80 px-3 py-1 text-xs font-semibold text-cyan-700 dark:border-cyan-500/40 dark:bg-cyan-900/30 dark:text-cyan-200">
+                            Editing: {editingPlan?.studentName || "Student"} {editingPlan?.focusLabel ? `(${editingPlan.focusLabel})` : ""}
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            {contextItems.map((item) => (
+                                <div
+                                    key={item.label}
+                                    className="rounded-2xl border border-cyan-200/70 bg-white/80 px-3 py-3 shadow-sm dark:border-cyan-500/25 dark:bg-white/5"
+                                >
+                                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-700/70 dark:text-cyan-200/70">
+                                        {item.label}
+                                    </p>
+                                    <p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-900 dark:text-white" title={item.value}>
+                                        {item.value}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </header>
 
                 <form className="space-y-5" onSubmit={onSubmit}>
                     <InterventionFormFields

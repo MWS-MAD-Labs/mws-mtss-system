@@ -78,7 +78,7 @@ export const FilterBar = ({ activeTier, setActiveTier, query, setQuery }) => (
             <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400" />
             <input
                 type="text"
-                placeholder="Search kids or boost type..."
+                placeholder="Search students or boost type..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-xs sm:text-sm bg-white/50 dark:bg-white/[0.07] backdrop-blur-md border border-white/60 dark:border-white/[0.12] text-slate-800 dark:text-white focus:ring-2 focus:ring-primary/40 focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition-all"
@@ -91,7 +91,7 @@ export const RosterHeader = ({ visible, total }) => (
     <div className="flex items-center justify-between gap-2 sm:gap-3" data-aos="fade-up" data-aos-delay="60">
         <div className="min-w-0">
             <p className="uppercase text-[9px] sm:text-xs text-muted-foreground tracking-[0.3em] sm:tracking-[0.4em]">Crew Roster</p>
-            <h2 className="text-base sm:text-2xl font-bold text-slate-900 dark:text-white truncate">Kids on your radar today</h2>
+            <h2 className="text-base sm:text-2xl font-bold text-slate-900 dark:text-white truncate">Students on your radar today</h2>
         </div>
         <div className="text-[10px] sm:text-sm text-muted-foreground whitespace-nowrap flex-shrink-0">
             <strong>{visible}</strong>/{total}
@@ -107,11 +107,11 @@ export const LoadMore = ({ visible, total, onLoadMore }) => (
                 onClick={onLoadMore}
                 className="px-4 py-2 rounded-full bg-white/80 dark:bg-white/10 border border-primary/30 text-sm font-semibold text-primary shadow-sm hover:-translate-y-0.5 transition"
             >
-                Load 10 more kids ({visible}/{total})
+                Load 10 more students ({visible}/{total})
             </button>
         ) : (
             <span className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-200 border border-emerald-200/70 dark:border-emerald-500/30">
-                All kids loaded
+                All students loaded
             </span>
         )}
     </div>

@@ -13,7 +13,15 @@ const formatMessageTime = (value) => {
     return TIME_FORMATTER.format(parsed);
 };
 
-const ChatMessageItem = React.memo(({ message, onWidgetAction }) => {
+const ChatMessageItem = React.memo(({
+    message,
+    onWidgetAction,
+    onMessageFeedback,
+    onRegenerate,
+    onPromptSuggestion,
+    regeneratePrompt,
+    isRegenerating
+}) => {
     const isUser = message.role === 'user';
 
     return (
@@ -23,6 +31,11 @@ const ChatMessageItem = React.memo(({ message, onWidgetAction }) => {
                     message={message}
                     isUser={isUser}
                     onWidgetAction={onWidgetAction}
+                    onMessageFeedback={onMessageFeedback}
+                    onRegenerate={onRegenerate}
+                    onPromptSuggestion={onPromptSuggestion}
+                    regeneratePrompt={regeneratePrompt}
+                    isRegenerating={isRegenerating}
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 px-2">
                     {formatMessageTime(message.timestamp)}
@@ -33,6 +46,11 @@ const ChatMessageItem = React.memo(({ message, onWidgetAction }) => {
 }, (previousProps, nextProps) => (
     previousProps.message === nextProps.message
     && previousProps.onWidgetAction === nextProps.onWidgetAction
+    && previousProps.onMessageFeedback === nextProps.onMessageFeedback
+    && previousProps.onRegenerate === nextProps.onRegenerate
+    && previousProps.onPromptSuggestion === nextProps.onPromptSuggestion
+    && previousProps.regeneratePrompt === nextProps.regeneratePrompt
+    && previousProps.isRegenerating === nextProps.isRegenerating
 ));
 
 ChatMessageItem.displayName = 'ChatMessageItem';

@@ -5,10 +5,13 @@ import { TierPill, ProgressBadge } from "../../components/StatusPills";
 const AdminStudentsRoster = ({
     pilotGuide = null,
     visibleStudents,
+    activeSubjectLabel = "",
     filteredCount,
+    filteredRowCount,
     selectedCount,
     mentorCount,
     onResetSelection,
+    onClearFilters,
     onOpenAssign,
     disableAssignment,
     selectedIds,
@@ -28,10 +31,12 @@ const AdminStudentsRoster = ({
             <div className="space-y-1" data-aos="fade-right" data-aos-delay="150">
                 <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Roster</p>
                 <h3 className="text-2xl font-black text-foreground dark:text-white bg-gradient-to-r from-[#0ea5e9] via-[#8b5cf6] to-[#ec4899] bg-clip-text text-transparent">
-                    All students in MTSS
+                    MTSS support units
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-xl">
-                    Highlight tiers, next updates, and progress streaks so principals can triage faster.
+                    {activeSubjectLabel
+                        ? `Showing ${activeSubjectLabel} support only, so chips, owner, and update dates match the selected subject.`
+                        : "Each row is one student; multi-subject support units open in Details with their own chip, progress, and update dates."}
                 </p>
             </div>
             {!isReadOnly && (
@@ -75,18 +80,39 @@ const AdminStudentsRoster = ({
                 </div>
             )}
         </div>
-        <StudentsTable
-            students={visibleStudents}
-            TierPill={TierPill}
-            ProgressBadge={ProgressBadge}
-            showActions={!isReadOnly}
-            pilotHintAction={pilotGuide?.studentAction || null}
-            onView={onViewStudent}
-            onUpdate={isReadOnly ? undefined : onUpdateStudent}
-            selectable={!isReadOnly}
-            selectedIds={isReadOnly ? [] : selectedIds}
-            onSelect={isReadOnly ? undefined : onToggleSelect}
-        />
+        {visibleStudents.length > 0 ? (
+            <StudentsTable
+                students={visibleStudents}
+                TierPill={TierPill}
+                ProgressBadge={ProgressBadge}
+                showActions={!isReadOnly}
+                pilotHintAction={pilotGuide?.studentAction || null}
+                onView={onViewStudent}
+                onUpdate={isReadOnly ? undefined : onUpdateStudent}
+                selectable={!isReadOnly}
+                selectedIds={isReadOnly ? [] : selectedIds}
+                onSelect={isReadOnly ? undefined : onToggleSelect}
+            />
+        ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/80 p-8 text-center dark:border-white/15 dark:bg-white/5">
+                <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-500 shadow-sm dark:bg-white/10 dark:text-white/70">
+                    <Users className="h-5 w-5" />
+                </div>
+                <h4 className="text-base font-bold text-slate-900 dark:text-white">No support units match the selected filters.</h4>
+                <p className="mx-auto mt-1 max-w-md text-sm text-slate-600 dark:text-white/60">
+                    Try clearing filters or switching subject / focus area, such as Math, English, Behavior, or Attendance.
+                </p>
+                {onClearFilters && (
+                    <button
+                        type="button"
+                        onClick={onClearFilters}
+                        className="mt-4 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-white/90"
+                    >
+                        Clear filters
+                    </button>
+                )}
+            </div>
+        )}
         <div
             ref={loadMoreRef}
             className="mt-6 flex flex-col items-center gap-2 text-xs font-semibold text-muted-foreground"
@@ -94,14 +120,14 @@ const AdminStudentsRoster = ({
             data-aos-delay="200"
         >
             <span>
-                Showing {visibleStudents.length} of {filteredCount} students
+                Showing {visibleStudents.length} of {filteredRowCount ?? filteredCount} student rows across {filteredCount} support units
             </span>
             {hasMoreStudents ? (
                 <span className="px-3 py-1 rounded-full border border-white/50 dark:border-white/20 bg-white/70 dark:bg-white/5 text-[0.7rem] uppercase tracking-[0.3em]">
                     Scroll to load more
                 </span>
             ) : (
-                <span className="px-3 py-1 rounded-full border border-emerald-200/50 bg-emerald-50 text-emerald-500 text-[0.7rem] uppercase tracking-[0.3em]">
+                <span className="px-3 py-1 rounded-full border border-emerald-200/50 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 dark:text-emerald-400 text-[0.7rem] uppercase tracking-[0.3em]">
                     All caught up
                 </span>
             )}

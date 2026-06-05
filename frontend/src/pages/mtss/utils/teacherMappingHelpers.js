@@ -56,6 +56,7 @@ export const inferNextUpdate = (assignment) => {
     const sourceDate = assignment?.checkIns?.slice(-1)[0]?.date || assignment?.startDate;
     if (!sourceDate) return "Awaiting update";
     const date = new Date(sourceDate);
+    if (Number.isNaN(date.getTime())) return "Awaiting update";
     date.setDate(date.getDate() + 7);
-    return formatDate(date);
+    return date.toISOString();
 };

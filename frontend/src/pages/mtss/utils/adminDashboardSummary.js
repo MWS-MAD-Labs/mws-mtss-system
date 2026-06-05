@@ -3,6 +3,12 @@ import { INTERVENTION_TYPES, TIER_LABELS, TIER_PRIORITY, TYPE_LOOKUP } from "./i
 import { resolveTypeKey, normalizeTierCode } from "./interventionNormalize";
 import { ensureStudentInterventions, pickPrimaryIntervention } from "./interventionSelection";
 import { isAssignmentTargetMet } from "./adminDashboardStats";
+import {
+    getAssignmentFocusLabels,
+    getAssignmentStudentKeys,
+    getAssignmentSupportUnitCount,
+    getAssignmentSupportUnitKeys,
+} from "./supportUnitUtils";
 
 const ASSIGNMENT_STATUSES = new Set(["active", "paused", "completed"]);
 
@@ -27,10 +33,10 @@ const isTieredIntervention = (entry = {}) => {
     return tierCode === "tier2" || tierCode === "tier3";
 };
 
-const getAssignmentTypeMeta = (assignment = {}) => {
-    const focusLabel = Array.isArray(assignment.focusAreas)
+const getAssignmentTypeMeta = (assignment = {}, focusOverride = "") => {
+    const focusLabel = focusOverride || (Array.isArray(assignment.focusAreas)
         ? assignment.focusAreas.find(Boolean)
-        : assignment.focusAreas;
+        : assignment.focusAreas);
     const typeKey = resolveTypeKey(focusLabel || assignment.strategyName || assignment.metricLabel);
     const meta = typeKey ? TYPE_LOOKUP.get(typeKey) : null;
 
@@ -89,7 +95,7 @@ export const buildSystemSnapshot = (summary, students = []) => {
     const fallbackTotal = students.length;
     const tierBreakdown = summary?.tierBreakdown?.length
         ? summary.tierBreakdown
-        : [{ label: "Tier 1", count: fallbackTotal, description: `${fallbackTotal} students` }];
+        : [{ label: "Tier 1", count: fallbackTotal, description: `${fallbackTotal} support units` }];
 
     return {
         totalStudents: summary?.total || fallbackTotal,
@@ -125,7 +131,7 @@ export const buildSummaryFromStudents = (students = []) => {
         .map(([label, count]) => ({
             label,
             count,
-            description: `${count} students`,
+            description: `${count} support units`,
         }))
         .sort((left, right) => (TIER_PRIORITY[normalizeTierCode(left.label)] || 99) - (TIER_PRIORITY[normalizeTierCode(right.label)] || 99));
 
@@ -145,20 +151,23 @@ export const buildSuccessByType = (assignments = []) => {
     const grouped = {};
 
     getTrackedAssignments(assignments).forEach((assignment) => {
-        const { label } = getAssignmentTypeMeta(assignment);
-        const bucket = grouped[label] || { total: 0, success: 0 };
-        bucket.total += 1;
-        if (isAssignmentTargetMet(assignment)) {
-            bucket.success += 1;
-        }
-        grouped[label] = bucket;
+        const unitCountPerFocus = Math.max(getAssignmentStudentKeys(assignment).length, 1);
+        getAssignmentFocusLabels(assignment).forEach((focus) => {
+            const { label } = getAssignmentTypeMeta(assignment, focus);
+            const bucket = grouped[label] || { total: 0, success: 0 };
+            bucket.total += unitCountPerFocus;
+            if (isAssignmentTargetMet(assignment)) {
+                bucket.success += unitCountPerFocus;
+            }
+            grouped[label] = bucket;
+        });
     });
 
     return Object.entries(grouped)
         .map(([label, value], index) => ({
             label,
             value: value.total ? Math.round((value.success / value.total) * 100) : 0,
-            detail: `${value.success}/${value.total} plans on track or completed`,
+            detail: `${value.success}/${value.total} support units on track or completed`,
             gradient: gradients[index % gradients.length],
         }))
         .sort((left, right) => right.value - left.value);
@@ -167,8 +176,9 @@ export const buildSuccessByType = (assignments = []) => {
 export const buildStrategyHighlights = (assignments = []) => {
     const counts = {};
     getTrackedAssignments(assignments).forEach((assignment) => {
-        (assignment.focusAreas || []).forEach((area) => {
-            counts[area] = (counts[area] || 0) + 1;
+        const unitCount = Math.max(getAssignmentStudentKeys(assignment).length, 1);
+        getAssignmentFocusLabels(assignment).forEach((area) => {
+            counts[area] = (counts[area] || 0) + unitCount;
         });
     });
 
@@ -177,35 +187,37 @@ export const buildStrategyHighlights = (assignments = []) => {
         .slice(0, 4)
         .map(([label, count]) => ({
             label,
-            value: `${count} active`,
+            value: `${count} active units`,
         }));
 };
 
 export const buildTierMovement = (students = [], assignments = []) => {
     if (!students.length) {
         return [
-            { label: "Improved", detail: "0 students", accent: "text-emerald-500", icon: ArrowUpRight },
-            { label: "Needs Support", detail: "0 students", accent: "text-rose-500", icon: ArrowDownRight },
-            { label: "Stable", detail: "0 students", accent: "text-sky-500", icon: Minus },
+            { label: "Improved", detail: "0 support units", accent: "text-emerald-500", icon: ArrowUpRight },
+            { label: "Needs Support", detail: "0 support units", accent: "text-rose-500", icon: ArrowDownRight },
+            { label: "Stable", detail: "0 support units", accent: "text-sky-500", icon: Minus },
         ];
     }
 
-    const movementByStudent = new Map(
-        students.map((student) => [student.id || student._id, "stable"]),
+    const movementBySupportUnit = new Map(
+        students.map((student) => {
+            const baseId = student.baseStudentId || student._id || student.id;
+            const assignmentId = student.supportUnit?.assignmentId || student.assignmentId || student.id || student._id;
+            return [student.supportUnit ? student.id : `${baseId}:${assignmentId}`, "stable"];
+        }),
     );
 
     getTrackedAssignments(assignments).forEach((assignment) => {
         const signal = getAssignmentProgressSignal(assignment);
-        (assignment.studentIds || []).forEach((student) => {
-            const key = student?._id || student?.id || student;
-            if (!key) return;
-            const previous = movementByStudent.get(key) || "stable";
+        getAssignmentSupportUnitKeys(assignment).forEach((key) => {
+            const previous = movementBySupportUnit.get(key) || "stable";
             if (signal === "needs-support") {
-                movementByStudent.set(key, "needs-support");
+                movementBySupportUnit.set(key, "needs-support");
                 return;
             }
             if (signal === "improved" && previous !== "needs-support") {
-                movementByStudent.set(key, "improved");
+                movementBySupportUnit.set(key, "improved");
             }
         });
     });
@@ -214,7 +226,7 @@ export const buildTierMovement = (students = [], assignments = []) => {
     let needsSupport = 0;
     let stable = 0;
 
-    movementByStudent.forEach((value) => {
+    movementBySupportUnit.forEach((value) => {
         if (value === "improved") {
             improved += 1;
         } else if (value === "needs-support") {
@@ -225,9 +237,9 @@ export const buildTierMovement = (students = [], assignments = []) => {
     });
 
     return [
-        { label: "Improved", detail: `${improved} students`, accent: "text-emerald-500", icon: ArrowUpRight },
-        { label: "Needs Support", detail: `${needsSupport} students`, accent: "text-rose-500", icon: ArrowDownRight },
-        { label: "Stable", detail: `${stable} students`, accent: "text-sky-500", icon: Minus },
+        { label: "Improved", detail: `${improved} support units`, accent: "text-emerald-500", icon: ArrowUpRight },
+        { label: "Needs Support", detail: `${needsSupport} support units`, accent: "text-rose-500", icon: ArrowDownRight },
+        { label: "Stable", detail: `${stable} support units`, accent: "text-sky-500", icon: Minus },
     ];
 };
 
@@ -235,51 +247,56 @@ export const buildAnalyticsSummary = (assignments = []) => {
     const trackedAssignments = getTrackedAssignments(assignments);
     const recentCutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
     let recentUpdates = 0;
-    const studentsWithProgress = new Set();
-    const recentlyUpdatedStudents = new Set();
+    const supportUnitsWithProgress = new Set();
+    const recentlyUpdatedSupportUnits = new Set();
+    const activeSupportUnitCount = trackedAssignments.reduce(
+        (total, assignment) => total + getAssignmentSupportUnitCount(assignment),
+        0,
+    );
 
     trackedAssignments.forEach((assignment) => {
-        const studentKeys = (assignment.studentIds || [])
-            .map((student) => student?._id || student?.id || student)
-            .filter(Boolean);
+        const supportUnitKeys = getAssignmentSupportUnitKeys(assignment);
 
         (assignment.checkIns || []).forEach((checkIn) => {
             if (checkIn?.date) {
-                studentKeys.forEach((key) => studentsWithProgress.add(String(key)));
+                supportUnitKeys.forEach((key) => supportUnitsWithProgress.add(String(key)));
                 if (new Date(checkIn.date).getTime() >= recentCutoff) {
-                    recentUpdates += 1;
-                    studentKeys.forEach((key) => recentlyUpdatedStudents.add(String(key)));
+                    recentUpdates += supportUnitKeys.length;
+                    supportUnitKeys.forEach((key) => recentlyUpdatedSupportUnits.add(String(key)));
                 }
             }
         });
     });
 
-    const goalHits = trackedAssignments.filter(isAssignmentTargetMet).length;
+    const goalHits = trackedAssignments.reduce(
+        (total, assignment) => total + (isAssignmentTargetMet(assignment) ? getAssignmentSupportUnitCount(assignment) : 0),
+        0,
+    );
 
     return [
         {
-            key: "active-plans",
-            label: "Active plans",
-            value: trackedAssignments.length,
-            helper: trackedAssignments.length ? "Tier 2 / Tier 3 plans in scope" : "No active plans in this segment",
+            key: "active-support-units",
+            label: "Active support units",
+            value: activeSupportUnitCount,
+            helper: activeSupportUnitCount ? "Student + subject pairings in scope" : "No active support units in this segment",
         },
         {
-            key: "students-with-progress",
-            label: "Students with progress",
-            value: studentsWithProgress.size,
-            helper: studentsWithProgress.size ? "Students with at least one recorded update" : "No progress updates recorded yet",
+            key: "support-units-with-progress",
+            label: "Support units with progress",
+            value: supportUnitsWithProgress.size,
+            helper: supportUnitsWithProgress.size ? "Student-subject units with at least one recorded update" : "No progress updates recorded yet",
         },
         {
             key: "recent-updates",
             label: "Updates in last 30 days",
             value: recentUpdates,
-            helper: recentUpdates ? `${recentlyUpdatedStudents.size} students updated recently` : "No recent progress captured",
+            helper: recentUpdates ? `${recentlyUpdatedSupportUnits.size} support units updated recently` : "No recent progress captured",
         },
         {
             key: "goals-met",
             label: "Goals met",
             value: goalHits,
-            helper: goalHits ? "Assignments already meeting target" : "No plans have hit the target yet",
+            helper: goalHits ? "Support units already meeting target" : "No support units have hit the target yet",
         },
     ];
 };
@@ -288,7 +305,7 @@ export const buildAnalyticsNarrative = (students = [], assignments = []) => {
     const trackedAssignments = getTrackedAssignments(assignments);
     if (!trackedAssignments.length) {
         return {
-            title: "All visible students are currently on universal support",
+            title: "All visible support units are currently on universal support",
             body: "No Tier 2 or Tier 3 intervention plans are active in this view, so intervention analytics stay empty until a support plan is created.",
         };
     }
@@ -298,11 +315,17 @@ export const buildAnalyticsNarrative = (students = [], assignments = []) => {
         .sort((left, right) => (TIER_PRIORITY[right] || 0) - (TIER_PRIORITY[left] || 0))[0] || "tier1";
 
     const uniqueTypes = new Set(
-        trackedAssignments.map((assignment) => getAssignmentTypeMeta(assignment).label),
+        trackedAssignments.flatMap((assignment) =>
+            getAssignmentFocusLabels(assignment).map((focus) => getAssignmentTypeMeta(assignment, focus).label),
+        ),
+    );
+    const activeSupportUnitCount = trackedAssignments.reduce(
+        (total, assignment) => total + getAssignmentSupportUnitCount(assignment),
+        0,
     );
 
     return {
-        title: `${trackedAssignments.length} active intervention plans across ${uniqueTypes.size} focus areas`,
+        title: `${activeSupportUnitCount} active support units across ${uniqueTypes.size} focus areas`,
         body: `The current segment includes intervention activity up to ${TIER_LABELS[highestTier] || "Tier 1"}, with analytics based on live progress updates and assignment outcomes.`,
     };
 };

@@ -45,12 +45,17 @@ const GrowthJourneyHistory = ({ intervention, config, glassStyles }) => {
                                 <p className="text-[10px] sm:text-sm text-foreground dark:text-white line-clamp-3 leading-snug">
                                     {entry.summary || entry.notes || entry.observation || "Check-in recorded"}
                                 </p>
-                                {(entry.nextSteps || entry.nextStep) && (
-                                    <p className="mt-1 text-[9px] sm:text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
-                                        Next steps: {entry.nextSteps || entry.nextStep}
-                                    </p>
-                                )}
-                                {entry.celebration && (
+                                    {(entry.nextSteps || entry.nextStep) && (
+                                        <p className="mt-1 text-[9px] sm:text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                                            Next steps: {entry.nextSteps || entry.nextStep}
+                                        </p>
+                                    )}
+                                    {entry.lateReason && (
+                                        <p className="mt-1 text-[9px] sm:text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                                            Late reason: {entry.lateReason}
+                                        </p>
+                                    )}
+                                    {entry.celebration && (
                                     <div className="mt-1 sm:mt-2 text-[9px] sm:text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full inline-flex items-center gap-0.5 sm:gap-1">
                                         {entry.celebration}
                                     </div>

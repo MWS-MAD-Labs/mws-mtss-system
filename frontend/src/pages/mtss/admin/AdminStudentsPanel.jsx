@@ -5,6 +5,38 @@ import AdminStudentsFilters from "./components/AdminStudentsFilters";
 import AdminStudentsRoster from "./components/AdminStudentsRoster";
 
 const BATCH_SIZE = 10;
+const getStudentRowId = (student = {}) =>
+    student.id || student._id || student.supportUnit?.assignmentId || student.baseStudentId || student.slug || student.name;
+
+const getBaseStudentId = (student = {}) =>
+    student.baseStudentId || student._id || student.id;
+
+const groupStudentsForRoster = (students = []) => {
+    const grouped = new Map();
+
+    students.forEach((student) => {
+        const baseId = getBaseStudentId(student) || getStudentRowId(student);
+        if (!baseId) return;
+        if (!grouped.has(baseId)) {
+            grouped.set(baseId, {
+                ...student,
+                supportUnitRows: [],
+                assignmentOptions: [],
+                interventions: [],
+            });
+        }
+
+        const entry = grouped.get(baseId);
+        entry.supportUnitRows.push(student);
+        entry.assignmentOptions.push(...(Array.isArray(student.assignmentOptions) ? student.assignmentOptions : []));
+        entry.interventions.push(...(Array.isArray(student.interventions) ? student.interventions : []));
+    });
+
+    return Array.from(grouped.values()).map((student) => ({
+        ...student,
+        supportUnitCount: student.supportUnitRows.length,
+    }));
+};
 
 const AdminStudentsPanel = ({
     pilotGuide = null,
@@ -16,6 +48,7 @@ const AdminStudentsPanel = ({
     mentorOptions,
     filteredStudents,
     allStudents,
+    onClearFilters,
     visibleCount = BATCH_SIZE,
     onVisibleCountChange,
     onViewStudent,
@@ -32,8 +65,21 @@ const AdminStudentsPanel = ({
 
     const selectedStudents = useMemo(() => {
         if (!selectedIds?.length) return [];
-        return allStudents.filter((student) => selectedIds.includes(student.id || student._id));
+        const selectedByBaseId = new Map();
+        allStudents.forEach((student) => {
+            if (!selectedIds.includes(getStudentRowId(student))) return;
+            const baseId = getBaseStudentId(student);
+            if (baseId && !selectedByBaseId.has(baseId)) {
+                selectedByBaseId.set(baseId, student);
+            }
+        });
+        return Array.from(selectedByBaseId.values());
     }, [selectedIds, allStudents]);
+
+    const groupedStudents = useMemo(
+        () => groupStudentsForRoster(filteredStudents),
+        [filteredStudents],
+    );
 
     useEffect(() => {
         if (!loadMoreRef.current) return;
@@ -43,8 +89,8 @@ const AdminStudentsPanel = ({
                 const [entry] = entries;
                 if (entry.isIntersecting) {
                     onVisibleCountChange?.((prev) => {
-                        if (prev >= filteredStudents.length) return prev;
-                        return Math.min(filteredStudents.length, prev + BATCH_SIZE);
+                        if (prev >= groupedStudents.length) return prev;
+                        return Math.min(groupedStudents.length, prev + BATCH_SIZE);
                     });
                 }
             },
@@ -52,13 +98,20 @@ const AdminStudentsPanel = ({
         );
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, [filteredStudents.length, onVisibleCountChange]);
+    }, [groupedStudents.length, onVisibleCountChange]);
 
     const visibleStudents = useMemo(
-        () => filteredStudents.slice(0, Math.min(visibleCount, filteredStudents.length)),
-        [filteredStudents, visibleCount],
+        () => groupedStudents.slice(0, Math.min(visibleCount, groupedStudents.length)),
+        [groupedStudents, visibleCount],
     );
-    const hasMoreStudents = visibleStudents.length < filteredStudents.length;
+    const activeSubjectLabel = useMemo(() => {
+        if (!filters?.type || filters.type === "all") return "";
+        const match = (typeOptions || []).find((option) => (
+            typeof option === "object" ? option.value === filters.type : option === filters.type
+        ));
+        return typeof match === "object" ? match.label : match || filters.type;
+    }, [filters?.type, typeOptions]);
+    const hasMoreStudents = visibleStudents.length < groupedStudents.length;
     const disableAssignment = selectedStudents.length < 2 || mentorDirectory.length === 0;
 
     return (
@@ -88,10 +141,13 @@ const AdminStudentsPanel = ({
             <AdminStudentsRoster
                 pilotGuide={pilotGuide}
                 visibleStudents={visibleStudents}
+                activeSubjectLabel={activeSubjectLabel}
                 filteredCount={filteredStudents.length}
+                filteredRowCount={groupedStudents.length}
                 selectedCount={selectedStudents.length}
                 mentorCount={mentorDirectory.length}
                 onResetSelection={onResetSelection}
+                onClearFilters={onClearFilters}
                 onOpenAssign={() => setAssignmentOpen(true)}
                 disableAssignment={disableAssignment}
                 selectedIds={selectedIds}

@@ -10,7 +10,11 @@ const MessageStream = React.memo(({
     renderedMessages,
     visibleStartIndex,
     isTyping,
-    onWidgetAction
+    onWidgetAction,
+    onMessageFeedback,
+    onRegenerate,
+    onPromptSuggestion,
+    isRegenerating
 }) => (
     <>
         {canLoadOlderMessages && (
@@ -32,13 +36,25 @@ const MessageStream = React.memo(({
                 </div>
             }
         >
-            {renderedMessages.map((message, index) => (
-                <ChatMessageItem
-                    key={message.id || `message-${visibleStartIndex + index}`}
-                    message={message}
-                    onWidgetAction={onWidgetAction}
-                />
-            ))}
+            {renderedMessages.map((message, index) => {
+                const previousUserMessage = [...renderedMessages]
+                    .slice(0, index)
+                    .reverse()
+                    .find((item) => item?.role === 'user');
+                const regeneratePrompt = message.prompt || previousUserMessage?.content || '';
+                return (
+                    <ChatMessageItem
+                        key={message.id || `message-${visibleStartIndex + index}`}
+                        message={message}
+                        onWidgetAction={onWidgetAction}
+                        onMessageFeedback={onMessageFeedback}
+                        onRegenerate={onRegenerate}
+                        onPromptSuggestion={onPromptSuggestion}
+                        regeneratePrompt={regeneratePrompt}
+                        isRegenerating={isRegenerating}
+                    />
+                );
+            })}
         </Suspense>
 
         {isTyping && (
@@ -63,6 +79,10 @@ const MessageStream = React.memo(({
     && previousProps.visibleStartIndex === nextProps.visibleStartIndex
     && previousProps.isTyping === nextProps.isTyping
     && previousProps.onWidgetAction === nextProps.onWidgetAction
+    && previousProps.onMessageFeedback === nextProps.onMessageFeedback
+    && previousProps.onRegenerate === nextProps.onRegenerate
+    && previousProps.onPromptSuggestion === nextProps.onPromptSuggestion
+    && previousProps.isRegenerating === nextProps.isRegenerating
     && previousProps.onLoadOlderMessages === nextProps.onLoadOlderMessages
 ));
 

@@ -17,6 +17,10 @@ import {
 import { buildChartSeries, buildHistory } from "./teacherMappingCharts";
 import { mergeRosterWithAssignments } from "./teacherRosterMerge";
 
+const normalizeText = (value = "") => String(value || "").trim();
+const buildPairingLabel = (studentName = "", subject = "", mentorName = "") =>
+    [studentName, subject, mentorName].map(normalizeText).filter(Boolean).join(" - ");
+
 export const mapAssignmentsToStudents = (assignments = [], teacherName = "MTSS Mentor") => {
     const map = new Map();
     const assignmentOptionsMap = new Map();
@@ -51,10 +55,19 @@ export const mapAssignmentsToStudents = (assignments = [], teacherName = "MTSS M
         const monitoringFrequency = assignment.monitoringFrequency || assignment.monitorFrequency || null;
         const monitoringMethod = assignment.monitoringMethod || assignment.monitorMethod || null;
         const assignmentId = assignment._id?.toString?.() || assignment.id || assignment.assignmentId || null;
+        const mentorName = assignment.mentorId?.name || assignment.mentorName || teacherName;
 
         (assignment.studentIds || []).forEach((student) => {
             const id = student?._id?.toString?.() || student?.id || student;
             if (!id) return;
+            const studentPairings = Array.isArray(assignment.pairings)
+                ? assignment.pairings.filter((pairing = {}) => {
+                    const pairingStudentId = pairing.studentId?.toString?.() || pairing.studentId || null;
+                    return !pairingStudentId || pairingStudentId === id;
+                })
+                : [];
+            const primaryPairing = studentPairings[0] || null;
+            const pairingLabel = primaryPairing?.pairingLabel || buildPairingLabel(student?.name || "Student", focus, mentorName);
             if (assignmentId) {
                 const existingOptions = assignmentOptionsMap.get(id) || [];
                 if (!existingOptions.some((option) => option.assignmentId === assignmentId)) {
@@ -71,6 +84,7 @@ export const mapAssignmentsToStudents = (assignments = [], teacherName = "MTSS M
                             statusLabel: STATUS_LABELS[statusKey] || "On Track",
                             startDate: assignment.startDate || null,
                             endDate: assignment.endDate || null,
+                            nextUpdate,
                             metricLabel: assignment.metricLabel || null,
                             strategyId: assignment.strategyId?.toString?.() || assignment.strategyId || null,
                             strategyName,
@@ -83,13 +97,24 @@ export const mapAssignmentsToStudents = (assignments = [], teacherName = "MTSS M
                             goal: goalDescription,
                             goals: Array.isArray(assignment.goals) ? assignment.goals : [],
                             history,
+                            chart,
                             weeklyFocusOverview: assignment.weeklyFocusOverview || null,
                             baselineScore: assignment.baselineScore || null,
                             targetScore: assignment.targetScore || null,
                             notes: assignment.notes || null,
-                            mentor: assignment.mentorId?.name || null,
+                            mentor: mentorName,
                             mentorNickname: assignment.mentorId?.username || null,
-                            mentorEmail: assignment.mentorId?.email || null,
+                            mentorEmail: assignment.mentorId?.email || assignment.mentorEmail || null,
+                            pairings: studentPairings.length ? studentPairings : assignment.pairings || [],
+                            pairingLabel,
+                            studentSubjectMentorPair: primaryPairing || {
+                                studentId: id,
+                                studentName: student?.name || "Student",
+                                subject: focus,
+                                focusArea: focus,
+                                mentorName,
+                                pairingLabel,
+                            },
                             createdAt: assignment.createdAt || assignment.startDate || null,
                             updatedAt: assignment.updatedAt || null,
                             lastUpdateAt,
@@ -116,6 +141,7 @@ export const mapAssignmentsToStudents = (assignments = [], teacherName = "MTSS M
                                 assignment.lastPlanUpdatedBy?.username ||
                                 assignment.createdBy?.name ||
                                 assignment.mentorId?.name ||
+                                assignment.mentorName ||
                                 null,
                         },
                     ]);
@@ -138,7 +164,16 @@ export const mapAssignmentsToStudents = (assignments = [], teacherName = "MTSS M
                 statusKey,
                 profile: {
                     teacher: teacherName,
-                    mentor: assignment.mentorId?.name || teacherName,
+                    mentor: mentorName,
+                    pairingLabel,
+                    studentSubjectMentorPair: primaryPairing || {
+                        studentId: id,
+                        studentName: student?.name || "Student",
+                        subject: focus,
+                        focusArea: focus,
+                        mentorName,
+                        pairingLabel,
+                    },
                     type: focus,
                     strategy: strategyName || assignment.focusAreas?.join(", ") || `Support focus - ${tier}`,
                     started: formatDate(assignment.startDate),

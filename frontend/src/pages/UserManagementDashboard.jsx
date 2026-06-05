@@ -361,14 +361,14 @@ const UserManagementDashboard = memo(() => {
                                         <h3 className="text-xl font-semibold mb-4">Management Insights</h3>
                                         <div className="space-y-4">
                                             <div className="p-4 bg-blue/10 rounded-lg">
-                                                <h4 className="font-semibold text-blue-700 mb-2">Leadership Structure</h4>
+                                                <h4 className="font-semibold text-blue-700 dark:text-blue-400 mb-2">Leadership Structure</h4>
                                                 <p className="text-sm text-muted-foreground">
                                                     Directorate members oversee {organizationStructure?.stats?.totalUsers || 0} total users
                                                     across {organizationStructure?.stats?.byDepartment?.length || 0} departments.
                                                 </p>
                                             </div>
                                             <div className="p-4 bg-green/10 rounded-lg">
-                                                <h4 className="font-semibold text-green-700 mb-2">Teaching Staff</h4>
+                                                <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">Teaching Staff</h4>
                                                 <p className="text-sm text-muted-foreground">
                                                     {organizationStructure?.stats?.byRole?.find(r => r._id === 'teacher')?.count || 0} teachers
                                                     and {organizationStructure?.stats?.byRole?.find(r => r._id === 'se_teacher')?.count || 0} SE teachers

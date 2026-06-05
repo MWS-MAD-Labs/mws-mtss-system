@@ -657,7 +657,7 @@ export const buildOperationPayloadFromForm = (operation = '', formValues = {}, s
 
 export const detectDockOperationIntent = (message = '', { role = '', routeFamily = 'general' } = {}) => {
     if (!canExecuteAutomationRole(role)) return null;
-    if (!['mtss', 'support_hub', 'emotional_dashboard', 'general'].includes(String(routeFamily || 'general'))) {
+    if (!['mtss', 'assistant_workspace', 'support_hub', 'emotional_dashboard', 'general'].includes(String(routeFamily || 'general'))) {
         return null;
     }
 

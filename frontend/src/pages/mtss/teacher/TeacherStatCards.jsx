@@ -2,19 +2,19 @@ import React, { memo, useEffect, useRef, useState, useCallback } from "react";
 
 const CARD_STYLES = [
     {
-        gradient: "from-[#6366f1] via-[#818cf8] to-[#a78bfa]",
+        gradient: "from-[var(--mtss-stat-indigo-from)] via-[var(--mtss-stat-indigo-via)] to-[var(--mtss-stat-indigo-to)]",
         iconBg: "bg-white/20",
         glow: "shadow-[0_16px_40px_rgba(99,102,241,0.3)]",
         darkGlow: "dark:shadow-[0_16px_40px_rgba(99,102,241,0.2)]",
     },
     {
-        gradient: "from-[#f59e0b] via-[#f97316] to-[#ef4444]",
+        gradient: "from-[var(--mtss-stat-amber-from)] via-[var(--mtss-stat-amber-via)] to-[var(--mtss-stat-amber-to)]",
         iconBg: "bg-white/20",
         glow: "shadow-[0_16px_40px_rgba(249,115,22,0.3)]",
         darkGlow: "dark:shadow-[0_16px_40px_rgba(249,115,22,0.2)]",
     },
     {
-        gradient: "from-[#10b981] via-[#14b8a6] to-[#06b6d4]",
+        gradient: "from-[var(--mtss-stat-teal-from)] via-[var(--mtss-stat-teal-via)] to-[var(--mtss-stat-teal-to)]",
         iconBg: "bg-white/20",
         glow: "shadow-[0_16px_40px_rgba(20,184,166,0.3)]",
         darkGlow: "dark:shadow-[0_16px_40px_rgba(20,184,166,0.2)]",

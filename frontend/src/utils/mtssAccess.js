@@ -2,11 +2,11 @@ const NATIVE_MTSS_ADMIN_ROLES = new Set(["directorate", "superadmin", "admin"]);
 const NATIVE_MTSS_TEACHER_ROLES = new Set(["teacher", "se_teacher"]);
 const DEFAULT_MTSS_LEADER_EMAILS = new Set([
     "aria@millennia21.id",
+    "faisal@millennia21.id",
     "kholida@millennia21.id",
     "latifah@millennia21.id",
 ]);
 const DEFAULT_MTSS_OBSERVER_EMAILS = new Set([
-    "faisal@millennia21.id",
     "mahrukh@millennia21.id",
 ]);
 

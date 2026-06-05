@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import socketService from "@/services/socketService";
 import { fetchPilotFeedbackSessions } from "@/services/mtssService";
+import { PILOT_FEEDBACK_ADMIN_EMAILS } from "../utils/pilotFeedbackAccess";
+
+const normalizeEmail = (value = "") => String(value || "").trim().toLowerCase();
+
+const shouldHidePilotSession = (session = {}) => {
+    const testerEmail = normalizeEmail(session?.tester?.email);
+    return Boolean(testerEmail && PILOT_FEEDBACK_ADMIN_EMAILS.has(testerEmail));
+};
 
 const sortSessions = (items = []) =>
     [...items].sort((left, right) => {
@@ -13,7 +21,7 @@ const sortSessions = (items = []) =>
 const mergeSessions = (existing = [], incoming = []) => {
     const map = new Map(existing.map((item) => [item.sessionKey, item]));
     incoming.forEach((item) => {
-        if (!item?.sessionKey) return;
+        if (!item?.sessionKey || shouldHidePilotSession(item)) return;
         map.set(item.sessionKey, {
             ...(map.get(item.sessionKey) || {}),
             ...item,
@@ -66,22 +74,33 @@ const usePilotFeedbackDashboardData = ({ enabled = true } = {}) => {
     const [lastLiveEventAt, setLastLiveEventAt] = useState(null);
     const dashboardUserId = user?.id || user?._id;
 
-    const refresh = useCallback(async () => {
+    const refresh = useCallback(async ({ background = false } = {}) => {
         if (!enabled) {
             setLoading(false);
             return;
         }
 
-        setLoading(true);
-        setError(null);
+        if (!background) {
+            setLoading(true);
+            setError(null);
+        }
+
         try {
-            const response = await fetchPilotFeedbackSessions({ limit: 300 });
-            setSessions(sortSessions(response?.sessions || []));
+            const response = await fetchPilotFeedbackSessions(
+                { limit: 300 },
+                background ? { skipGlobalLoading: true } : undefined,
+            );
+            setSessions(sortSessions((response?.sessions || []).filter((session) => !shouldHidePilotSession(session))));
             setServerStats(response?.stats || null);
+            if (background) {
+                setError(null);
+            }
         } catch (err) {
             setError(err?.response?.data?.message || err?.message || "Failed to load pilot feedback sessions.");
         } finally {
-            setLoading(false);
+            if (!background) {
+                setLoading(false);
+            }
         }
     }, [enabled]);
 
@@ -93,7 +112,7 @@ const usePilotFeedbackDashboardData = ({ enabled = true } = {}) => {
         if (!enabled) return undefined;
 
         const intervalId = window.setInterval(() => {
-            refresh();
+            refresh({ background: true });
         }, 15000);
 
         return () => window.clearInterval(intervalId);

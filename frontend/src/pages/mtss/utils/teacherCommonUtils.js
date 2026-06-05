@@ -5,9 +5,9 @@
 import { ClipboardCheck, ShieldCheck, Star } from "lucide-react";
 
 export const STAT_TEMPLATE = [
-    { key: "active", label: "Active Interventions", shortLabel: "Active", sub: "Kids in a boost bubble", icon: ShieldCheck, accent: "from-[#0ea5e9]/90 via-[#818cf8]/85 to-[#34d399]/80" },
+    { key: "active", label: "Active Interventions", shortLabel: "Active", sub: "Students in a boost bubble", icon: ShieldCheck, accent: "from-[#0ea5e9]/90 via-[#818cf8]/85 to-[#34d399]/80" },
     { key: "due", label: "Updates Due", shortLabel: "Updates", sub: "Check-ins waiting today", icon: ClipboardCheck, accent: "from-[#fcd34d]/90 via-[#fb923c]/85 to-[#38bdf8]/80" },
-    { key: "success", label: "Success Rate", shortLabel: "Success", sub: "Kids hitting targets", icon: Star, accent: "from-[#22d3ee]/90 via-[#a855f7]/85 to-[#f472b6]/80" },
+    { key: "success", label: "Success Rate", shortLabel: "Success", sub: "Students hitting targets", icon: Star, accent: "from-[#22d3ee]/90 via-[#a855f7]/85 to-[#f472b6]/80" },
 ];
 
 export const formatDate = (value, options = { month: "short", day: "numeric" }) => {

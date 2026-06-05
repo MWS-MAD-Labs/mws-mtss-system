@@ -457,6 +457,7 @@ const WorkforceHumanisticLayer = memo(() => {
         if (routeMatches(pathname, "/emotional-checkin/staff")) return false;
         if (pathname === "/support-hub" || pathname === "/mtss/teacher") return false;
         if (routeMatches(pathname, "/emotional-checkin/teacher-dashboard")) return false;
+        if (routeMatches(pathname, "/notifications/settings")) return false;
         return true;
     }, [normalizedRole, pathname]);
 

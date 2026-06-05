@@ -83,7 +83,9 @@ export const resolveStudentLastUpdate = (student = {}) => {
 export const formatLastUpdateDate = (value) => {
     const timestamp = toTimestamp(value);
     if (!timestamp) return null;
-    return LAST_UPDATE_DATE_FORMATTER.format(new Date(timestamp));
+    const date = new Date(timestamp);
+    if (date.getFullYear() < 2020) return null;
+    return LAST_UPDATE_DATE_FORMATTER.format(date);
 };
 
 export const formatUpdateDateLabel = (value, fallback = null) => {

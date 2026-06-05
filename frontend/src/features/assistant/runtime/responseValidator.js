@@ -53,10 +53,19 @@ const ALLOWED_ROUTES = new Set([
     '/ai-assistant'
 ]);
 
-const toText = (value, max = 220) => String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, max);
+const escapeHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+
+const toText = (value, max = 220) => escapeHtml(
+    String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, max)
+);
 
 const toMultilineText = (value, max = 280) => String(value || '')
     .replace(/&lt;br\s*\/?&gt;/gi, '\n')

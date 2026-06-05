@@ -109,15 +109,23 @@ const AdminMentorAssignPage = () => {
             toast({ title: "Mentor not ready", description: "We could not find mentor data for this assignment.", variant: "destructive" });
             return;
         }
-        if (selectedIds.length < 2) {
-            toast({ title: "Select at least two students", description: "MTSS Tier 2 thrives on tight-knit groups, so add another student.", variant: "destructive" });
+            if (selectedIds.length < 2) {
+                toast({ title: "Select at least two students", description: "MTSS Tier 2 thrives on tight-knit groups, so add another student.", variant: "destructive" });
+                return;
+            }
+        const focusAreas = focusInput ? focusInput.split(",").map((item) => item.trim()).filter(Boolean) : [];
+        if (!focusAreas.length) {
+            toast({
+                title: "Focus area required",
+                description: "Add a subject or focus area, such as Math, English, Behavior, or Attendance.",
+                variant: "destructive",
+            });
             return;
         }
 
-        setSubmitting(true);
-        try {
-            const focusAreas = focusInput ? focusInput.split(",").map((item) => item.trim()).filter(Boolean) : [];
-            await createMentorAssignment({ mentorId: mentor._id, studentIds: selectedIds, tier, focusAreas, notes: notes.trim() });
+            setSubmitting(true);
+            try {
+                await createMentorAssignment({ mentorId: mentor._id, studentIds: selectedIds, tier, focusAreas, notes: notes.trim() });
             toast({ title: "New caseload created", description: `Paired ${mentor.name} with ${selectedIds.length} students.` });
             navigate("/mtss/admin");
         } catch (err) {

@@ -33,17 +33,21 @@ const MentorAssignForm = memo(({
                     ))}
                 </select>
             </label>
-            <label className="space-y-2 text-sm font-semibold text-foreground dark:text-white">
-                <span className="flex items-center justify-between text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
-                    Focus areas <span className="text-[10px] px-2 py-0.5 rounded-full border border-border/40 text-muted-foreground">Optional</span>
-                </span>
-                <input
-                    value={focusInput}
-                    onChange={(event) => onFocusChange(event.target.value)}
-                    placeholder="Fluency boost, SEL routines"
-                    className="w-full rounded-2xl border border-border/50 bg-white/95 dark:bg-white/10 px-4 py-3 focus:ring-2 focus:ring-primary/40 shadow-inner"
-                />
-            </label>
+                <label className="space-y-2 text-sm font-semibold text-foreground dark:text-white">
+                    <span className="flex items-center justify-between text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+                        Focus areas <span className="text-[10px] text-rose-500">Required</span>
+                    </span>
+                    <input
+                        value={focusInput}
+                        onChange={(event) => onFocusChange(event.target.value)}
+                        placeholder="Math, English, Behavior, Attendance"
+                        required
+                        className="w-full rounded-2xl border border-border/50 bg-white/95 dark:bg-white/10 px-4 py-3 focus:ring-2 focus:ring-primary/40 shadow-inner"
+                    />
+                    <span className="block text-xs font-normal text-muted-foreground">
+                        Use a subject or focus area so ownership is clear in the mentor dashboard.
+                    </span>
+                </label>
         </div>
 
         <label className="space-y-2 text-sm font-semibold text-foreground dark:text-white">
@@ -87,13 +91,13 @@ const MentorAssignForm = memo(({
             >
                 Cancel
             </button>
-            <button
-                type="submit"
-                disabled={submitting || selectedIds.length < 2}
-                className={`px-6 py-2.5 rounded-full text-sm font-semibold text-white transition ${
-                    submitting || selectedIds.length < 2
-                        ? "bg-muted cursor-not-allowed opacity-60"
-                        : "bg-gradient-to-r from-[#22d3ee] via-[#3b82f6] to-[#a855f7] shadow-xl hover:-translate-y-0.5"
+                <button
+                    type="submit"
+                    disabled={submitting || selectedIds.length < 2 || !focusInput.trim()}
+                    className={`px-6 py-2.5 rounded-full text-sm font-semibold text-white transition ${
+                        submitting || selectedIds.length < 2 || !focusInput.trim()
+                            ? "bg-muted cursor-not-allowed opacity-60"
+                            : "bg-gradient-to-r from-[#22d3ee] via-[#3b82f6] to-[#a855f7] shadow-xl hover:-translate-y-0.5"
                 }`}
             >
                 {submitting ? "Assigning..." : "Assign Selected"}

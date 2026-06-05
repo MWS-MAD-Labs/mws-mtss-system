@@ -14,7 +14,9 @@ const EvidenceViewer = memo(({ evidence = [] }) => {
     const docEvidence = evidence.filter((ev) => !isImage(ev));
 
     const openLightbox = useCallback(
-        (ev) => {
+        (ev, event) => {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
             const idx = imageEvidence.findIndex((img) => img.url === ev.url);
             setLightbox(idx >= 0 ? idx : 0);
         },
@@ -40,7 +42,8 @@ const EvidenceViewer = memo(({ evidence = [] }) => {
                 {imageEvidence.map((ev, idx) => (
                     <button
                         key={ev.url || idx}
-                        onClick={() => openLightbox(ev)}
+                        type="button"
+                        onClick={(event) => openLightbox(ev, event)}
                         className="w-8 h-8 sm:w-10 sm:h-10 rounded-md overflow-hidden border border-slate-200/60 dark:border-slate-700/40 hover:ring-2 hover:ring-primary/40 transition-all flex-shrink-0"
                     >
                         <img src={ev.url} alt={ev.fileName || "Evidence"} className="w-full h-full object-cover" loading="lazy" />
@@ -58,9 +61,9 @@ const EvidenceViewer = memo(({ evidence = [] }) => {
                         title={downloadingUrl === ev.url ? "Downloading..." : (ev.fileName || "Download")}
                     >
                         {ev.fileType === "application/pdf" ? (
-                            <FileText className="w-3 h-3 text-red-500 flex-shrink-0" />
+                            <FileText className="w-3 h-3 text-red-500 dark:text-red-400 flex-shrink-0" />
                         ) : (
-                            <File className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                            <File className="w-3 h-3 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                         )}
                         <span className="text-[8px] sm:text-[9px] font-medium text-foreground dark:text-white truncate max-w-[60px]">
                             {ev.fileName || "File"}

@@ -54,7 +54,7 @@ export const pilotSteps = [
         routeKey: "hub",
         primaryActionLabel: "Open briefing hub",
         routeGuidance:
-            "The main button keeps you on the pilot hub. Use the route chips only if you want to pre-open the admin dashboard or teacher dashboard in another tab before starting the walkthrough.",
+            "The main button keeps you on the pilot hub. Use the page label badges only if you want to pre-open the admin dashboard or teacher dashboard in another tab before starting the walkthrough.",
         goal: "Understand the pilot rules, how feedback works, and which teacher account should be used for the unit.",
         principalTask:
             "Approach the pilot as both a reviewer and a trainer. Every step should help the principal decide whether the workflow is clear enough to teach back to teachers without product-team assistance.",

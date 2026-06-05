@@ -36,7 +36,7 @@ const MentorAssignHeader = memo(({
             </div>
         </div>
         <p className="text-sm text-slate-600 dark:text-white/70 max-w-2xl">
-            Select at least two students to keep the small-group energy collaborative. Focus areas and notes stay optional so the flow remains light but intentional.
+                Select at least two students and name the subject or focus area so the mentor dashboard shows clear ownership.
         </p>
         <p className="text-xs font-semibold text-slate-500 dark:text-white/60">
             Caseload scope: {mentorSegments.allowedGrades.length ? mentorSegments.allowedGrades.join(", ") : mentor?.unit || "All Grades"}
@@ -55,7 +55,7 @@ const MentorAssignHeader = memo(({
             <div className="rounded-2xl bg-white/80 dark:bg-white/10 border border-white/60 dark:border-white/10 px-4 py-3 shadow-inner">
                 <p className="text-[0.6rem] uppercase tracking-[0.3em] text-slate-500 dark:text-white/60">Focus Area</p>
                 <p className="text-xs font-bold text-slate-700 dark:text-white line-clamp-1">
-                    {focusInput || "Fluency boost, SEL routines"}
+                        {focusInput || "Math, English, Behavior, Attendance"}
                 </p>
             </div>
         </div>

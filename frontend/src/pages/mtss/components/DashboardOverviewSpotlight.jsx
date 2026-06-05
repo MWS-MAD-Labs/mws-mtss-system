@@ -2,27 +2,29 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import DashboardOverviewSpotlightDetails from "./DashboardOverviewSpotlightDetails";
 import DashboardOverviewSpotlightChart from "./DashboardOverviewSpotlightChart";
+import { expandStudentsBySupportUnit } from "../utils/supportUnitUtils";
 
 const DashboardOverviewSpotlight = ({ students, progressData, TierPill }) => {
     const [spotlightIndex, setSpotlightIndex] = useState(0);
+    const supportUnits = useMemo(() => expandStudentsBySupportUnit(students), [students]);
 
     useEffect(() => {
         setSpotlightIndex(0);
-    }, [students.length]);
+    }, [supportUnits.length]);
 
     const setNext = useCallback(() => {
-        setSpotlightIndex((prev) => (students.length ? (prev + 1) % students.length : 0));
-    }, [students.length]);
+        setSpotlightIndex((prev) => (supportUnits.length ? (prev + 1) % supportUnits.length : 0));
+    }, [supportUnits.length]);
 
     const setPrev = useCallback(() => {
         setSpotlightIndex((prev) => {
-            if (!students.length) return 0;
-            return (prev - 1 + students.length) % students.length;
+            if (!supportUnits.length) return 0;
+            return (prev - 1 + supportUnits.length) % supportUnits.length;
         });
-    }, [students.length]);
+    }, [supportUnits.length]);
 
-    const { spotlightStudent, spotlightProfile, progressUnit, spotlightStatus, weekLabel, chartSeries, history } = useMemo(() => {
-        const student = students?.[spotlightIndex] ?? students?.[0] ?? null;
+    const { spotlightStudent, spotlightProfile, progressUnit, spotlightStatus, weekLabel, chartSeries, history, pairingLabel } = useMemo(() => {
+        const student = supportUnits?.[spotlightIndex] ?? supportUnits?.[0] ?? null;
         const profile = student?.profile || {};
         const unit = profile.progressUnit || (student?.type === "Behavior" ? "pts" : student?.type === "Attendance" ? "%" : "wpm");
         const status = profile.target ? Math.round((profile.current / profile.target) * 100) : 0;
@@ -38,6 +40,7 @@ const DashboardOverviewSpotlight = ({ students, progressData, TierPill }) => {
                 ? `Week ${Math.min(currentWeek, totalWeeks)} of ${totalWeeks}`
                 : profile.duration || "Weekly check-in";
         const historyList = profile.history || [];
+        const pairingLabel = student?.supportUnit?.pairingLabel || student?.pairingLabel || profile?.pairingLabel || null;
         return {
             spotlightStudent: student,
             spotlightProfile: profile,
@@ -46,8 +49,9 @@ const DashboardOverviewSpotlight = ({ students, progressData, TierPill }) => {
             weekLabel: label,
             chartSeries: series,
             history: historyList,
+            pairingLabel,
         };
-    }, [students, progressData, spotlightIndex]);
+    }, [supportUnits, progressData, spotlightIndex]);
 
     return (
         <section className="mtss-liquid mtss-card-surface mtss-rainbow-shell p-6 space-y-6 border border-primary/10">
@@ -55,7 +59,7 @@ const DashboardOverviewSpotlight = ({ students, progressData, TierPill }) => {
                 <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-white/10 border border-white/50 text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-600 dark:text-white/80">
-                            Student Spotlight
+                                Support Unit Spotlight
                         </span>
                         <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500/15 via-fuchsia-500/10 to-emerald-500/10 text-[11px] font-semibold text-slate-700 dark:text-white/80 border border-white/40">
                             {weekLabel}
@@ -63,11 +67,13 @@ const DashboardOverviewSpotlight = ({ students, progressData, TierPill }) => {
                     </div>
                     <div>
                         <h2 className="text-2xl md:text-3xl font-black text-foreground dark:text-white">
-                            {spotlightStudent?.name || "Featured Student"}
-                        </h2>
-                        <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-                            Quickly scan assignment context, trends, and recent notes for this student.
-                        </p>
+                                {pairingLabel || (spotlightStudent?.supportUnit?.subject
+                                    ? `${spotlightStudent?.name || "Featured Student"} - ${spotlightStudent.supportUnit.subject}`
+                                    : spotlightStudent?.name || "Featured Student")}
+                            </h2>
+                            <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+                                Quickly scan subject-level ownership, trends, and recent notes for this support unit.
+                            </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
                         <span className="px-3 py-1.5 rounded-full bg-sky-100/80 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
@@ -101,13 +107,13 @@ const DashboardOverviewSpotlight = ({ students, progressData, TierPill }) => {
                             className="flex-1 min-w-0 sm:flex-none sm:min-w-[200px] sm:max-w-xs px-4 py-2 rounded-full bg-white/90 dark:bg-white/10 border border-white/60 dark:border-white/20 text-sm font-semibold text-foreground dark:text-white shadow-sm"
                             value={spotlightStudent?.id || ""}
                             onChange={(e) => {
-                                const idx = students.findIndex((s) => (s.id || s._id) === e.target.value);
+                                const idx = supportUnits.findIndex((s) => (s.id || s._id) === e.target.value);
                                 setSpotlightIndex(idx >= 0 ? idx : 0);
                             }}
                         >
-                            {students.map((student) => (
+                            {supportUnits.map((student) => (
                                 <option key={student.id || student._id} value={student.id || student._id}>
-                                    {student.name}
+                                    {student.supportUnit?.subject ? `${student.name} - ${student.supportUnit.subject}` : student.name}
                                 </option>
                             ))}
                         </select>
@@ -122,7 +128,7 @@ const DashboardOverviewSpotlight = ({ students, progressData, TierPill }) => {
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/75 dark:bg-white/10 border border-white/50 text-xs font-semibold text-foreground dark:text-white shadow-sm">
                             <Sparkles className="w-4 h-4 text-primary" />
-                            {students.length} in roster
+                            {supportUnits.length} support units
                         </span>
                         <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-400/20 via-emerald-400/10 to-cyan-400/15 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200 border border-emerald-200/60 dark:border-emerald-500/30">
                             <Activity className="w-4 h-4" />

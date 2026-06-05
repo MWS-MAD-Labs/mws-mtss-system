@@ -9,4 +9,9 @@ export {
     buildAnalyticsNarrative,
 } from "./adminDashboardSummary";
 export { buildTrendData, formatDateLabel } from "./adminDashboardTrends";
-export { buildMentorSpotlights, buildMentorRoster, buildRecentActivity } from "./adminDashboardMentors";
+export {
+    buildMentorSpotlights,
+    buildMentorRoster,
+    buildMentorSubjectCoverageRows,
+    buildRecentActivity,
+} from "./adminDashboardMentors";

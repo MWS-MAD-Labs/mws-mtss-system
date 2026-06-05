@@ -8,7 +8,7 @@ const AdminMentorsFooter = ({ visibleCount, total }) => (
                 Scroll to load more
             </span>
         ) : (
-            <span className="px-3 py-1 rounded-full border border-emerald-200/60 bg-emerald-50 text-emerald-600 text-[0.65rem] uppercase tracking-[0.3em]">
+            <span className="px-3 py-1 rounded-full border border-emerald-200/60 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[0.65rem] uppercase tracking-[0.3em]">
                 All mentors loaded
             </span>
         )}

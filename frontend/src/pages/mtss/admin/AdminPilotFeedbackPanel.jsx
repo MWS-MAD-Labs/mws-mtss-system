@@ -65,18 +65,54 @@ const bugOptions = [
     { value: "clean", label: "No bugs" },
 ];
 
+const getPrincipalIdentityKey = (session = {}) => {
+    const testerEmail = String(session?.tester?.email || "").trim().toLowerCase();
+    if (testerEmail) {
+        return `email:${testerEmail}`;
+    }
+
+    const testerUserId = String(session?.tester?.userId || "").trim();
+    if (testerUserId) {
+        return `user:${testerUserId}`;
+    }
+
+    const testerName = String(session?.tester?.name || "").trim().toLowerCase();
+    const testerUnit = String(session?.tester?.unit || "").trim().toLowerCase();
+    if (testerName || testerUnit) {
+        return `fallback:${testerName}:${testerUnit}`;
+    }
+
+    return `session:${session?.sessionKey || "unknown-session"}`;
+};
+
+const collapseSessionsByPrincipal = (items = []) => {
+    const seen = new Set();
+
+    return items.filter((session) => {
+        const principalKey = getPrincipalIdentityKey(session);
+        if (seen.has(principalKey)) {
+            return false;
+        }
+
+        seen.add(principalKey);
+        return true;
+    });
+};
+
 const AdminPilotFeedbackPanel = memo(() => {
     const { sessions, stats, loading, error, refresh, lastLiveEventAt } = usePilotFeedbackDashboardData({ enabled: true });
     const [query, setQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [readinessFilter, setReadinessFilter] = useState("all");
     const [bugFilter, setBugFilter] = useState("all");
-    const [selectedSessionKey, setSelectedSessionKey] = useState("");
+    const [selectedPrincipalKey, setSelectedPrincipalKey] = useState("");
+
+    const principalSessions = useMemo(() => collapseSessionsByPrincipal(sessions), [sessions]);
 
     const filteredSessions = useMemo(() => {
         const loweredQuery = query.trim().toLowerCase();
 
-        return sessions.filter((session) => {
+        const matchingSessions = principalSessions.filter((session) => {
             const testerName = String(session?.tester?.name || "").toLowerCase();
             const testerEmail = String(session?.tester?.email || "").toLowerCase();
             const testerUnit = String(session?.tester?.unit || "").toLowerCase();
@@ -94,16 +130,17 @@ const AdminPilotFeedbackPanel = memo(() => {
 
             return matchesQuery && matchesStatus && matchesReadiness && matchesBug;
         });
-    }, [bugFilter, query, readinessFilter, sessions, statusFilter]);
+        return matchingSessions;
+    }, [bugFilter, principalSessions, query, readinessFilter, statusFilter]);
 
     const selectedSession = useMemo(
-        () => filteredSessions.find((entry) => entry.sessionKey === selectedSessionKey) || filteredSessions[0] || null,
-        [filteredSessions, selectedSessionKey],
+        () => filteredSessions.find((entry) => getPrincipalIdentityKey(entry) === selectedPrincipalKey) || filteredSessions[0] || null,
+        [filteredSessions, selectedPrincipalKey],
     );
 
-    const stepCoverage = useMemo(() => buildStepCoverage(sessions), [sessions]);
+    const stepCoverage = useMemo(() => buildStepCoverage(principalSessions), [principalSessions]);
     const readinessTrend = useMemo(() => buildReadinessTrendData(filteredSessions), [filteredSessions]);
-    const readinessDistribution = useMemo(() => buildReadinessDistribution(sessions), [sessions]);
+    const readinessDistribution = useMemo(() => buildReadinessDistribution(principalSessions), [principalSessions]);
     const selectedBugSummary = useMemo(() => buildBugSeveritySummary(selectedSession), [selectedSession]);
 
     const coverageSummary = useMemo(() => ({
@@ -113,14 +150,14 @@ const AdminPilotFeedbackPanel = memo(() => {
 
     useEffect(() => {
         if (!filteredSessions.length) {
-            setSelectedSessionKey("");
+            setSelectedPrincipalKey("");
             return;
         }
 
-        if (!filteredSessions.some((entry) => entry.sessionKey === selectedSessionKey)) {
-            setSelectedSessionKey(filteredSessions[0].sessionKey);
+        if (!filteredSessions.some((entry) => getPrincipalIdentityKey(entry) === selectedPrincipalKey)) {
+            setSelectedPrincipalKey(getPrincipalIdentityKey(filteredSessions[0]));
         }
-    }, [filteredSessions, selectedSessionKey]);
+    }, [filteredSessions, selectedPrincipalKey]);
 
     const selectedStatusLabel = STATUS_LABELS[selectedSession?.status] || "In progress";
     const selectedReadinessLabel = getSessionReadinessLabel(selectedSession);
@@ -160,11 +197,11 @@ const AdminPilotFeedbackPanel = memo(() => {
                 <div className="space-y-6 xl:sticky xl:top-6">
                     <PilotPanelSection
                         eyebrow="Session navigator"
-                        title="Pick a principal session"
-                        description="Search, filter, and open the session you want to review."
+                        title="Pick the latest principal snapshot"
+                        description="Search, filter, and open the newest pilot feedback for each principal while older sessions stay preserved in history."
                         action={(
                             <Badge variant="outline" className="rounded-full border-slate-300 bg-white/85 dark:border-white/15 dark:bg-white/10">
-                                {filteredSessions.length}/{sessions.length}
+                                {filteredSessions.length}/{principalSessions.length}
                             </Badge>
                         )}
                     >
@@ -202,10 +239,10 @@ const AdminPilotFeedbackPanel = memo(() => {
                                 <div className="space-y-3 max-h-[64rem] overflow-y-auto pr-1">
                                     {filteredSessions.map((session) => (
                                         <PilotSessionListItem
-                                            key={session.sessionKey}
+                                            key={getPrincipalIdentityKey(session)}
                                             session={session}
-                                            active={session.sessionKey === selectedSession?.sessionKey}
-                                            onSelect={() => setSelectedSessionKey(session.sessionKey)}
+                                            active={getPrincipalIdentityKey(session) === getPrincipalIdentityKey(selectedSession)}
+                                            onSelect={() => setSelectedPrincipalKey(getPrincipalIdentityKey(session))}
                                             readinessLabel={getSessionReadinessLabel(session)}
                                             statusLabel={STATUS_LABELS[session?.status] || "In progress"}
                                             formattedUpdatedAt={formatDateTime(session?.updatedAt || session?.clientUpdatedAt)}

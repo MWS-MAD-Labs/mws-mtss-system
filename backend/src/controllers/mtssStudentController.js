@@ -18,6 +18,10 @@ const {
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit
 } = require('../utils/mtssAccess');
+const {
+    buildAssignmentPairings,
+    getMentorAssignmentFocusLabels
+} = require('../utils/mentorAssignmentPairingUtils');
 
 const TIER_PRIORITY = { 'Tier 1': 1, 'Tier 2': 2, 'Tier 3': 3 };
 
@@ -362,7 +366,7 @@ const buildFilter = (query = {}, skipGradeClassFilter = false) => {
     }
 
     if (query.search) {
-        const regex = new RegExp(query.search.trim(), 'i');
+        const regex = new RegExp(escapeRegex(query.search.trim()), 'i');
         filter.$or = [{ name: regex }, { nickname: regex }, { email: regex }];
     }
 
@@ -900,14 +904,11 @@ const getStudent = async (req, res) => {
         }
 
         // Build intervention details with progress data for each assignment
-        const interventionDetails = assignments.map(assignment => {
-            const focusArea = normalizeFocusArea(
-                assignment.focusAreas?.[0] ||
-                assignment.strategyName ||
-                assignment.monitoringMethod
-            );
-            const typeKey = resolveInterventionTypeKey(focusArea);
-            const meta = INTERVENTION_TYPE_META.get(typeKey) || INTERVENTION_TYPE_META.get('SEL');
+        const interventionDetails = assignments.flatMap(assignment => {
+            const focusLabels = getMentorAssignmentFocusLabels(assignment);
+            const scopedFocusLabels = focusLabels.length
+                ? focusLabels
+                : [assignment.strategyName || assignment.monitoringMethod || 'SEL'];
             const checkIns = assignment.checkIns || [];
             const lastCheckIn = checkIns[checkIns.length - 1];
             const firstCheckIn = checkIns[0];
@@ -954,9 +955,10 @@ const getStudent = async (req, res) => {
                 score: checkIn.value,
                 unit: checkIn.unit || assignment.targetScore?.unit || assignment.baselineScore?.unit || assignment.metricLabel || null,
                 performed: checkIn.performed !== false,
-                skipReason: checkIn.skipReason || null,
-                skipReasonNote: checkIn.skipReasonNote || null,
-                celebration: checkIn.celebration,
+	                skipReason: checkIn.skipReason || null,
+	                skipReasonNote: checkIn.skipReasonNote || null,
+                    lateReason: checkIn.lateReason || null,
+	                celebration: checkIn.celebration,
                 evidence: checkIn.evidence || [],
                 // Qualitative mode fields (Kindergarten)
                 signal: checkIn.signal || null,
@@ -968,59 +970,77 @@ const getStudent = async (req, res) => {
                 weeklyFocus: checkIn.weeklyFocus || null
             }));
 
-            return {
-                id: assignment._id,
-                type: typeKey,
-                label: meta?.label || focusArea || 'SEL',
-                focusArea: focusArea || meta?.label || null,
-                tier: assignment.tier,
-                tierLabel: assignment.tier === 'tier3' ? 'Tier 3' : assignment.tier === 'tier2' ? 'Tier 2' : 'Tier 1',
-                status: assignment.status,
-                strategyName: assignment.strategyName || focusArea || null,
-                strategyId: assignment.strategyId || null,
-                duration: assignment.duration || null,
-                monitoringMethod: assignment.monitoringMethod || null,
-                monitoringFrequency: assignment.monitoringFrequency || null,
-                customFrequencyDays: assignment.customFrequencyDays || [],
-                customFrequencyNote: assignment.customFrequencyNote || null,
-                mentor: assignment.mentorId?.name || 'MTSS Mentor',
-                mentorNickname: assignment.mentorId?.username || null,
-                mentorUsername: assignment.mentorId?.username || null,
-                mentorGender: assignment.mentorId?.gender || null,
-                mentorEmail: assignment.mentorId?.email || null,
-                startDate: assignment.startDate,
-                endDate: assignment.endDate,
-                createdAt: assignment.createdAt || assignment.startDate,
-                updatedAt: assignment.updatedAt || assignment.startDate,
-                baseline: assignment.baselineScore?.value ?? firstCheckIn?.value ?? null,
-                current: lastCheckIn?.value ?? null,
-                target: assignment.targetScore?.value ?? null,
-                progressUnit: assignment.metricLabel || 'score',
-                progress: (
-                    assignment.targetScore?.value && lastCheckIn?.value
-                        ? Math.min(100, Math.round((lastCheckIn.value / assignment.targetScore.value) * 100))
-                        : 0
-                ),
-                checkInsCount: checkIns.length,
-                chart,
-                history,
-                goals: assignment.goals || [],
-                notes: assignment.notes,
-                mode: 'quantitative',
-                planChangeLog: (assignment.planChangeLog || []).map((entry = {}) => ({
-                    ...entry,
-                    changedByName: entry.changedBy?.name || entry.changedBy?.username || null,
-                    changedByEmail: entry.changedBy?.email || null
-                })),
-                latestSignal,
-                latestWeeklyFocus,
-                latestTags,
-                latestContext,
-                latestObservation,
-                latestResponse,
-                latestNextStep,
-                signalDistribution
-            };
+            return scopedFocusLabels.map((focusLabel) => {
+                const focusArea = normalizeFocusArea(
+                    focusLabel ||
+                    assignment.strategyName ||
+                    assignment.monitoringMethod
+                );
+                const typeKey = resolveInterventionTypeKey(focusArea);
+                const meta = INTERVENTION_TYPE_META.get(typeKey) || INTERVENTION_TYPE_META.get('SEL');
+                const pairing = buildAssignmentPairings({
+                    ...assignment,
+                    focusAreas: [focusLabel || focusArea],
+                    studentIds: [student]
+                })[0] || null;
+
+                return {
+                    id: `${assignment._id}-${typeKey}`,
+                    assignmentId: assignment._id,
+                    type: typeKey,
+                    label: meta?.label || focusArea || 'SEL',
+                    focusArea: focusArea || meta?.label || null,
+                    tier: assignment.tier,
+                    tierLabel: assignment.tier === 'tier3' ? 'Tier 3' : assignment.tier === 'tier2' ? 'Tier 2' : 'Tier 1',
+                    status: assignment.status,
+                    strategyName: assignment.strategyName || focusArea || null,
+                    strategyId: assignment.strategyId || null,
+                    duration: assignment.duration || null,
+                    monitoringMethod: assignment.monitoringMethod || null,
+                    monitoringFrequency: assignment.monitoringFrequency || null,
+                    customFrequencyDays: assignment.customFrequencyDays || [],
+                    customFrequencyNote: assignment.customFrequencyNote || null,
+                    mentor: assignment.mentorId?.name || 'MTSS Mentor',
+                    pairingLabel: pairing?.pairingLabel || `${student.name} - ${focusArea || meta?.label || 'SEL'} - ${assignment.mentorId?.name || 'MTSS Mentor'}`,
+                    studentSubjectMentorPair: pairing,
+                    mentorNickname: assignment.mentorId?.username || null,
+                    mentorUsername: assignment.mentorId?.username || null,
+                    mentorGender: assignment.mentorId?.gender || null,
+                    mentorEmail: assignment.mentorId?.email || null,
+                    startDate: assignment.startDate,
+                    endDate: assignment.endDate,
+                    createdAt: assignment.createdAt || assignment.startDate,
+                    updatedAt: assignment.updatedAt || assignment.startDate,
+                    baseline: assignment.baselineScore?.value ?? firstCheckIn?.value ?? null,
+                    current: lastCheckIn?.value ?? null,
+                    target: assignment.targetScore?.value ?? null,
+                    progressUnit: assignment.metricLabel || 'score',
+                    progress: (
+                        assignment.targetScore?.value && lastCheckIn?.value
+                            ? Math.min(100, Math.round((lastCheckIn.value / assignment.targetScore.value) * 100))
+                            : 0
+                    ),
+                    checkInsCount: checkIns.length,
+                    chart,
+                    history,
+                    goals: assignment.goals || [],
+                    notes: assignment.notes,
+                    mode: 'quantitative',
+                    planChangeLog: (assignment.planChangeLog || []).map((entry = {}) => ({
+                        ...entry,
+                        changedByName: entry.changedBy?.name || entry.changedBy?.username || null,
+                        changedByEmail: entry.changedBy?.email || null
+                    })),
+                    latestSignal,
+                    latestWeeklyFocus,
+                    latestTags,
+                    latestContext,
+                    latestObservation,
+                    latestResponse,
+                    latestNextStep,
+                    signalDistribution
+                };
+            });
         });
 
         // Add interventionDetails to payload
@@ -1091,11 +1111,12 @@ const submitKindergartenMoodCheckin = async (req, res) => {
         const resolvedSource = sanitizeSubmissionSource(source, fallbackSource);
         const now = new Date();
         const todayKey = toDateKey(now);
-        const currentEntries = toSafeArray(student.kindergartenMoodCheckIns);
-        const existingIndex = currentEntries.findIndex((entry = {}) => (
-            toDateKey(entry.date) === todayKey &&
-            sanitizeSubmissionSource(entry.source, 'student') === resolvedSource
-        ));
+
+        // Build start/end of today for the atomic range query
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(startOfDay);
+        endOfDay.setDate(endOfDay.getDate() + 1);
 
         const nextEntry = {
             date: now,
@@ -1107,21 +1128,44 @@ const submitKindergartenMoodCheckin = async (req, res) => {
             submittedByUserId: req.user?.id || req.user?._id
         };
 
-        if (existingIndex >= 0) {
-            const existing = currentEntries[existingIndex]?.toObject?.() || currentEntries[existingIndex];
-            currentEntries[existingIndex] = { ...existing, ...nextEntry };
-        } else {
-            currentEntries.push(nextEntry);
+        // Atomically replace an existing same-source entry for today (arrayFilter update).
+        // If no entry matched, modifiedCount === 0 and we push a new one.
+        const updateResult = await MTSSStudent.updateOne(
+            { _id: student._id },
+            { $set: { 'kindergartenMoodCheckIns.$[entry]': nextEntry } },
+            {
+                arrayFilters: [
+                    {
+                        'entry.date': { $gte: startOfDay, $lt: endOfDay },
+                        'entry.source': resolvedSource
+                    }
+                ]
+            }
+        );
+
+        if (updateResult.modifiedCount === 0) {
+            // No existing entry for today: push new entry and trim retention atomically
+            await MTSSStudent.updateOne(
+                { _id: student._id },
+                {
+                    $push: {
+                        kindergartenMoodCheckIns: {
+                            $each: [nextEntry],
+                            $slice: -KINDERGARTEN_MOOD_RETENTION
+                        }
+                    }
+                }
+            );
         }
 
-        student.kindergartenMoodCheckIns = currentEntries.slice(-KINDERGARTEN_MOOD_RETENTION);
-        await student.save();
+        // Refetch to get the committed state for the portal payload
+        const updatedStudent = await MTSSStudent.findById(student._id).lean();
 
         const assignments = await MentorAssignment.find({ studentIds: student._id })
             .select('focusAreas strategyName monitoringMethod checkIns mode updatedAt')
             .lean();
 
-        const kindergartenPortal = buildKindergartenPortalPayload({ student: student.toObject(), assignments });
+        const kindergartenPortal = buildKindergartenPortalPayload({ student: updatedStudent, assignments });
 
         sendSuccess(res, 'Kindergarten mood check-in saved', {
             moodCheckin: kindergartenPortal.moodCheckin,

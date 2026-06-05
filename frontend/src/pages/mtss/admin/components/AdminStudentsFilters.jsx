@@ -44,7 +44,7 @@ const AdminStudentsFilters = ({
                         Smart filters
                     </div>
                     <p className="text-sm text-muted-foreground dark:text-white/60">
-                        Blend grade, tier, and mentor filters to spot caseload gaps instantly.
+                        Blend grade, tier, subject, focus area, and mentor filters to spot caseload gaps instantly.
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600 dark:text-white/70" data-aos="fade-left">
@@ -69,7 +69,7 @@ const AdminStudentsFilters = ({
                     variant: "fade-up",
                     delay: 120,
                 })}
-                {renderSelect(filters.type, typeOptions, "type", (option) => (option?.value === "all" ? "All Types" : option?.label || option), {
+                {renderSelect(filters.type, typeOptions, "type", (option) => (option?.value === "all" ? "All Subjects / Focus Areas" : option?.label || option), {
                     variant: "fade-up-left",
                     delay: 160,
                 })}

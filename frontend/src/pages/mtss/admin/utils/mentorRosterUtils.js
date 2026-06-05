@@ -66,20 +66,21 @@ export const buildMentorRoster = (mentorRoster = [], mentorDirectory = [], stude
     const statsMap = new Map(
         mentorRoster.map((mentor) => [
             makeMentorKey(mentor),
-            {
-                interventionStudents: mentor.activeStudents || mentor.students || 0,
-                successRate: mentor.successRate || "0%",
-            },
-        ]),
-    );
+                {
+                    interventionStudents: mentor.activeStudents || mentor.students || 0,
+                    successRate: mentor.successRate || "0%",
+                    coverage: Array.isArray(mentor.coverage) ? mentor.coverage : [],
+                },
+            ]),
+        );
 
     const rosterMap = new Map();
 
     teacherMentors.forEach((mentor) => {
-        const key = makeMentorKey(mentor);
-        const stats = statsMap.get(key) || { interventionStudents: 0, successRate: "0%" };
-        const classOwnedStudents = countAutomaticOwnedStudents(mentor, students);
-        rosterMap.set(key, {
+            const key = makeMentorKey(mentor);
+            const stats = statsMap.get(key) || { interventionStudents: 0, successRate: "0%", coverage: [] };
+            const classOwnedStudents = countAutomaticOwnedStudents(mentor, students);
+            rosterMap.set(key, {
             _id: mentor._id || mentor.id || null,
             name: mentor.name,
             role: mentor.jobPosition || mentor.role || "Teacher",
@@ -87,11 +88,12 @@ export const buildMentorRoster = (mentorRoster = [], mentorDirectory = [], stude
             classes: Array.isArray(mentor.classes) ? mentor.classes : [],
             activeStudents: classOwnedStudents,
             classOwnedStudents,
-            interventionStudents: stats.interventionStudents,
-            manualAssignedStudents: stats.interventionStudents,
-            successRate: stats.successRate,
+                interventionStudents: stats.interventionStudents,
+                manualAssignedStudents: stats.interventionStudents,
+                successRate: stats.successRate,
+                coverage: stats.coverage,
+            });
         });
-    });
 
     mentorRoster.forEach((mentor) => {
         const key = makeMentorKey(mentor);
@@ -105,10 +107,11 @@ export const buildMentorRoster = (mentorRoster = [], mentorDirectory = [], stude
             activeStudents: existing?.activeStudents || 0,
             classOwnedStudents: existing?.classOwnedStudents || 0,
             interventionStudents: mentor.activeStudents || mentor.students || existing?.interventionStudents || 0,
-            manualAssignedStudents: mentor.activeStudents || mentor.students || existing?.manualAssignedStudents || 0,
-            successRate: mentor.successRate || existing?.successRate || "0%",
+                manualAssignedStudents: mentor.activeStudents || mentor.students || existing?.manualAssignedStudents || 0,
+                successRate: mentor.successRate || existing?.successRate || "0%",
+                coverage: Array.isArray(mentor.coverage) ? mentor.coverage : existing?.coverage || [],
+            });
         });
-    });
 
     return Array.from(rosterMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 };

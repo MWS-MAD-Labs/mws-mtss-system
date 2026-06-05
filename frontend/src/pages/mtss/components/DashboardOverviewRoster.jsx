@@ -11,13 +11,19 @@ const DashboardOverviewRoster = ({ students, TierPill, ProgressBadge, onView, on
         setVisibleCount(BATCH);
     }, [students.length]);
 
+    const rosterStudents = useMemo(() => (Array.isArray(students) ? students : []), [students]);
+
+    useEffect(() => {
+        setVisibleCount(BATCH);
+    }, [rosterStudents.length]);
+
     const visibleStudents = useMemo(
-        () => (students || []).slice(0, Math.min(visibleCount, students.length)),
-        [students, visibleCount],
+        () => rosterStudents.slice(0, Math.min(visibleCount, rosterStudents.length)),
+        [rosterStudents, visibleCount],
     );
 
-    const hasMore = visibleStudents.length < students.length;
-    const progressPercent = students.length ? Math.round((visibleStudents.length / students.length) * 100) : 0;
+    const hasMore = visibleStudents.length < rosterStudents.length;
+    const progressPercent = rosterStudents.length ? Math.round((visibleStudents.length / rosterStudents.length) * 100) : 0;
 
     return (
         <section className="relative rounded-[28px] sm:rounded-[32px] overflow-hidden border border-white/40 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
@@ -35,12 +41,12 @@ const DashboardOverviewRoster = ({ students, TierPill, ProgressBadge, onView, on
                             </p>
                         </div>
                         <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-800 dark:text-white mt-1">
-                            Kids on your radar today
+                            Students on your radar today
                         </h2>
                     </div>
                     <div className="flex items-center gap-2 mt-2 sm:mt-0">
                         <span className="px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200/50 dark:border-indigo-500/20 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
-                            {students.length} students
+                            {rosterStudents.length} students
                         </span>
                     </div>
                 </div>
@@ -73,20 +79,20 @@ const DashboardOverviewRoster = ({ students, TierPill, ProgressBadge, onView, on
                             />
                         </div>
                         <p className="text-[10px] sm:text-xs text-center text-slate-400 dark:text-slate-500 mt-1.5">
-                            {visibleStudents.length} of {students.length} shown
+                            {visibleStudents.length} of {rosterStudents.length} students shown
                         </p>
                     </div>
 
                     {hasMore ? (
                         <button
                             type="button"
-                            onClick={() => setVisibleCount((prev) => Math.min(students.length, prev + BATCH))}
+                                    onClick={() => setVisibleCount((prev) => Math.min(rosterStudents.length, prev + BATCH))}
                             className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-semibold shadow-[0_8px_25px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 transition-all duration-200"
                         >
                             <span>Show more</span>
                             <ChevronDown className="w-4 h-4 transition-transform group-hover:translate-y-0.5" />
                         </button>
-                    ) : students.length > 0 ? (
+                    ) : rosterStudents.length > 0 ? (
                         <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-500/20 text-sm font-medium">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             All students loaded

@@ -21,10 +21,10 @@ import { sanitizeInput } from "@/lib/ratingUtils";
 import { Button } from "@/components/ui/button";
 
 const moodBadgeMap = {
-    positive: { label: "You're doing great", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    balanced: { label: "Steady and okay", className: "bg-sky-100 text-sky-700 border-sky-200" },
-    challenging: { label: "Needs gentle support", className: "bg-amber-100 text-amber-700 border-amber-200" },
-    depleted: { label: "Take recovery time", className: "bg-rose-100 text-rose-700 border-rose-200" }
+    positive: { label: "You're doing great", className: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/50" },
+    balanced: { label: "Steady and okay", className: "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-700/50" },
+    challenging: { label: "Needs gentle support", className: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700/50" },
+    depleted: { label: "Take recovery time", className: "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-700/50" }
 };
 
 const weatherIconMap = {

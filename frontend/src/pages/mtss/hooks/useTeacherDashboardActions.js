@@ -2,6 +2,9 @@ import { useCallback } from "react";
 import { updateMentorAssignment, uploadEvidenceAttachments } from "@/services/mtssService";
 import { canUserSubmitProgressForAssignment } from "../utils/editPlanAccess";
 
+const getTodayInputValue = () => new Date().toISOString().slice(0, 10);
+const isLateProgressDate = (dateValue) => Boolean(dateValue && dateValue < getTodayInputValue());
+
 const useTeacherDashboardActions = ({
     students,
     progressForm,
@@ -10,6 +13,7 @@ const useTeacherDashboardActions = ({
     setSubmittingProgress,
     toast,
     setSavingQuickUpdate,
+    setUploadProgress,
     onCloseQuickUpdate,
 }) => {
     const handleProgressSubmitForm = useCallback(
@@ -19,6 +23,25 @@ const useTeacherDashboardActions = ({
                 toast({
                     title: "Complete the required fields",
                     description: "Student, date, and score are required to submit progress.",
+                    variant: "destructive",
+                });
+                return;
+            }
+                if (
+                    progressForm.performed !== "yes" &&
+                    (!progressForm.skipReason || (progressForm.skipReason === "other" && !progressForm.skipReasonNote?.trim()))
+                ) {
+                toast({
+                    title: "Skip reason required",
+                    description: "Choose why this intervention was skipped before saving the update.",
+                    variant: "destructive",
+                });
+                    return;
+                }
+            if (isLateProgressDate(progressForm.date) && !progressForm.lateReason?.trim()) {
+                toast({
+                    title: "Late reason required",
+                    description: "Add why this progress update is being submitted after the support date.",
                     variant: "destructive",
                 });
                 return;
@@ -65,10 +88,11 @@ const useTeacherDashboardActions = ({
                             nextSteps: trimmedNotes || undefined,
                             value: Number.isFinite(parsedScoreValue) ? parsedScoreValue : undefined,
                             unit: progressForm.scoreUnit,
-                            performed: progressForm.performed === "yes",
-                            skipReason: progressForm.performed !== "yes" ? (progressForm.skipReason || undefined) : undefined,
-                            skipReasonNote: progressForm.performed !== "yes" && progressForm.skipReason === "other" ? (progressForm.skipReasonNote || undefined) : undefined,
-                            evidence: evidencePayload?.length ? evidencePayload : undefined,
+                                performed: progressForm.performed === "yes",
+                                skipReason: progressForm.performed !== "yes" ? (progressForm.skipReason || undefined) : undefined,
+                                skipReasonNote: progressForm.performed !== "yes" && progressForm.skipReason === "other" ? (progressForm.skipReasonNote || undefined) : undefined,
+                                lateReason: isLateProgressDate(progressForm.date) ? (progressForm.lateReason?.trim() || undefined) : undefined,
+                                evidence: evidencePayload?.length ? evidencePayload : undefined,
                         },
                     ],
                 });
@@ -108,6 +132,25 @@ const useTeacherDashboardActions = ({
             const selectedOption = Array.isArray(student?.assignmentOptions)
                 ? student.assignmentOptions.find((option) => option?.assignmentId === assignmentId)
                 : null;
+                if (
+                    formState.performed !== "yes" &&
+                    (!formState.skipReason || (formState.skipReason === "other" && !formState.skipReasonNote?.trim()))
+                ) {
+                toast({
+                    title: "Skip reason required",
+                    description: "Choose why this intervention was skipped before saving the update.",
+                    variant: "destructive",
+                });
+                    return;
+                }
+            if (isLateProgressDate(formState.date) && !formState.lateReason?.trim()) {
+                toast({
+                    title: "Late reason required",
+                    description: "Add why this progress update is being submitted after the support date.",
+                    variant: "destructive",
+                });
+                return;
+            }
             if (!canUserSubmitProgressForAssignment(selectedOption)) {
                 toast({
                     title: "Progress permission denied",
@@ -117,8 +160,9 @@ const useTeacherDashboardActions = ({
                 return;
             }
             setSavingQuickUpdate(true);
+            setUploadProgress?.(0);
             try {
-                const evidencePayload = await uploadEvidenceAttachments(evidenceFiles);
+                const evidencePayload = await uploadEvidenceAttachments(evidenceFiles, setUploadProgress);
 
                 const trimmedNotes = formState.notes?.trim() || "";
                 const parsedScoreValue = formState.scoreValue !== "" ? Number(formState.scoreValue) : undefined;
@@ -131,10 +175,11 @@ const useTeacherDashboardActions = ({
                             nextSteps: trimmedNotes || undefined,
                             value: Number.isFinite(parsedScoreValue) ? parsedScoreValue : undefined,
                             unit: formState.scoreUnit,
-                            performed: formState.performed === "yes",
-                            skipReason: formState.performed !== "yes" ? (formState.skipReason || undefined) : undefined,
-                            skipReasonNote: formState.performed !== "yes" && formState.skipReason === "other" ? (formState.skipReasonNote || undefined) : undefined,
-                            celebration: formState.badge || undefined,
+                                performed: formState.performed === "yes",
+                                skipReason: formState.performed !== "yes" ? (formState.skipReason || undefined) : undefined,
+                                skipReasonNote: formState.performed !== "yes" && formState.skipReason === "other" ? (formState.skipReasonNote || undefined) : undefined,
+                                lateReason: isLateProgressDate(formState.date) ? (formState.lateReason?.trim() || undefined) : undefined,
+                                celebration: formState.badge || undefined,
                             evidence: evidencePayload?.length ? evidencePayload : undefined,
                         },
                     ],
@@ -155,9 +200,10 @@ const useTeacherDashboardActions = ({
                 });
             } finally {
                 setSavingQuickUpdate(false);
+                setUploadProgress?.(0);
             }
         },
-        [toast, onCloseQuickUpdate, refresh, setSavingQuickUpdate],
+        [toast, onCloseQuickUpdate, refresh, setSavingQuickUpdate, setUploadProgress],
     );
 
     return { handleProgressSubmitForm, handleQuickUpdateSubmit };

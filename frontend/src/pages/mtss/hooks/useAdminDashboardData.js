@@ -16,14 +16,264 @@ import {
     buildStrategyHighlights,
     buildTierMovement,
     buildRecentActivity,
+    buildMentorSubjectCoverageRows,
     calculateSuccessRate,
     buildSummaryFromStudents,
     buildAnalyticsSummary,
     buildAnalyticsNarrative,
 } from "../utils/adminDashboardUtils";
+import { expandStudentsBySupportUnit } from "../utils/supportUnitUtils";
+import { resolveTypeKey } from "../utils/interventionNormalize";
 import useAdminDashboardSegments from "./useAdminDashboardSegments";
 
 const STUDENT_LIMIT = 650;
+const STATUS_LABELS = {
+    active: "On Track",
+    paused: "Needs Attention",
+    completed: "Completed",
+    closed: "Closed",
+};
+
+const normalizeText = (value = "") => String(value || "").trim();
+
+const getStudentKey = (student = {}) =>
+    student?._id?.toString?.() ||
+    student?.id?.toString?.() ||
+    student?.toString?.() ||
+    "";
+
+const normalizeTierCode = (tier = "") => {
+    const normalized = normalizeText(tier).toLowerCase().replace(/\s+/g, "");
+    if (normalized.includes("3")) return "tier3";
+    if (normalized.includes("1")) return "tier1";
+    return "tier2";
+};
+
+const mapTierLabel = (tier = "") => {
+    const code = normalizeTierCode(tier);
+    if (code === "tier3") return "Tier 3";
+    if (code === "tier1") return "Tier 1";
+    return "Tier 2";
+};
+
+const getFocusLabel = (assignment = {}) => {
+    if (Array.isArray(assignment.focusAreas)) {
+        const focus = assignment.focusAreas.find((entry) => normalizeText(entry));
+        if (focus) return normalizeText(focus);
+    }
+    return normalizeText(assignment.strategyName || assignment.metricLabel || assignment.monitoringMethod) || "Focused Support";
+};
+
+const getGoalLabel = (assignment = {}) => {
+    if (!Array.isArray(assignment.goals)) return "";
+    const goal = assignment.goals.find(Boolean);
+    if (!goal) return "";
+    if (typeof goal === "string") return normalizeText(goal);
+    return normalizeText(goal.description || goal.goal || goal.title || goal.name);
+};
+
+const getMentorLabel = (assignment = {}) =>
+    normalizeText(assignment.mentorId?.name || assignment.mentorName || assignment.mentor || assignment.owner) || "Unassigned";
+
+const buildPairingLabel = (studentName = "", subject = "", mentor = "") =>
+    [studentName, subject, mentor].map(normalizeText).filter(Boolean).join(" - ");
+
+const getSupportSubjectLabel = (unit = {}) =>
+    normalizeText(unit.supportUnit?.subject || unit.profile?.type || unit.type) || "Focused Support";
+
+const getSupportOwnerLabel = (unit = {}) =>
+    normalizeText(
+        unit.supportUnit?.owner ||
+        unit.studentSubjectMentorPair?.mentorName ||
+        unit.profile?.studentSubjectMentorPair?.mentorName ||
+        unit.mentor ||
+        unit.profile?.mentor,
+    ) || "Unassigned";
+
+const buildSubjectStudentBreakdown = (supportUnits = []) => {
+    const map = new Map();
+
+    supportUnits.forEach((unit = {}) => {
+        const subject = getSupportSubjectLabel(unit);
+        const owner = getSupportOwnerLabel(unit);
+        const studentId = normalizeText(unit.baseStudentId || unit._id || unit.id || unit.slug || unit.name);
+        const studentName = normalizeText(unit.name) || "Student";
+        const key = subject.toLowerCase();
+        const entry = map.get(key) || {
+            subject,
+            supportUnitCount: 0,
+            students: new Map(),
+            owners: new Set(),
+            tierCodes: new Set(),
+        };
+
+        entry.supportUnitCount += 1;
+        entry.students.set(studentId || studentName, {
+            id: studentId || studentName,
+            name: studentName,
+            owner,
+            tier: unit.supportUnit?.tier || unit.tier || "Tier 1",
+            pairingLabel: unit.supportUnit?.pairingLabel || buildPairingLabel(studentName, subject, owner),
+        });
+        entry.owners.add(owner);
+        entry.tierCodes.add(normalizeTierCode(unit.supportUnit?.tierCode || unit.tier));
+        map.set(key, entry);
+    });
+
+    return Array.from(map.values())
+        .map((entry) => ({
+            subject: entry.subject,
+            supportUnitCount: entry.supportUnitCount,
+            studentCount: entry.students.size,
+            owners: Array.from(entry.owners).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+            tierCodes: Array.from(entry.tierCodes),
+            students: Array.from(entry.students.values()).sort((a, b) => a.name.localeCompare(b.name)),
+        }))
+        .sort((a, b) => b.supportUnitCount - a.supportUnitCount || a.subject.localeCompare(b.subject));
+};
+
+const getLatestCheckIn = (assignment = {}) =>
+    Array.isArray(assignment.checkIns) && assignment.checkIns.length
+        ? assignment.checkIns[assignment.checkIns.length - 1]
+        : null;
+
+const buildAssignmentOptionsByStudent = (assignments = []) => {
+    const map = new Map();
+
+    assignments.forEach((assignment = {}) => {
+        const assignmentId = assignment._id?.toString?.() || assignment.id || assignment.assignmentId;
+        if (!assignmentId) return;
+
+        const focus = getFocusLabel(assignment);
+        const focusAreas = Array.isArray(assignment.focusLabels) && assignment.focusLabels.length
+            ? assignment.focusLabels
+            : (Array.isArray(assignment.focusAreas) && assignment.focusAreas.length ? assignment.focusAreas : [focus]);
+        const tierCode = normalizeTierCode(assignment.tier);
+        const latestCheckIn = getLatestCheckIn(assignment);
+        const lastUpdateAt = latestCheckIn?.date || assignment.updatedAt || assignment.lastPlanUpdatedAt || assignment.createdAt || assignment.startDate;
+        const option = {
+            assignmentId,
+            focus,
+            subject: focus,
+            type: focus,
+            focusArea: focus,
+            focusAreas,
+            interventionType: focus,
+            interventionTypes: focusAreas,
+            tier: assignment.tier,
+            tierCode,
+            tierValue: tierCode,
+            tierLabel: mapTierLabel(assignment.tier),
+            statusKey: assignment.status || "active",
+            status: assignment.status || "active",
+            statusLabel: STATUS_LABELS[assignment.status] || assignment.status || "Active",
+            strategyId: assignment.strategyId || "",
+            strategyName: assignment.strategyName || "",
+            metricLabel: assignment.metricLabel || "score",
+            mentor: getMentorLabel(assignment),
+            mentorName: getMentorLabel(assignment),
+            mentorEmail: assignment.mentorId?.email || assignment.mentorEmail || "",
+            startDate: assignment.startDate,
+            endDate: assignment.endDate,
+            duration: assignment.duration,
+            monitoringMethod: assignment.monitoringMethod,
+            monitoringFrequency: assignment.monitoringFrequency,
+            customFrequencyDays: Array.isArray(assignment.customFrequencyDays) ? assignment.customFrequencyDays : [],
+            customFrequencyNote: assignment.customFrequencyNote || "",
+            baselineScore: assignment.baselineScore,
+            targetScore: assignment.targetScore,
+            goals: assignment.goals || [],
+            goal: getGoalLabel(assignment),
+            notes: assignment.notes || "",
+            checkIns: assignment.checkIns || [],
+            lastUpdateAt,
+            lastUpdateSubject: focus,
+            nextUpdate: assignment.nextUpdate,
+            pairings: Array.isArray(assignment.pairings) ? assignment.pairings : [],
+        };
+
+        (assignment.studentIds || []).forEach((student) => {
+            const key = getStudentKey(student);
+            if (!key) return;
+            const existing = map.get(key) || [];
+            const studentPairings = option.pairings.filter((pairing = {}) => {
+                const pairingStudentKey = getStudentKey(pairing.studentId || pairing.student || pairing.studentId);
+                return !pairingStudentKey || pairingStudentKey === key;
+            });
+            const primaryPairing = studentPairings[0] || null;
+            const studentOption = {
+                ...option,
+                studentName: student?.name || primaryPairing?.studentName || "Student",
+                pairings: studentPairings.length ? studentPairings : option.pairings,
+                pairingLabel: primaryPairing?.pairingLabel || buildPairingLabel(student?.name, focus, option.mentor),
+                studentSubjectMentorPair: primaryPairing || {
+                    studentId: key,
+                    studentName: student?.name || "Student",
+                    subject: focus,
+                    focusArea: focus,
+                    mentorName: option.mentor,
+                    pairingLabel: buildPairingLabel(student?.name, focus, option.mentor),
+                },
+            };
+            existing.push(studentOption);
+            map.set(key, existing);
+        });
+    });
+
+    return map;
+};
+
+const attachAssignmentOptionsToStudents = (students = [], assignments = []) => {
+    const optionsByStudent = buildAssignmentOptionsByStudent(assignments);
+
+    return students.map((student) => {
+        const key = getStudentKey(student);
+        const assignmentOptions = (optionsByStudent.get(key) || student.assignmentOptions || [])
+            .slice()
+            .sort((a, b) => {
+                const tierRank = { tier3: 3, tier2: 2, tier1: 1 };
+                const rankDiff = (tierRank[b.tierCode] || 0) - (tierRank[a.tierCode] || 0);
+                if (rankDiff) return rankDiff;
+                return new Date(b.lastUpdateAt || 0) - new Date(a.lastUpdateAt || 0);
+            });
+        const primary = assignmentOptions[0] || null;
+        const assignmentInterventions = assignmentOptions
+            .filter((option) => option?.assignmentId)
+            .map((option) => {
+                const focus = option.focus || option.focusAreas?.[0] || option.strategyName || "Focused Support";
+                const tierCode = option.tierCode || normalizeTierCode(option.tierValue || option.tier);
+                return {
+                    id: option.assignmentId,
+                    type: resolveTypeKey(focus) || "SEL",
+                    label: focus,
+                    tier: option.tier || mapTierLabel(tierCode),
+                    tierCode,
+                    status: option.statusKey || option.status || "active",
+                    strategies: [option.strategyName].filter(Boolean),
+                    history: option.history || [],
+                    hasData: true,
+                };
+            });
+
+        return {
+            ...student,
+            assignmentOptions,
+            assignmentId: primary?.assignmentId || student.assignmentId,
+            mentor: primary?.mentor || student.mentor,
+            profile: {
+                ...(student.profile || {}),
+                mentor: primary?.mentor || student.profile?.mentor,
+            },
+            lastUpdate: primary?.lastUpdateAt
+                ? {
+                    at: primary.lastUpdateAt,
+                    subject: primary.lastUpdateSubject || primary.focus,
+                }
+                : student.lastUpdate,
+            interventions: assignmentInterventions.length ? assignmentInterventions : student.interventions,
+        };
+    });
+};
 
 const useAdminDashboardData = () => {
     const { user } = useSelector((state) => state.auth);
@@ -176,26 +426,38 @@ const useAdminDashboardData = () => {
     }, [mentors, assignments]);
 
     const successRate = useMemo(() => calculateSuccessRate(assignments), [assignments]);
-
-    const statCards = useMemo(
-        () => buildAdminStatCards(students.length, mentorCount, successRate),
-        [students.length, mentorCount, successRate],
+    const enrichedStudents = useMemo(
+        () => attachAssignmentOptionsToStudents(students, assignments),
+        [students, assignments],
+    );
+    const supportUnits = useMemo(() => expandStudentsBySupportUnit(enrichedStudents), [enrichedStudents]);
+    const supportUnitCount = useMemo(
+        () => supportUnits.length,
+        [supportUnits.length],
     );
 
-    const summary = useMemo(() => buildSummaryFromStudents(students), [students]);
-    const systemSnapshot = useMemo(() => buildSystemSnapshot(summary, students), [summary, students]);
+    const statCards = useMemo(
+        () => buildAdminStatCards(supportUnitCount, mentorCount, successRate),
+        [supportUnitCount, mentorCount, successRate],
+    );
+
+    const summary = useMemo(() => buildSummaryFromStudents(supportUnits), [supportUnits]);
+    const systemSnapshot = useMemo(() => buildSystemSnapshot(summary, supportUnits), [summary, supportUnits]);
     const successByType = useMemo(() => buildSuccessByType(assignments), [assignments]);
     const { trendData, trendPaths } = useMemo(() => buildTrendData(assignments), [assignments]);
     const mentorSpotlights = useMemo(() => buildMentorSpotlights(assignments), [assignments]);
     const mentorRoster = useMemo(() => buildMentorRoster(assignments), [assignments]);
+    const mentorSubjectCoverageRows = useMemo(() => buildMentorSubjectCoverageRows(assignments), [assignments]);
+    const subjectStudentBreakdown = useMemo(() => buildSubjectStudentBreakdown(supportUnits), [supportUnits]);
     const strategyHighlights = useMemo(() => buildStrategyHighlights(assignments), [assignments]);
-    const tierMovement = useMemo(() => buildTierMovement(students, assignments), [students, assignments]);
+    const tierMovement = useMemo(() => buildTierMovement(supportUnits, assignments), [supportUnits, assignments]);
     const analyticsSummary = useMemo(() => buildAnalyticsSummary(assignments), [assignments]);
-    const analyticsNarrative = useMemo(() => buildAnalyticsNarrative(students, assignments), [students, assignments]);
+    const analyticsNarrative = useMemo(() => buildAnalyticsNarrative(supportUnits, assignments), [supportUnits, assignments]);
     const recentActivity = useMemo(() => buildRecentActivity(assignments), [assignments]);
 
     return {
-        students,
+        students: enrichedStudents,
+        supportUnits,
         assignments,
         mentors,
         statCards,
@@ -207,6 +469,8 @@ const useAdminDashboardData = () => {
         analyticsNarrative,
         mentorSpotlights,
         mentorRoster,
+        mentorSubjectCoverageRows,
+        subjectStudentBreakdown,
         strategyHighlights,
         tierMovement,
         recentActivity,

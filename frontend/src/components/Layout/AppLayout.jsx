@@ -118,16 +118,7 @@ const AppLayout = memo(() => {
 
                         {/* Right actions */}
                         <div className="flex items-center gap-3">
-                            <Link
-                                to="/notifications"
-                                className="relative rounded-full p-2 hover-card"
-                                aria-label="Notifications"
-                            >
-                                <Bell className="h-6 w-6 text-muted-foreground hover:text-accent" />
-                                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary" />
-                            </Link>
-
-                            <Link to="/profile" aria-label="Profile">
+<Link to="/profile" aria-label="Profile">
                                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-bold text-primary-foreground hover:opacity-90">
                                     U
                                 </div>

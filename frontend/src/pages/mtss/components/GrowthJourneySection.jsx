@@ -11,6 +11,7 @@ const GrowthJourneySection = memo(({
     durationLabel,
     frequencyLabel,
     mentorLabel,
+    pairingLabel,
     goalLabel,
     monitoringMethodLabel,
     startDateLabel,
@@ -39,6 +40,7 @@ const GrowthJourneySection = memo(({
                     durationLabel={durationLabel}
                     frequencyLabel={frequencyLabel}
                     mentorLabel={mentorLabel}
+                    pairingLabel={pairingLabel}
                     goalLabel={goalLabel}
                     monitoringMethodLabel={monitoringMethodLabel}
                     startDateLabel={startDateLabel}

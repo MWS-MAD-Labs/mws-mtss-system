@@ -1,10 +1,11 @@
 import { Building2, UserCheck, Star } from "lucide-react";
+import { getAssignmentSupportUnitCount } from "./supportUnitUtils";
 
 const STAT_CARD_TEMPLATE = [
     {
         key: "students",
-        label: "Students in MTSS",
-        caption: "Across all tiers",
+        label: "MTSS Support Units",
+        caption: "Student + subject pairings",
         accent: "from-[#ff80b5] via-[#f472b6] to-[#c084fc]",
         icon: Building2,
     },
@@ -53,6 +54,16 @@ export const isAssignmentTargetMet = (assignment) => {
 
 export const calculateSuccessRate = (assignments = []) => {
     if (!assignments.length) return 0;
-    const hitting = assignments.filter(isAssignmentTargetMet).length;
-    return Math.round((hitting / assignments.length) * 100);
+    let totalUnits = 0;
+    let hittingUnits = 0;
+
+    assignments.forEach((assignment) => {
+        const unitCount = getAssignmentSupportUnitCount(assignment);
+        totalUnits += unitCount;
+        if (isAssignmentTargetMet(assignment)) {
+            hittingUnits += unitCount;
+        }
+    });
+
+    return totalUnits ? Math.round((hittingUnits / totalUnits) * 100) : 0;
 };

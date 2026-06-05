@@ -20,6 +20,7 @@ import {
     mergeRosterWithAssignments,
 } from "../utils/teacherDashboardUtils";
 import { mapTierLabel } from "../utils/teacherMappingHelpers";
+import { expandStudentsBySupportUnit } from "../utils/supportUnitUtils";
 
 const SUBJECT_ALIAS_MAP = {
     english: ["english", "bahasa inggris", "ela", "reading", "literacy", "ela/reading"],
@@ -264,7 +265,8 @@ const useTeacherDashboardData = (viewerUser = null) => {
 
             setStatCards(cards);
             const finalStudents = mergedStudents.length ? mergedStudents : assignmentSummary.students;
-            setStudents(finalStudents);
+            const supportUnitStudents = expandStudentsBySupportUnit(finalStudents);
+            setStudents(supportUnitStudents.length ? supportUnitStudents : finalStudents);
             setProgressData(
                 assignmentSummary.spotlightChart.length
                     ? assignmentSummary.spotlightChart

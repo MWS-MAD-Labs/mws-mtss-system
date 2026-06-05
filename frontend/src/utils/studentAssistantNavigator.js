@@ -171,6 +171,7 @@ const normalizeText = (value = '') => String(value || '').toLowerCase().replace(
 const normalizeRole = (role = '') => String(role || '').trim().toLowerCase();
 const normalizeTheme = (theme = '') => (String(theme || '').trim().toLowerCase() === 'dark' ? 'dark' : 'light');
 const getThemeIncantation = (theme = 'light') => (normalizeTheme(theme) === 'dark' ? 'Nox' : 'Lumos Maxima');
+const MTSS_ADMIN_NAV_ROLES = new Set(['head_unit', 'principal', 'directorate', 'admin', 'superadmin']);
 
 const isStudentRole = (role = '') => normalizeRole(role) === 'student';
 
@@ -189,8 +190,11 @@ export const getAssistantAllowedRoutes = (role = 'student') => {
         routes.add('/emotional-checkin/dashboard');
     }
 
-    if (['admin', 'superadmin', 'directorate'].includes(normalizedRole)) {
+    if (MTSS_ADMIN_NAV_ROLES.has(normalizedRole)) {
         routes.add('/mtss/admin');
+    }
+
+    if (['admin', 'superadmin', 'directorate'].includes(normalizedRole)) {
         routes.add('/user-management');
     }
 

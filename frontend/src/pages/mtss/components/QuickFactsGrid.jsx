@@ -4,11 +4,24 @@ import { BookOpen, Users, CalendarDays, Award } from "lucide-react";
 import { glassStyles } from "../config/studentProfileConfig";
 
 const QuickFactsGrid = memo(({ student, profile, mentorLabel }) => {
+    const attendanceContext = profile?.attendanceContext || {};
     const quickFacts = [
         { label: "Grade", value: student.grade || "-", icon: BookOpen, gradient: "from-blue-500 to-cyan-500" },
         { label: "Class", value: student.className || "-", icon: Users, gradient: "from-emerald-500 to-teal-500" },
         { label: "Started", value: profile?.started || "-", icon: CalendarDays, gradient: "from-rose-500 to-pink-500" },
         { label: "Mentor", value: mentorLabel, icon: Award, gradient: "from-purple-500 to-violet-500" },
+    ];
+    const attendanceFacts = [
+        { label: "Attendance Rate", value: attendanceContext.rate || "Not recorded", icon: CalendarDays, gradient: "from-indigo-500 to-violet-500" },
+        { label: "Missed MTSS Sessions", value: attendanceContext.missedMtssSessions ?? 0, icon: Users, gradient: "from-amber-500 to-orange-500" },
+        {
+            label: "Last Absence",
+            value: attendanceContext.lastAbsenceSubject
+                ? `${attendanceContext.lastAbsenceDate} - ${attendanceContext.lastAbsenceSubject}`
+                : attendanceContext.lastAbsenceDate || "No absence logged",
+            icon: Award,
+            gradient: "from-rose-500 to-pink-500",
+        },
     ];
 
     return (
@@ -42,7 +55,7 @@ const QuickFactsGrid = memo(({ student, profile, mentorLabel }) => {
             </div>
 
             {/* ── Desktop: 4-column grid ─────────────────────── */}
-            <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {quickFacts.map((fact, i) => {
                     const Icon = fact.icon;
                     return (
@@ -65,8 +78,36 @@ const QuickFactsGrid = memo(({ student, profile, mentorLabel }) => {
                         </motion.div>
                     );
                 })}
-            </div>
-        </>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+                    {attendanceFacts.map((fact, i) => {
+                        const Icon = fact.icon;
+                        return (
+                            <motion.div
+                                key={fact.label}
+                                initial={{ opacity: 0, y: 14 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.22 + i * 0.04 }}
+                                className={`${glassStyles.inner} rounded-2xl p-3 sm:p-4`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div className={`h-8 w-8 rounded-xl bg-gradient-to-br ${fact.gradient} flex items-center justify-center shadow-sm`}>
+                                        <Icon className="h-4 w-4 text-white" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">
+                                            {fact.label}
+                                        </p>
+                                        <p className="text-sm font-bold text-foreground dark:text-white truncate">
+                                            {fact.value}
+                                        </p>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
+                </div>
+            </>
     );
 });
 

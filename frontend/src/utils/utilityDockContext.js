@@ -48,6 +48,7 @@ const isEmotionalPatternsRoute = (pathname = '') => /\/profile\/emotional-patter
 const isEmotionalHistoryRoute = (pathname = '') => /\/profile\/emotional-history/i.test(String(pathname || '').trim());
 const isSupportHubRoute = (pathname = '') => /\/(?:student\/support-hub|support-hub)\b/i.test(String(pathname || '').trim());
 const isMtssRoute = (pathname = '') => /\/mtss\//i.test(String(pathname || '').trim());
+const isAssistantRoute = (pathname = '') => /\/(?:ai-assistant|student\/ai-chat)\b/i.test(String(pathname || '').trim());
 const isEmotionalDashboardRoute = (pathname = '') => /\/emotional-checkin\/(?:dashboard|teacher-dashboard)\b/i.test(String(pathname || '').trim());
 
 const detectRouteFamily = (pathname = '') => {
@@ -56,6 +57,7 @@ const detectRouteFamily = (pathname = '') => {
     if (isEmotionalHistoryRoute(path)) return 'emotional_history';
     if (isSupportHubRoute(path)) return 'support_hub';
     if (isMtssRoute(path)) return 'mtss';
+    if (isAssistantRoute(path)) return 'assistant_workspace';
     if (isEmotionalDashboardRoute(path)) return 'emotional_dashboard';
     return 'general';
 };
@@ -71,8 +73,8 @@ const MTSS_AUTOMATION_ROLES = new Set([
 ]);
 
 const isStudentRole = (role = '') => String(role || '').trim().toLowerCase() === 'student';
-const isAdminRole = (role = '') => ['admin', 'superadmin', 'directorate'].includes(String(role || '').trim().toLowerCase());
 const isTeacherScopeRole = (role = '') => ['teacher', 'se_teacher', 'head_unit', 'principal'].includes(String(role || '').trim().toLowerCase());
+const isLeadershipRole = (role = '') => ['head_unit', 'principal', 'directorate', 'admin', 'superadmin'].includes(String(role || '').trim().toLowerCase());
 
 const getCommandPackByRoute = (routeFamily = 'general', role = '') => {
     const student = isStudentRole(role);
@@ -103,6 +105,11 @@ const getCommandPackByRoute = (routeFamily = 'general', role = '') => {
                 { command: 'summarize emotional check-in status', outcome: 'latest check-in insight' },
                 { command: 'what should i do next', outcome: 'next best action now' }
             ],
+            assistant_workspace: [
+                { command: 'what can you help me do for MTSS', outcome: 'student-friendly assistant capability breakdown' },
+                { command: 'check my mtss status', outcome: 'tier + active support summary' },
+                { command: 'plan my next 20 minutes', outcome: 'micro plan based on MTSS and class context' }
+            ],
             general: [
                 { command: 'summarize this page', outcome: 'live page summary without route switch' },
                 { command: 'help me right now', outcome: 'quick actionable guidance' },
@@ -132,6 +139,11 @@ const getCommandPackByRoute = (routeFamily = 'general', role = '') => {
         emotional_history: [
             { command: 'summarize this emotional history page', outcome: 'timeline overview + pattern shifts' }
         ],
+        assistant_workspace: [
+            { command: 'break down your MTSS teacher/principal capabilities', outcome: 'full role-aware assistant capability map' },
+            { command: 'rank overdue mtss students', outcome: 'priority triage table + first action' },
+            { command: 'create executive mtss brief', outcome: 'principal-ready risk, owner, due-date summary' }
+        ],
         general: [
             { command: 'summarize this page', outcome: 'live contextual recap' },
             { command: 'open mtss teacher dashboard', outcome: 'safe role-scoped navigation' },
@@ -149,11 +161,13 @@ const getCommandPackByRoute = (routeFamily = 'general', role = '') => {
     if (isTeacherScopeRole(normalizedRole)) {
         roleSpecificCommands.push(
             { command: 'log progress check-in now', outcome: 'run append_mtss_progress_checkin flow' },
-            { command: 'create intervention for selected student', outcome: 'run create_mtss_intervention flow' }
+            { command: 'create intervention for selected student', outcome: 'run create_mtss_intervention flow' },
+            { command: 'draft parent-friendly mtss update', outcome: 'ready-to-send family communication' }
         );
     }
-    if (isAdminRole(normalizedRole)) {
+    if (isLeadershipRole(normalizedRole)) {
         roleSpecificCommands.push(
+            { command: 'create principal mtss action brief', outcome: 'risk radar + owner + due date plan' },
             { command: 'assign students to mtss mentor', outcome: 'run assign_students_to_mtss_mentor flow' },
             { command: 'reassign mentor for assignment', outcome: 'run reassign_mtss_assignment_mentor flow' }
         );
@@ -556,9 +570,10 @@ export const composeDockContextMessage = ({
         commandPack?.id ? `command_pack_id: ${String(commandPack.id).trim()}` : '',
         commandPack?.roleScope ? `command_pack_scope: ${String(commandPack.roleScope).trim()}` : '',
         commandLines ? `command_pack_commands: ${clampText(commandLines, 620)}` : '',
-        'instruction: You are running in inline dock mode. Use runtime context as trusted current-page data. Answer directly from this context, stay concise, and do not claim lack of page access when context exists.',
+        'instruction: You are running in inline dock mode. Use runtime context as trusted current-page data. Answer directly from this context and from server-side role MTSS context. Stay concise, and do not claim lack of page access when context exists.',
         'instruction_2: Keep user in current workspace unless user explicitly asks navigation.',
         'instruction_3: If user asks for one of command_pack commands, answer with concrete action-ready output (short checklist/table style when useful).',
+        'instruction_4: For teacher/principal MTSS requests, include the role POV, top risk/priority, and the safest next action; when automation is appropriate, mention the specific execute_operation form the Dock can open.',
         '[/DOCK_RUNTIME_CONTEXT]',
         `User message: ${userMessage}`
     ].filter(Boolean);

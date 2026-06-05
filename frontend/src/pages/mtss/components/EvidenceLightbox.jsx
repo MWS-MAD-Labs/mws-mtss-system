@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { downloadEvidenceFile } from "./evidenceDownloadUtils";
+import { lockBodyScroll } from "../utils/bodyScrollLock";
 
 const EvidenceLightbox = memo(({ images = [], initialIndex = 0, onClose }) => {
     const [current, setCurrent] = useState(initialIndex);
@@ -22,17 +23,10 @@ const EvidenceLightbox = memo(({ images = [], initialIndex = 0, onClose }) => {
             else if (e.key === "ArrowRight") goNext();
         };
         window.addEventListener("keydown", handler);
-        const previousOverflow = document.body.style.overflow;
-        const previousOverscroll = document.body.style.overscrollBehavior;
-        const previousTouchAction = document.body.style.touchAction;
-        document.body.style.overflow = "hidden";
-        document.body.style.overscrollBehavior = "none";
-        document.body.style.touchAction = "none";
+        const releaseScrollLock = lockBodyScroll();
         return () => {
             window.removeEventListener("keydown", handler);
-            document.body.style.overflow = previousOverflow;
-            document.body.style.overscrollBehavior = previousOverscroll;
-            document.body.style.touchAction = previousTouchAction;
+            releaseScrollLock();
         };
     }, [onClose, goPrev, goNext]);
 

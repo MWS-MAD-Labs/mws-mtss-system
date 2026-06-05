@@ -365,7 +365,7 @@ const UserForm = memo(({ user, onSubmit, onCancel }) => {
                         {/* Teacher Assignment Section */}
                         {(formData.role === 'teacher' || formData.role === 'se_teacher') && (
                             <div className="space-y-4 p-4 bg-blue/5 rounded-lg border border-blue/20">
-                                <h4 className="font-medium text-blue-700 flex items-center">
+                                <h4 className="font-medium text-blue-700 dark:text-blue-400 flex items-center">
                                     <GraduationCap className="w-4 h-4 mr-2" />
                                     Teaching Assignments
                                 </h4>
@@ -378,7 +378,7 @@ const UserForm = memo(({ user, onSubmit, onCancel }) => {
                         {/* Head Unit Assignment Section */}
                         {formData.role === 'head_unit' && (
                             <div className="space-y-4 p-4 bg-purple/5 rounded-lg border border-purple/20">
-                                <h4 className="font-medium text-purple-700 flex items-center">
+                                <h4 className="font-medium text-purple-700 dark:text-purple-400 flex items-center">
                                     <User className="w-4 h-4 mr-2" />
                                     Department Leadership
                                 </h4>
