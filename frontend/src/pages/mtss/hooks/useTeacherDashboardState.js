@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { useToast } from "@/components/ui/use-toast";
 import { createDefaultInterventionForm, createDefaultProgressForm } from "../data/teacherDashboardContent";
@@ -56,6 +56,7 @@ const resolveTierValue = (value = "tier2") => {
 
 const resolveDurationValue = (value = "") => {
     const normalized = normalizeText(value);
+    if (normalized === "custom") return "Custom";
     return /^\d+\s+weeks?$/.test(normalized) ? normalized.replace(/weeks?$/, "weeks") : "";
 };
 
@@ -91,13 +92,55 @@ const resolveGoalValue = (option = {}) => {
     return "";
 };
 
+const formatScoreLabel = (score, fallbackUnit = "score") => {
+    const value = resolveScoreValue(score);
+    if (!value) return "Not set";
+    const unit = resolveScoreUnit(score, fallbackUnit);
+    return unit ? `${value} ${unit}` : value;
+};
+
+const formatDateTimeLabel = (value) => {
+    if (!value) return "No progress yet";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "No progress yet";
+    return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    }).format(parsed);
+};
+
+const resolveLastProgressUpdate = (option = {}) => {
+    const checkIns = Array.isArray(option.checkIns) ? option.checkIns : [];
+    const latestCheckIn = checkIns
+        .filter((entry) => entry?.date)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    return latestCheckIn?.date || option.lastUpdateAt || option.updatedAt || null;
+};
+
+const resolveOwnerLabel = (option = {}) =>
+    option?.mentor ||
+    option?.mentorName ||
+    option?.owner ||
+    option?.teacher ||
+    option?.createdByName ||
+    "Unassigned";
+
+const resolveStatusLabel = (option = {}) =>
+    option?.statusLabel ||
+    option?.statusKey ||
+    option?.status ||
+    "Active";
+
 const buildInterventionFormFromAssignment = (student, option = {}) => {
     const fallbackUnit = option.metricLabel || "score";
     const baselineUnit = resolveScoreUnit(option.baselineScore, fallbackUnit);
 
     return {
         ...createDefaultInterventionForm(),
-        studentId: student?.id || student?._id || "",
+        studentId: student?.baseStudentId || student?.id || student?._id || "",
         studentName: student?.name || "",
         grade: student?.grade || student?.currentGrade || "",
         className: student?.className || "",
@@ -140,13 +183,18 @@ const buildScorePayload = (value, unit = "score", allowClear = false) => {
 export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {}) => {
     const { toast } = useToast();
     const location = useLocation();
+    const navigate = useNavigate();
     const tabStorageKey = useMemo(() => `mtss:teacher-tab:${location.pathname}`, [location.pathname]);
-    const requestedTab = useMemo(() => {
+
+    // Capture URL params once at mount — stable refs so they never re-trigger effects
+    const initialTabRef = useRef(() => {
         const params = new URLSearchParams(location.search);
         const tab = params.get("tab");
         return tab && tabs.some((entry) => entry.key === tab) ? tab : null;
-    }, [location.search, tabs]);
-    const [activeTab, setStoredActiveTab] = useMtssPersistentState(tabStorageKey, requestedTab || "dashboard");
+    });
+    const urlConsumedRef = useRef(false);
+
+    const [activeTab, setStoredActiveTab] = useMtssPersistentState(tabStorageKey, initialTabRef.current?.() || "dashboard");
     const [interventionForm, setInterventionForm] = useState(() => createDefaultInterventionForm());
     const [progressForm, setProgressForm] = useState(() => createDefaultProgressForm());
     const [editingPlan, setEditingPlan] = useState(null);
@@ -156,13 +204,27 @@ export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {
     const authUser = useSelector((state) => state.auth?.user);
     const actingUser = viewerUser || authUser;
 
+    // Apply URL-requested tab once, then strip tab+search params so the user
+    // can freely switch tabs without the URL constantly snapping them back.
     useEffect(() => {
-        if (requestedTab && requestedTab !== activeTab) {
-            setStoredActiveTab(requestedTab);
+        if (urlConsumedRef.current) return;
+        const initialTab = initialTabRef.current?.();
+        if (!initialTab) return;
+        urlConsumedRef.current = true;
+        if (initialTab !== activeTab) {
+            setStoredActiveTab(initialTab);
         }
-    }, [activeTab, requestedTab, setStoredActiveTab]);
+        const cleaned = new URLSearchParams(location.search);
+        cleaned.delete("tab");
+        cleaned.delete("search");
+        const qs = cleaned.toString();
+        navigate(`${location.pathname}${qs ? `?${qs}` : ""}`, { replace: true });
+    }, [activeTab, setStoredActiveTab, navigate, location.pathname, location.search]);
 
     const setActiveTab = useCallback((value) => {
+        if (value === "create") {
+            setInterventionForm(createDefaultInterventionForm());
+        }
         setStoredActiveTab(value);
     }, [setStoredActiveTab]);
 
@@ -178,10 +240,24 @@ export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {
         const selectedOption = assignmentOption || resolveEditableAssignmentOption(student);
         if (!selectedOption?.assignmentId) return false;
 
+        const metricUnit = selectedOption.metricLabel || "score";
+        const subjectLabel =
+            selectedOption.focus ||
+            selectedOption.focusAreas?.[0] ||
+            selectedOption.strategyName ||
+            "Focused Support";
+
         setEditingPlan({
             assignmentId: selectedOption.assignmentId,
             studentName: student?.name || "Student",
-            focusLabel: selectedOption.focus || selectedOption.strategyName || "Intervention",
+            focusLabel: subjectLabel,
+            subject: subjectLabel,
+            owner: resolveOwnerLabel(selectedOption),
+            goal: resolveGoalValue(selectedOption) || "Not set",
+            baseline: formatScoreLabel(selectedOption.baselineScore, metricUnit),
+            target: formatScoreLabel(selectedOption.targetScore, metricUnit),
+            lastProgressUpdate: formatDateTimeLabel(resolveLastProgressUpdate(selectedOption)),
+            status: resolveStatusLabel(selectedOption),
         });
         setInterventionForm(buildInterventionFormFromAssignment(student, selectedOption));
         setActiveTab("edit");
@@ -304,10 +380,11 @@ export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {
                         summary: progressForm.notes || "Progress update",
                         value: progressForm.scoreValue ? Number(progressForm.scoreValue) : undefined,
                         unit: progressForm.scoreUnit || "score",
-                        performed: progressForm.performed === "yes" || progressForm.performed === true,
-                        skipReason: progressForm.performed === "no" ? (progressForm.skipReason || undefined) : undefined,
-                        skipReasonNote: progressForm.performed === "no" && progressForm.skipReason === "other" ? (progressForm.skipReasonNote || undefined) : undefined,
-                        celebration: progressForm.badge || undefined,
+                            performed: progressForm.performed === "yes" || progressForm.performed === true,
+                            skipReason: progressForm.performed === "no" ? (progressForm.skipReason || undefined) : undefined,
+                            skipReasonNote: progressForm.performed === "no" && progressForm.skipReason === "other" ? (progressForm.skipReasonNote || undefined) : undefined,
+                            lateReason: progressForm.lateReason?.trim() || undefined,
+                            celebration: progressForm.badge || undefined,
                     }],
                 };
 

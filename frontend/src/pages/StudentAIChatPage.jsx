@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, Plus, Loader2, Volume2, VolumeX, Pencil, Check, X, PanelLeft, PanelLeftClose, History, Clock3 } from 'lucide-react';
+import { AlertTriangle, Send, Sparkles, Plus, Loader2, Volume2, VolumeX, Pencil, Check, X, PanelLeft, PanelLeftClose, History, Clock3 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from "@/components/ui/use-toast";
 import { useDispatch, useSelector } from 'react-redux';
@@ -30,6 +30,7 @@ import {
     setBuddyAnimation,
     resetBuddyToIdle,
     toggleSound,
+    clearError,
     selectMessages,
     selectSessionId,
     selectIsLoading,
@@ -42,7 +43,8 @@ import {
     selectHistoryLoading,
     selectAssistantProfile,
     selectAssistantLoading,
-    selectAssistantSaving
+    selectAssistantSaving,
+    selectError
 } from '@/store/slices/aiChatSlice';
 import aiChatService from '@/services/aiChatService';
 import './StudentAIChatPage.css';
@@ -323,6 +325,7 @@ export default function StudentAIChatPage() {
     const assistantProfile = useSelector(selectAssistantProfile);
     const assistantLoading = useSelector(selectAssistantLoading);
     const assistantSaving = useSelector(selectAssistantSaving);
+    const assistantError = useSelector(selectError);
     const assistantName = assistantProfile?.assistant?.assistantName || 'Nova';
     const dailyFocus = useMemo(
         () => (Array.isArray(assistantProfile?.assistant?.daily?.focusItems)
@@ -346,6 +349,7 @@ export default function StudentAIChatPage() {
     const [coachNudge, setCoachNudge] = useState(null);
     const [isCoachVisible, setIsCoachVisible] = useState(false);
     const [manualVisibleCount, setManualVisibleCount] = useState(CHAT_MESSAGE_WINDOW_SIZE);
+    const [lastRetryMessage, setLastRetryMessage] = useState('');
 
     const messagesScrollRef = useRef(null);
     const inputRef = useRef(null);
@@ -1176,6 +1180,34 @@ export default function StudentAIChatPage() {
         }
     }, [handleClientAction, handleExecuteOperation]);
 
+    const handleAssistantFeedback = useCallback(async ({ message, reason, context }) => {
+        const responseText = String(message?.content || '').trim();
+        const feedbackReason = String(reason || '').trim();
+        const feedbackContext = String(context || '').trim();
+        if (!responseText || !feedbackReason) return;
+
+        await aiChatService.submitAssistantFeedback({
+            sessionId,
+            messageId: message?.id || null,
+            prompt: message?.prompt || '',
+            response: responseText,
+            reason: feedbackReason,
+            context: feedbackContext,
+            metadata: {
+                role: normalizedRole,
+                route: location.pathname,
+                context: feedbackContext
+            }
+        });
+
+        toast({
+            title: feedbackReason === 'wrong_answer' ? 'Wrong answer reported' : 'Feedback recorded',
+            description: feedbackContext
+                ? 'Thanks. Your context was attached to the review.'
+                : 'Thanks. The AI response has been flagged for review.'
+        });
+    }, [location.pathname, normalizedRole, sessionId, toast]);
+
     const clearThemeCommandTimeouts = useCallback(() => {
         themeCommandTimeoutsRef.current.forEach((timerId) => window.clearTimeout(timerId));
         themeCommandTimeoutsRef.current = [];
@@ -1279,6 +1311,8 @@ export default function StudentAIChatPage() {
         setIsCoachVisible(false);
         lastInteractionAtRef.current = Date.now();
         setLocalInputValue('');
+        setLastRetryMessage(userMessage);
+        dispatch(clearError());
         dispatch(addUserMessage(userMessage));
 
         const themeIntent = detectAssistantThemeIntent(userMessage, getCurrentTheme());
@@ -1343,6 +1377,23 @@ export default function StudentAIChatPage() {
         e.preventDefault();
         dispatchChatMessage(inputValue);
     }, [dispatchChatMessage, inputValue]);
+
+    const handleRetryAssistantMessage = useCallback((promptOverride = '') => {
+        const retryMessage = String(promptOverride || lastRetryMessage || '').trim();
+        if (!retryMessage || isLoading) return;
+        dispatchChatMessage(retryMessage);
+    }, [dispatchChatMessage, isLoading, lastRetryMessage]);
+
+    const handleAssistantPromptSuggestion = useCallback((suggestion) => {
+        const nextValue = String(suggestion || '').trim();
+        if (!nextValue) return;
+        setLocalInputValue(nextValue);
+        inputRef.current?.focus();
+    }, []);
+
+    const handleDismissAssistantError = useCallback(() => {
+        dispatch(clearError());
+    }, [dispatch]);
 
     const handleInputChange = useCallback((e) => {
         lastInteractionAtRef.current = Date.now();
@@ -1838,6 +1889,10 @@ export default function StudentAIChatPage() {
                                 visibleStartIndex={visibleStartIndex}
                                 isTyping={isTyping}
                                 onWidgetAction={handleWidgetAction}
+                                onMessageFeedback={handleAssistantFeedback}
+                                onRegenerate={handleRetryAssistantMessage}
+                                onPromptSuggestion={handleAssistantPromptSuggestion}
+                                isRegenerating={isLoading}
                             />
                         )}
                     </div>
@@ -1883,6 +1938,47 @@ export default function StudentAIChatPage() {
                                         >
                                             Snooze
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                    </AnimatePresence>
+
+                <AnimatePresence>
+                    {assistantError && !isLoading && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                            transition={{ duration: 0.2 }}
+                            className="px-4 pb-2"
+                        >
+                            <div className="max-w-3xl mx-auto">
+                                <div role="alert" className="rounded-2xl border border-amber-300/70 bg-amber-50/95 px-3 py-2.5 text-amber-900 shadow-sm dark:border-amber-400/30 dark:bg-amber-950/55 dark:text-amber-100">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex min-w-0 items-start gap-2">
+                                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                            <p className="text-sm font-medium">{assistantError}</p>
+                                        </div>
+                                        <div className="flex shrink-0 gap-2">
+                                            {lastRetryMessage && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleRetryAssistantMessage}
+                                                    className="rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+                                                >
+                                                    Retry
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={handleDismissAssistantError}
+                                                className="rounded-full border border-amber-300/80 bg-white/80 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-white/10 dark:text-amber-100"
+                                            >
+                                                Dismiss
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

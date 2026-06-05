@@ -26,7 +26,7 @@ const OverviewPanelSection = ({ title, icon: Icon, children, accent = "text-prim
     </div>
 );
 
-const AdminOverviewPanel = ({ statCards, systemSnapshot, recentActivity, mentorSpotlights, icons }) => {
+const AdminOverviewPanel = ({ statCards, systemSnapshot, subjectStudentBreakdown = [], recentActivity, mentorSpotlights, icons }) => {
     const TierIcon = icons.tier;
     const InterventionIcon = icons.interventions;
     const ActivityIcon = icons.activity;
@@ -62,7 +62,7 @@ const AdminOverviewPanel = ({ statCards, systemSnapshot, recentActivity, mentorS
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
-                <OverviewPanelSection title="Students by Tier" icon={TierIcon}>
+                <OverviewPanelSection title="Support Units by Tier" icon={TierIcon}>
                     <div className="space-y-4">
                         {systemSnapshot.tierBreakdown.map((tier) => (
                             <div key={tier.label} className="flex items-center gap-4">
@@ -84,7 +84,7 @@ const AdminOverviewPanel = ({ statCards, systemSnapshot, recentActivity, mentorS
                     </div>
                 </OverviewPanelSection>
 
-                <OverviewPanelSection title="Active Intervention Types" icon={InterventionIcon} accent="text-sky-500">
+                <OverviewPanelSection title="Active Subjects / Focus Areas" icon={InterventionIcon} accent="text-sky-500">
                     {hasActiveInterventions ? (
                         <div className="space-y-4">
                             {systemSnapshot.interventions.map((item) => (
@@ -101,13 +101,45 @@ const AdminOverviewPanel = ({ statCards, systemSnapshot, recentActivity, mentorS
                                     </div>
                                 </div>
                             ))}
+                            {subjectStudentBreakdown.length > 0 && (
+                                <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/80 p-4 dark:border-sky-400/20 dark:bg-sky-500/10">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-sky-700 dark:text-sky-200">
+                                        Student-subject breakdown
+                                    </p>
+                                    <div className="mt-3 space-y-3">
+                                        {subjectStudentBreakdown.slice(0, 4).map((row) => {
+                                            const studentPreview = row.students.slice(0, 3).map((student) => student.name).join(", ");
+                                            const studentLabel = row.students.length > 3
+                                                ? `${studentPreview} +${row.students.length - 3}`
+                                                : studentPreview;
+                                            return (
+                                                <div key={row.subject} className="rounded-xl bg-white/75 px-3 py-2 text-xs dark:bg-slate-800/60">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <p className="font-black text-slate-900 dark:text-white">{row.subject}</p>
+                                                        <span className="font-semibold text-sky-700 dark:text-sky-200">
+                                                            {row.supportUnitCount} units
+                                                        </span>
+                                                    </div>
+                                                    <p className="mt-1 truncate text-slate-600 dark:text-white/70" title={studentLabel}>
+                                                        {studentLabel || "No students"}
+                                                    </p>
+                                                    <p className="mt-1 truncate text-[10px] font-semibold text-slate-500 dark:text-white/50" title={row.owners.join(", ")}>
+                                                        Owners: {row.owners.slice(0, 2).join(", ") || "Unassigned"}
+                                                        {row.owners.length > 2 ? ` +${row.owners.length - 2}` : ""}
+                                                    </p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <EmptyStateCard
                             title={allTierOne ? "No active interventions in this view" : "No intervention plans are currently in scope"}
                             description={
                                 allTierOne
-                                    ? "Every visible student is currently staying in Tier 1 or universal support, so intervention types should remain empty until a Tier 2 or Tier 3 plan is created."
+                                    ? "Every visible support unit is currently staying in Tier 1 or universal support, so subject / focus area signals should remain empty until a Tier 2 or Tier 3 plan is created."
                                     : "No active intervention assignments were found for this segment yet."
                             }
                             icon={ShieldCheck}
@@ -123,7 +155,7 @@ const AdminOverviewPanel = ({ statCards, systemSnapshot, recentActivity, mentorS
                             {recentActivity.map((item) => (
                                 <div
                                     key={`${item.date}-${item.student}`}
-                                    className="grid grid-cols-[90px_1fr] gap-4 rounded-2xl bg-white/50 p-4 dark:bg-white/5"
+                                    className="grid grid-cols-[90px_1fr] gap-4 rounded-2xl bg-white/50 p-4 dark:bg-slate-800/50"
                                 >
                                     <div>
                                         <p className="font-semibold text-foreground dark:text-white">{item.date}</p>
@@ -149,7 +181,7 @@ const AdminOverviewPanel = ({ statCards, systemSnapshot, recentActivity, mentorS
                     {mentorSpotlights.length ? (
                         <div className="space-y-4">
                             {mentorSpotlights.map((mentor) => (
-                                <div key={mentor.name} className="flex items-center gap-4 rounded-2xl bg-white/60 p-4 dark:bg-white/5">
+                                <div key={mentor.name} className="flex items-center gap-4 rounded-2xl bg-white/60 p-4 dark:bg-slate-800/50">
                                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/70 to-rose/70 font-black text-white">
                                         {mentor.name
                                             .split(" ")
@@ -162,7 +194,7 @@ const AdminOverviewPanel = ({ statCards, systemSnapshot, recentActivity, mentorS
                                         <p className="text-xs text-muted-foreground">{mentor.focus}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-sm font-semibold text-foreground dark:text-white">{mentor.caseload} students</p>
+                                        <p className="text-sm font-semibold text-foreground dark:text-white">{mentor.caseload} support units</p>
                                         <p className="text-xs font-semibold text-emerald-500">{mentor.trend}</p>
                                     </div>
                                 </div>

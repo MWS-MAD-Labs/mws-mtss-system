@@ -36,6 +36,7 @@ const TeacherDashboardPanels = memo(
         editingPlan,
         onCancelEditPlan,
         refresh,
+        user,
     }) => {
         const panelContent = useMemo(() => {
             switch (activeTab) {
@@ -76,6 +77,7 @@ const TeacherDashboardPanels = memo(
                             textareaClass={textareaClass}
                             students={students}
                             submitting={submittingPlan}
+                            user={user}
                         />
                     );
                 case "edit":

@@ -9,11 +9,12 @@ import PageLoader from "@/components/PageLoader";
 import { fetchMtssMentors } from "@/services/mtssService";
 import { useLocation, useNavigate } from "react-router-dom";
 import QuickUpdateModal from "./components/QuickUpdateModal";
+import SubjectPickerModal from "./components/SubjectPickerModal";
 import PilotTaskHintBanner from "./components/PilotTaskHintBanner";
 import TeacherDashboardPanels from "./components/TeacherDashboardPanels";
 import TeacherDashboardStatus from "./components/TeacherDashboardStatus";
 import useTeacherDashboardActions from "./hooks/useTeacherDashboardActions";
-import { canUserEditPlanForStudent, resolveEditableAssignmentForUser } from "./utils/editPlanAccess";
+import { canUserEditPlanForStudent, resolveEditableAssignmentForUser, resolveAllEditableAssignmentsForUser } from "./utils/editPlanAccess";
 import { resolvePilotTeacherPreview } from "./utils/pilotTeacherPreview";
 import { resolvePilotStepGuide } from "./utils/pilotStepGuidance";
 import useMtssObserver from "./hooks/useMtssObserver";
@@ -85,6 +86,12 @@ const TeacherDashboardPage = memo(() => {
         error: dataError,
         refresh,
     } = useTeacherDashboardData(effectiveTeacherUser);
+    // Compute allowed tabs before the state hook so requestedTab validation
+    // uses the observer-filtered list, preventing URL ?tab= bypass.
+    const allowedTabs = useMemo(() => {
+        const hiddenKeys = isObserver ? ["edit", "create", "submit"] : ["edit"];
+        return tabs.filter((tab) => !hiddenKeys.includes(tab.key));
+    }, [isObserver]);
     const {
         activeTab,
         setActiveTab,
@@ -101,9 +108,11 @@ const TeacherDashboardPage = memo(() => {
         submittingPlan,
         setSubmittingProgress,
         submittingProgress,
-    } = useTeacherDashboardState(tabs, { onSaveSuccess: refresh, viewerUser: effectiveTeacherUser });
+    } = useTeacherDashboardState(allowedTabs, { onSaveSuccess: refresh, viewerUser: effectiveTeacherUser });
     const [quickUpdateStudent, setQuickUpdateStudent] = useState(null);
     const [savingQuickUpdate, setSavingQuickUpdate] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [subjectPicker, setSubjectPicker] = useState(null);
 
     const { base: baseFieldClass, textarea: textareaClass, notes: notesTextareaClass } = fieldClasses;
     const handleViewStudent = useCallback(
@@ -123,9 +132,14 @@ const TeacherDashboardPage = memo(() => {
 
     const handleOpenQuickUpdate = useCallback((student) => setQuickUpdateStudent(student), []);
     const canEditPlanForStudent = useCallback(
-        (student) => {
-            const assignmentOption = resolveEditableAssignmentForUser(effectiveTeacherUser, student);
-            return Boolean(assignmentOption?.assignmentId);
+        (student, assignmentOption = null) => {
+            const resolvedOption = assignmentOption?.assignmentId
+                ? assignmentOption
+                : resolveEditableAssignmentForUser(effectiveTeacherUser, student);
+            return Boolean(
+                resolvedOption?.assignmentId &&
+                canUserEditPlanForStudent(effectiveTeacherUser, student, resolvedOption),
+            );
         },
         [effectiveTeacherUser],
     );
@@ -134,8 +148,9 @@ const TeacherDashboardPage = memo(() => {
             const student = payload?.student || payload;
             if (!student) return;
 
-            const assignmentOption = payload?.assignmentOption || resolveEditableAssignmentForUser(effectiveTeacherUser, student);
-            if (!assignmentOption?.assignmentId) {
+            const allEditable = resolveAllEditableAssignmentsForUser(effectiveTeacherUser, student);
+
+            if (!allEditable.length) {
                 toast({
                     title: "No editable intervention",
                     description: `${student?.name || "Student"} doesn't have an intervention plan you can edit.`,
@@ -144,27 +159,30 @@ const TeacherDashboardPage = memo(() => {
                 return;
             }
 
-            if (!canUserEditPlanForStudent(effectiveTeacherUser, student, assignmentOption)) {
-                toast({
-                    title: "Edit permission denied",
-                    description: "Only homeroom teacher or matching subject teacher can edit this intervention plan.",
-                    variant: "destructive",
-                });
+            if (allEditable.length === 1) {
+                startEditingPlan(student, allEditable[0]);
                 return;
             }
 
-            startEditingPlan(student, assignmentOption);
+            setSubjectPicker({ student, options: allEditable });
         },
         [effectiveTeacherUser, startEditingPlan, toast],
     );
+
+    const handleSubjectPickerSelect = useCallback(
+        (option) => {
+            if (!subjectPicker?.student) return;
+            startEditingPlan(subjectPicker.student, option);
+            setSubjectPicker(null);
+        },
+        [subjectPicker, startEditingPlan],
+    );
+
+    const handleSubjectPickerClose = useCallback(() => setSubjectPicker(null), []);
     const handleCancelEditPlan = useCallback(() => {
         cancelEditingPlan();
         setActiveTab("students");
     }, [cancelEditingPlan, setActiveTab]);
-    const heroTabs = useMemo(() => {
-        const hiddenKeys = isObserver ? ["edit", "create", "submit"] : ["edit"];
-        return tabs.filter((tab) => !hiddenKeys.includes(tab.key));
-    }, [isObserver]);
     const handleHeroTabChange = useCallback(
         (nextTab) => {
             if (nextTab === "edit" && !isEditingPlan) {
@@ -190,12 +208,13 @@ const TeacherDashboardPage = memo(() => {
         setSubmittingProgress,
         toast,
         setSavingQuickUpdate,
+        setUploadProgress,
         onCloseQuickUpdate: handleCloseQuickUpdate,
     });
 
     return (
         <div ref={pageRef} className="ecd-page-root mtss-theme mtss-animated-bg min-h-screen relative text-foreground dark:text-white transition-colors">
-            {(submittingPlan || submittingProgress || savingQuickUpdate) && <PageLoader />}
+            {(submittingPlan || submittingProgress) && <PageLoader />}
             <div className="mtss-bg-overlay" />
 
             {/* Human-centered hybrid photo background */}
@@ -232,7 +251,7 @@ const TeacherDashboardPage = memo(() => {
                 >
                     <TeacherHeroSection
                         heroBadge={heroBadge}
-                        tabs={heroTabs}
+                        tabs={allowedTabs}
                         activeTab={activeTab}
                         onTabChange={handleHeroTabChange}
                         pilotGuide={pilotGuide?.pageType === "teacher" ? pilotGuide : null}
@@ -289,17 +308,27 @@ const TeacherDashboardPage = memo(() => {
                     onQuickUpdate={isObserver ? undefined : handleOpenQuickUpdate}
                     onEditPlan={isObserver ? undefined : handleEditPlan}
                     canEditPlanForStudent={isObserver ? () => false : canEditPlanForStudent}
+                    user={effectiveTeacherUser}
                     editingPlan={editingPlan}
                     onCancelEditPlan={handleCancelEditPlan}
                     refresh={refresh}
                 />
             </div>
+            {subjectPicker && !isObserver && (
+                <SubjectPickerModal
+                    student={subjectPicker.student}
+                    options={subjectPicker.options}
+                    onSelect={handleSubjectPickerSelect}
+                    onClose={handleSubjectPickerClose}
+                />
+            )}
             {quickUpdateStudent && !isObserver && (
                 <QuickUpdateModal
                     student={quickUpdateStudent}
                     onClose={handleCloseQuickUpdate}
                     onSubmit={handleQuickUpdateSubmit}
                     submitting={savingQuickUpdate}
+                    uploadProgress={uploadProgress}
                 />
             )}
         </div>

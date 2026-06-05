@@ -22,6 +22,7 @@ const InterventionFormFields = memo(({
     onStudentChange,
     onStrategyChange,
     isEditing = false,
+    allowedSubjectKeys = null,
 }) => {
     const fieldClass = `${baseFieldClass} bg-white/90 dark:bg-slate-900/50 border border-white/70 dark:border-white/15 shadow-[0_10px_30px_rgba(15,23,42,0.08)] focus:ring-2 focus:ring-primary/40`;
     const textareaFieldClass = `${textareaClass} bg-white/90 dark:bg-slate-900/50 border border-white/70 dark:border-white/15 shadow-[0_10px_30px_rgba(15,23,42,0.08)] focus:ring-2 focus:ring-primary/40`;
@@ -62,17 +63,25 @@ const InterventionFormFields = memo(({
             </div>
 
             <div className="grid md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="120">
-                <div className={`${fieldWrap} flex flex-col gap-2`}>
-                    <label className={labelClass}>
-                        Intervention Type
-                    </label>
-                    <select className={fieldClass} value={formState.type} onChange={(e) => onChange("type", e.target.value)}>
-                        <option value="">Select type</option>
-                        {INTERVENTION_TYPES.map((type) => (
-                            <option key={type.value} value={type.value}>{type.label}</option>
-                        ))}
-                    </select>
-                </div>
+                    <div className={`${fieldWrap} flex flex-col gap-2`}>
+                        <label className={labelClass}>
+                            Subject / Focus Area
+                        </label>
+                        <select className={fieldClass} value={formState.type} onChange={(e) => onChange("type", e.target.value)}>
+                            <option value="">Select subject or focus area</option>
+                            {INTERVENTION_TYPES
+                                .filter((type) => !allowedSubjectKeys || allowedSubjectKeys.has(type.value))
+                                .map((type) => (
+                                    <option key={type.value} value={type.value}>{type.label}</option>
+                                ))
+                            }
+                        </select>
+                        <p className="text-xs text-muted-foreground">
+                            {allowedSubjectKeys
+                                ? "Showing subjects you are assigned to teach for this student."
+                                : "Examples: Math, English, Behavior, Attendance."}
+                        </p>
+                    </div>
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>
                         Tier Level
@@ -96,11 +105,11 @@ const InterventionFormFields = memo(({
                             <option key={strategy._id} value={strategy._id}>{strategy.name}</option>
                         ))}
                     </select>
-                    <p className="text-xs text-muted-foreground">
-                        {strategyFallbackActive
-                            ? "No exact match for this type yet. Showing full strategy library."
-                            : "Suggestions filtered by intervention type."}
-                    </p>
+                        <p className="text-xs text-muted-foreground">
+                            {strategyFallbackActive
+                                ? "No exact match for this focus area yet. Showing full strategy library."
+                                : "Suggestions filtered by subject / focus area."}
+                        </p>
                 </div>
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>

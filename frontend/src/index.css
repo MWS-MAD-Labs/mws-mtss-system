@@ -102,6 +102,7 @@
     --mtss-role-ink-teacher: #2b133d;
     --mtss-role-ink-admin: #341310;
     --mtss-role-ink-family: #0c2b28;
+    --mtss-chart-dot-border: #ffffff;
     --mtss-shell-light: linear-gradient(135deg, rgba(255, 253, 247, 0.98), rgba(255, 240, 245, 0.96) 40%, rgba(240, 244, 255, 0.94));
     --mtss-shell-dark: linear-gradient(135deg, rgba(28, 16, 48, 0.92), rgba(17, 29, 55, 0.9) 45%, rgba(8, 41, 52, 0.88));
     --mtss-shell-border-light: rgba(255, 255, 255, 0.65);
@@ -165,6 +166,7 @@ html.dark {
     --mtss-role-ink-teacher: #fff5ff;
     --mtss-role-ink-admin: #fff4e8;
     --mtss-role-ink-family: #e6fff7;
+    --mtss-chart-dot-border: #1e293b;
 }
 
 /* ------------------------- Base page styles ------------------------- */

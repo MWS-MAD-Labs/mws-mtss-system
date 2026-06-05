@@ -255,6 +255,48 @@ export const resolveEditableAssignmentForUser = (user = {}, student = {}) => {
     return escalatedEditable[0] || editableOptions[0];
 };
 
+export const resolveAllEditableAssignmentsForUser = (user = {}, student = {}) => {
+    const options = getCandidateAssignmentOptions(student);
+    if (!options.length) return [];
+    return options.filter((option) => canUserEditPlanForStudent(user, student, option));
+};
+
+/**
+ * Returns the Set of intervention type values (matching interventionFormConfig INTERVENTION_TYPES)
+ * that `user` is allowed to create for `student`.
+ * Returns null when there is no restriction (show all types).
+ */
+export const resolveAllowedSubjectKeys = (user = {}, student = null) => {
+    if (!student) return null;
+
+    const classes = Array.isArray(user?.classes) ? user.classes : [];
+    if (!classes.length) return null;
+
+    // Homeroom for this student's class → unrestricted
+    const isHomeroom = classes.some((cls) => {
+        if (!isHomeroomRole(cls?.role || "")) return false;
+        return (
+            gradeMatches(cls?.grade, student) &&
+            classMatches(cls?.className, student, { allowGenericLabel: true })
+        );
+    });
+    if (isHomeroom) return null;
+
+    // Check if teacher has ANY class assignment matching this student's grade
+    const hasGradeMatch = classes.some((cls) => gradeMatches(cls?.grade, student));
+    if (!hasGradeMatch) return null;
+
+    // Collect only the subjects they teach for this student's grade/class
+    const allowed = new Set(["universal"]);
+    classes.forEach((cls) => {
+        if (!gradeMatches(cls?.grade, student)) return;
+        if (!classMatches(cls?.className, student, { allowGenericLabel: true })) return;
+        resolveClassSubjectKeys(cls).forEach((key) => allowed.add(key));
+    });
+
+    return allowed;
+};
+
 export const formatPlanAuditDate = (value) => {
     if (!value) return null;
     const parsed = new Date(value);

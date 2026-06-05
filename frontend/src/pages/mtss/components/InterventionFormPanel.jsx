@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { fetchStrategies } from "@/services/mtssService";
 import { filterStrategiesByType, validateInterventionForm } from "../config/interventionFormConfig";
+import { resolveAllowedSubjectKeys } from "../utils/editPlanAccess";
 import InterventionFormFields from "./InterventionFormFields";
 import PilotTaskHintBanner from "./PilotTaskHintBanner";
 
@@ -16,9 +17,21 @@ const InterventionFormPanel = memo(({
     submitting = false,
     isEditing = false,
     editingPlan = null,
+    user = null,
 }) => {
     const [strategies, setStrategies] = useState([]);
     const [loadingStrategies, setLoadingStrategies] = useState(false);
+    const [confirmPending, setConfirmPending] = useState(false);
+
+    const handleFormSubmit = (e) => {
+        if (isEditing && !confirmPending) {
+            e.preventDefault();
+            setConfirmPending(true);
+            return;
+        }
+        setConfirmPending(false);
+        onSubmit(e);
+    };
 
     useEffect(() => {
         let mounted = true;
@@ -53,14 +66,24 @@ const InterventionFormPanel = memo(({
         [students, formState.studentId],
     );
 
+    const allowedSubjectKeys = useMemo(
+        () => resolveAllowedSubjectKeys(user, selectedStudent),
+        [user, selectedStudent],
+    );
+
     const handleStudentChange = (event) => {
         const value = event.target.value;
         const student = students.find((candidate) => candidate.id === value || candidate._id === value);
+        const nextAllowed = resolveAllowedSubjectKeys(user, student || null);
         onChange("studentId", value);
         onChange("studentName", student?.name || "");
         onChange("grade", student?.grade || student?.currentGrade || "");
         onChange("className", student?.className || "");
         onChange("mode", "quantitative");
+        // Reset type if it's no longer allowed for the newly selected student
+        if (nextAllowed && formState.type && !nextAllowed.has(formState.type)) {
+            onChange("type", "");
+        }
     };
 
     const handleStrategyChange = (event) => {
@@ -82,8 +105,8 @@ const InterventionFormPanel = memo(({
             data-aos-duration="700"
         >
             <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute -top-20 -left-10 h-56 w-56 bg-gradient-to-br from-[#f472b6]/25 via-[#60a5fa]/20 to-transparent blur-[120px]" />
-                <div className="absolute -bottom-16 right-0 h-64 w-64 bg-gradient-to-br from-[#22d3ee]/20 via-[#a855f7]/15 to-transparent blur-[140px]" />
+                <div className="absolute -top-20 -left-10 h-56 w-56 bg-gradient-to-br from-[var(--mtss-glow-pink)]/25 via-[var(--mtss-glow-blue)]/20 to-transparent blur-[120px]" />
+                <div className="absolute -bottom-16 right-0 h-64 w-64 bg-gradient-to-br from-[var(--mtss-glow-cyan)]/20 via-[var(--mtss-glow-purple)]/15 to-transparent blur-[140px]" />
                 <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.6),_transparent_60%)] dark:opacity-20" />
             </div>
             <div className="relative space-y-6">
@@ -96,7 +119,7 @@ const InterventionFormPanel = memo(({
                         <Sparkles className="w-4 h-4 text-primary" />
                         Plan Builder
                     </div>
-                    <h2 className="text-2xl sm:text-3xl font-black leading-tight bg-gradient-to-r from-[#0f172a] via-[#334155] to-[#2563eb] dark:from-white dark:via-[#c7d2fe] dark:to-[#f472b6] text-transparent bg-clip-text">
+                    <h2 className="text-2xl sm:text-3xl font-black leading-tight bg-gradient-to-r from-[var(--mtss-heading-light-from)] via-[var(--mtss-heading-light-via)] to-[var(--mtss-heading-light-to)] dark:from-white dark:via-[var(--mtss-heading-dark-via)] dark:to-[var(--mtss-heading-dark-to)] text-transparent bg-clip-text">
                         {isEditing ? "Adjust the active intervention" : "Set up a focused MTSS intervention"}
                     </h2>
                     <p className="text-sm text-slate-600 dark:text-slate-200 max-w-2xl">
@@ -109,9 +132,14 @@ const InterventionFormPanel = memo(({
                             Editing: {editingPlan?.studentName || "Student"} {editingPlan?.focusLabel ? `(${editingPlan.focusLabel})` : ""}
                         </div>
                     )}
+                    {isEditing && (
+                        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/70 px-4 py-3 text-xs leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-200">
+                            <strong>What changes:</strong> strategy, goal, frequency, and monitoring method are updated on the active plan. <strong>What stays:</strong> all progress logs already recorded for this student are preserved and unaffected.
+                        </div>
+                    )}
                 </header>
 
-                <form className="space-y-5" onSubmit={onSubmit}>
+                <form className="space-y-5" onSubmit={handleFormSubmit}>
                     <InterventionFormFields
                         formState={formState}
                         onChange={onChange}
@@ -125,24 +153,49 @@ const InterventionFormPanel = memo(({
                         onStudentChange={handleStudentChange}
                         onStrategyChange={handleStrategyChange}
                         isEditing={isEditing}
+                        allowedSubjectKeys={allowedSubjectKeys}
                     />
 
                     <div className="flex flex-wrap gap-3 pt-2">
-                        <button
-                            type="submit"
-                            disabled={!isValid || submitting}
-                            className={`relative inline-flex items-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-600 text-white font-semibold shadow-[0_18px_45px_rgba(14,116,214,0.28)] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                pilotGuide?.formAction === "save-plan" ? "ring-2 ring-amber-400/90 ring-offset-2 ring-offset-white dark:ring-amber-300 dark:ring-offset-slate-900 animate-pulse" : ""
-                            }`}
-                        >
-                            {pilotGuide?.formAction === "save-plan" && (
-                                <span className="pointer-events-none absolute -top-3 right-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-white shadow-lg animate-bounce">
-                                    Save here
-                                </span>
-                            )}
-                            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                            {submitting ? "Saving..." : "Save Intervention Plan"}
-                        </button>
+                        {!confirmPending ? (
+                            <button
+                                type="submit"
+                                disabled={!isValid || submitting}
+                                className={`relative inline-flex items-center gap-2 px-5 py-3 rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-600 text-white font-semibold shadow-[0_18px_45px_rgba(14,116,214,0.28)] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                    pilotGuide?.formAction === "save-plan" ? "ring-2 ring-amber-400/90 ring-offset-2 ring-offset-white dark:ring-amber-300 dark:ring-offset-slate-900 animate-pulse" : ""
+                                }`}
+                            >
+                                {pilotGuide?.formAction === "save-plan" && (
+                                    <span className="pointer-events-none absolute -top-3 right-2 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-white shadow-lg animate-bounce">
+                                        Save here
+                                    </span>
+                                )}
+                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                {submitting ? "Saving..." : "Save Intervention Plan"}
+                            </button>
+                        ) : (
+                            <div className="w-full rounded-2xl border border-rose-200/60 bg-rose-50/70 px-4 py-4 dark:border-rose-500/30 dark:bg-rose-900/20">
+                                <p className="text-sm font-semibold text-rose-800 dark:text-rose-200 mb-3">
+                                    Save changes to this active plan? Strategy, goal, and frequency will be updated. Existing progress logs are unaffected.
+                                </p>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="submit"
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-500 text-white text-xs font-semibold hover:bg-rose-600 transition"
+                                    >
+                                        {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                        Yes, save changes
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmPending(false)}
+                                        className="inline-flex items-center px-4 py-2 rounded-full border border-rose-300/60 text-rose-700 dark:text-rose-200 text-xs font-semibold hover:bg-rose-100 dark:hover:bg-rose-900/30 transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </form>
             </div>
