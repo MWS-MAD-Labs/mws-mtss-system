@@ -20,6 +20,11 @@ const {
     normalizeClassLabel,
     normalizeGradeLabel
 } = require('../utils/mtssAccess');
+const {
+    buildAssignmentPairings,
+    buildMentorSubjectCoverageRows,
+    getMentorAssignmentFocusLabels
+} = require('../utils/mentorAssignmentPairingUtils');
 
 const TIER_ORDER = {
     tier1: 1,
@@ -674,6 +679,10 @@ const enrichAssignmentForTeacherTools = (assignment = {}, viewer = {}) => {
 
     return {
         ...assignment,
+        focusLabels: getMentorAssignmentFocusLabels(assignment),
+        pairings: buildAssignmentPairings(assignment),
+        mentorName: assignment.mentorId?.name || null,
+        mentorEmail: assignment.mentorId?.email || null,
         weeklyFocusOverview: buildWeeklyFocusOverview(assignment.checkIns || []),
         viewerPermissions,
         viewerCanEditPlan: viewerPermissions.canEditPlan,
@@ -1195,12 +1204,13 @@ const sanitizeCheckIn = (checkIn = {}) => {
         date: safeDate,
         summary: summary || 'Progress update',
         nextSteps: nextSteps || undefined,
-        value: Number.isFinite(parsedValue) ? parsedValue : undefined,
+        value: Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : undefined,
         unit: checkIn.unit ? checkIn.unit.toString().trim().toLowerCase() : undefined,
         performed: typeof checkIn.performed === 'boolean' ? checkIn.performed : true,
-        skipReason: checkIn.skipReason || undefined,
-        skipReasonNote: checkIn.skipReasonNote ? checkIn.skipReasonNote.toString().trim() : undefined,
-        celebration: checkIn.celebration ? checkIn.celebration.toString().trim() : undefined,
+	        skipReason: checkIn.skipReason || undefined,
+	        skipReasonNote: checkIn.skipReasonNote ? checkIn.skipReasonNote.toString().trim() : undefined,
+        lateReason: checkIn.lateReason ? checkIn.lateReason.toString().trim().slice(0, 300) : undefined,
+	        celebration: checkIn.celebration ? checkIn.celebration.toString().trim() : undefined,
         signal,
         tags: tags?.length ? tags : undefined,
         context: context || undefined,
@@ -1221,15 +1231,15 @@ const sanitizeCheckIn = (checkIn = {}) => {
     };
 };
 
-const normalizeAssignmentTier = (tier = 'tier2') => {
-    let normalizedTier = tier || 'tier2';
+const normalizeAssignmentTier = (tier = 'tier1') => {
+    let normalizedTier = tier || 'tier1';
     if (typeof normalizedTier === 'string') {
         normalizedTier = normalizedTier.toLowerCase().replace(/\s+/g, '');
         if (!normalizedTier.startsWith('tier')) {
             normalizedTier = `tier${normalizedTier}`;
         }
     }
-    return normalizedTier || 'tier2';
+    return normalizedTier || 'tier1';
 };
 
 const createMentorAssignment = async (req, res) => {
@@ -1279,6 +1289,7 @@ const createMentorAssignment = async (req, res) => {
             : [];
 
         const resolvedMode = 'quantitative';
+        const focusAreasOverridden = !normalizedFocusAreas.length;
         const resolvedFocusAreas = normalizedFocusAreas.length ? normalizedFocusAreas : ['Universal Supports'];
 
         const cleanedStrategyName = strategyName?.trim() || undefined;
@@ -1321,7 +1332,23 @@ const createMentorAssignment = async (req, res) => {
             lastPlanUpdatedBy: req.user?.id || null
         });
 
-        sendSuccess(res, 'Intervention plan created', { assignment }, 201);
+        // Post-creation TOCTOU guard: a concurrent request may have won the race.
+        // If we find a conflict (excluding ourselves), roll back and return 409.
+        const postConflicts = await findSubjectConflicts({
+            studentIds,
+            subjectKeys: requestedSubjectKeys,
+            excludeAssignmentId: assignment._id
+        });
+        if (postConflicts.length) {
+            await MentorAssignment.deleteOne({ _id: assignment._id });
+            return sendError(res, buildDuplicateInterventionMessage(postConflicts), 409);
+        }
+
+        const responsePayload = { assignment };
+        if (focusAreasOverridden) {
+            responsePayload.warnings = ['Focus areas were empty; defaulted to "Universal Supports"'];
+        }
+        sendSuccess(res, 'Intervention plan created', responsePayload, 201);
 
         emitAssignmentEvent(assignment._id, 'created').catch((error) => {
             console.error('Failed to broadcast new mentor assignment:', error);
@@ -1369,8 +1396,9 @@ const getMentorAssignments = async (req, res) => {
             });
 
         const assignments = scopedAssignments.map((assignment) => enrichAssignmentForTeacherTools(assignment, req.user));
+        const mentorSubjectCoverage = buildMentorSubjectCoverageRows(assignments);
 
-        sendSuccess(res, 'Mentor assignments retrieved', { assignments });
+        sendSuccess(res, 'Mentor assignments retrieved', { assignments, mentorSubjectCoverage });
     } catch (error) {
         console.error('Failed to fetch mentor assignments:', error);
         sendError(res, 'Failed to retrieve mentor assignments', 500);
@@ -1434,8 +1462,25 @@ const updateMentorAssignment = async (req, res) => {
         const isCreator = assignment.createdBy?.toString?.() === viewerId;
         const includesPlanEdits = hasPlanEditPayload(req.body);
         const hasCheckInUpdates = Boolean(Array.isArray(checkIns) && checkIns.length);
+        if (hasCheckInUpdates && checkIns.some((checkIn = {}) => checkIn.performed === false && !checkIn.skipReason)) {
+            return sendError(res, 'A skip reason is required when an intervention is marked as skipped.', 400);
+        }
+        if (hasCheckInUpdates) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const hasLateWithoutReason = checkIns.some((checkIn = {}) => {
+                if (!checkIn.date) return false;
+                const checkInDate = new Date(checkIn.date);
+                if (Number.isNaN(checkInDate.getTime())) return false;
+                checkInDate.setHours(0, 0, 0, 0);
+                return checkInDate < today && !checkIn.lateReason;
+            });
+            if (hasLateWithoutReason) {
+                return sendError(res, 'A late reason is required when a progress update is submitted after the support date.', 400);
+            }
+        }
 
-        let assignmentStudents = [];
+	        let assignmentStudents = [];
 
         if (includesPlanEdits || hasCheckInUpdates) {
             const [hydratedScope] = await hydrateAssignmentStudents([{

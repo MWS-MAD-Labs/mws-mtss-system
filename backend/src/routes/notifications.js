@@ -12,6 +12,10 @@ const {
 } = require('../controllers/notificationController');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { validateQuery } = require('../middleware/validation');
+const {
+    getNotificationPreferences,
+    updateNotificationPreferences,
+} = require('../controllers/notificationPreferenceController');
 
 // All notification routes require authentication
 router.use(authenticate);
@@ -40,6 +44,10 @@ router.delete('/:notificationId', deleteNotification);
 // Admin-only routes for creating notifications
 router.post('/system', requireAdmin, createSystemNotification);
 router.post('/support-request', requireAdmin, createSupportRequestNotification);
+
+// Notification preferences (teacher alert delivery settings)
+router.get('/preferences', getNotificationPreferences);
+router.put('/preferences', updateNotificationPreferences);
 
 // Slack interactive actions (no authentication required for Slack webhooks)
 router.post('/slack/actions', handleSlackAction);

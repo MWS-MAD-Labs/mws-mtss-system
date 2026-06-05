@@ -281,7 +281,7 @@ const SupportModeSelectionPage = memo(() => {
             </span>
             <br />
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#ff58c2] via-[#ffb347] to-[#7dd3fc]">
-              for Our Kids
+              for Our Students
             </span>
           </h1>
           {/* Trust indicators */}

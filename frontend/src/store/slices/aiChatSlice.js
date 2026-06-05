@@ -2,6 +2,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import * as aiChatService from '@/services/aiChatService';
 import { normalizeAssistantWidgets } from '@/features/assistant/runtime/responseValidator';
 
+const AI_ASSISTANT_FALLBACK_MESSAGE = 'AI Assistant could not respond. Retry or continue without AI.';
+
 // Async thunks for API calls
 export const sendMessage = createAsyncThunk(
     'aiChat/sendMessage',
@@ -9,11 +11,19 @@ export const sendMessage = createAsyncThunk(
         try {
             const response = await aiChatService.sendChatMessage(message, sessionId);
             if (response.success) {
-                return response.data;
+                const data = response.data || {};
+                const assistantMessage = String(data.message || '').trim();
+                if (!assistantMessage) {
+                    return rejectWithValue(AI_ASSISTANT_FALLBACK_MESSAGE);
+                }
+                return {
+                    ...data,
+                    message: assistantMessage
+                };
             }
-            return rejectWithValue('Failed to send message');
+            return rejectWithValue(response.message || AI_ASSISTANT_FALLBACK_MESSAGE);
         } catch (error) {
-            return rejectWithValue(error.message);
+            return rejectWithValue(error?.response?.data?.message || error.message || AI_ASSISTANT_FALLBACK_MESSAGE);
         }
     }
 );
@@ -174,6 +184,7 @@ const aiChatSlice = createSlice({
             state.buddyExpression = BUDDY_EXPRESSIONS.thinking;
             state.buddyAnimation = 'nod';
             state.lastMessageTime = Date.now();
+            state.error = null;
         },
 
         // Add AI message
@@ -222,6 +233,7 @@ const aiChatSlice = createSlice({
             state.sessionId = null;
             state.buddyExpression = BUDDY_EXPRESSIONS.idle;
             state.buddyAnimation = 'wave';
+            state.error = null;
         },
 
         // Settings
@@ -253,14 +265,20 @@ const aiChatSlice = createSlice({
                     state.sessionId = action.payload.sessionId;
                 }
 
+                const messageContent = String(action.payload.message || AI_ASSISTANT_FALLBACK_MESSAGE).trim();
+                state.error = action.payload.error ? messageContent : null;
+
                 // AI response is added via addAIMessage action
                 const aiMessage = {
                     role: 'assistant',
-                    content: action.payload.message,
+                    content: messageContent,
                     timestamp: new Date().toISOString(),
                     id: `ai_${Date.now()}`,
-                    expression: detectExpression(action.payload.message),
-                    widgets: normalizeWidgets(action.payload.uiWidgets)
+                    expression: detectExpression(messageContent),
+                    widgets: normalizeWidgets(action.payload.uiWidgets),
+                    isError: Boolean(action.payload.error),
+                    canRetry: Boolean(action.payload.error),
+                    prompt: action.meta?.arg?.message || ''
                 };
                 state.messages.push(aiMessage);
                 state.buddyExpression = BUDDY_EXPRESSIONS[aiMessage.expression] || BUDDY_EXPRESSIONS.happy;
@@ -284,16 +302,19 @@ const aiChatSlice = createSlice({
             .addCase(sendMessage.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isTyping = false;
-                state.error = action.payload;
+                const fallbackMessage = action.payload || AI_ASSISTANT_FALLBACK_MESSAGE;
+                state.error = fallbackMessage;
                 state.buddyExpression = BUDDY_EXPRESSIONS.confused;
 
                 // Add error message
                 state.messages.push({
                     role: 'assistant',
-                    content: "Sorry, I'm having some technical issues right now. Please try asking again! 😊",
+                    content: fallbackMessage,
                     timestamp: new Date().toISOString(),
                     id: `error_${Date.now()}`,
-                    isError: true
+                    isError: true,
+                    canRetry: true,
+                    prompt: action.meta?.arg?.message || ''
                 });
             });
 

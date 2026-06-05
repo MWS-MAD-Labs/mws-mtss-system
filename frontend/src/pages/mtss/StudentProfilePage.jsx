@@ -66,6 +66,7 @@ const StudentProfilePage = memo(() => {
         durationLabel,
         frequencyLabel,
         mentorLabel,
+        pairingLabel,
         goalLabel,
         monitoringMethodLabel,
         startDateLabel,
@@ -135,6 +136,7 @@ const StudentProfilePage = memo(() => {
                                     durationLabel={durationLabel}
                                     frequencyLabel={frequencyLabel}
                                     mentorLabel={mentorLabel}
+                                    pairingLabel={pairingLabel}
                                     goalLabel={goalLabel}
                                     monitoringMethodLabel={monitoringMethodLabel}
                                     startDateLabel={startDateLabel}

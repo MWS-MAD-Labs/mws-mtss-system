@@ -181,12 +181,14 @@ const ObserverDashboardPage = memo(() => {
 
     /* ── Data ─────────────────────────────────────────────────────── */
     const {
-        students, statCards, systemSnapshot, recentActivity,
+        students, supportUnits, statCards, systemSnapshot, recentActivity,
         mentorSpotlights, mentorRoster, mentors,
         successByType, trendData, trendPaths,
-        strategyHighlights, tierMovement,
+        strategyHighlights, tierMovement, mentorSubjectCoverageRows,
+        subjectStudentBreakdown,
         loading, error, refresh,
     } = useAdminDashboardData();
+    const dashboardRows = supportUnits?.length ? supportUnits : students;
 
     const {
         activeTab,
@@ -195,7 +197,7 @@ const ObserverDashboardPage = memo(() => {
         filteredStudents, gradeOptions, tierOptions, typeOptions, mentorOptions,
         visibleCount, setVisibleCount,
         handleViewStudent,
-    } = useAdminDashboardState(students);
+    } = useAdminDashboardState(dashboardRows);
 
     /* ── Computed values ──────────────────────────────────────────── */
     const totalStudents = systemSnapshot?.totalStudents ?? students.length;
@@ -265,6 +267,7 @@ const ObserverDashboardPage = memo(() => {
                     <AdminOverviewPanel
                         statCards={statCards}
                         systemSnapshot={systemSnapshot}
+                        subjectStudentBreakdown={subjectStudentBreakdown}
                         recentActivity={recentActivity}
                         mentorSpotlights={mentorSpotlights}
                         icons={overviewIcons}
@@ -280,7 +283,7 @@ const ObserverDashboardPage = memo(() => {
                         typeOptions={typeOptions}
                         mentorOptions={mentorOptions}
                         filteredStudents={filteredStudents}
-                        allStudents={students}
+                        allStudents={dashboardRows}
                         visibleCount={visibleCount}
                         onVisibleCountChange={setVisibleCount}
                         onViewStudent={handleViewStudent}
@@ -308,6 +311,7 @@ const ObserverDashboardPage = memo(() => {
                         trendData={trendData}
                         strategyHighlights={strategyHighlights}
                         tierMovement={tierMovement}
+                        mentorSubjectCoverageRows={mentorSubjectCoverageRows}
                     />
                 );
             default:
@@ -315,10 +319,11 @@ const ObserverDashboardPage = memo(() => {
         }
     }, [
         activeTab, statCards, systemSnapshot, recentActivity, mentorSpotlights,
+        subjectStudentBreakdown,
         filters, handleFilterChange, gradeOptions, tierOptions, typeOptions,
-        mentorOptions, filteredStudents, students, visibleCount, setVisibleCount, handleViewStudent, mentors,
+        mentorOptions, filteredStudents, dashboardRows, visibleCount, setVisibleCount, handleViewStudent, mentors,
         refresh, mentorRoster, successByType, trendPaths, trendData,
-        strategyHighlights, tierMovement,
+        strategyHighlights, tierMovement, mentorSubjectCoverageRows,
     ]);
 
     return (

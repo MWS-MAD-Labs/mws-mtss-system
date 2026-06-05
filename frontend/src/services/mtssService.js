@@ -27,7 +27,7 @@ export const fetchMtssMentors = (params = {}, config = {}) =>
     api.get('/mtss/mentors', withConfig(config, params)).then(withData);
 
 export const upsertPilotFeedbackSession = (payload, config = {}) =>
-    api.post('/mtss/pilot-feedback', payload, config).then(withData);
+    api.post('/mtss/pilot-feedback', payload, { skipGlobalLoading: true, ...config }).then(withData);
 
 export const fetchPilotFeedbackSessions = (params = {}, config = {}) =>
     api.get('/mtss/pilot-feedback', withConfig(config, params)).then(withData);
