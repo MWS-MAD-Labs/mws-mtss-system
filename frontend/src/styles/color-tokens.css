@@ -1,0 +1,226 @@
+/* ================================================================
+   COLOR TOKENS — Daily Check-in & MTSS
+   ================================================================
+   Single source of truth for all hardcoded color values.
+   All token names follow this convention:
+     --cw-*   = Check-in Weather gradient stops
+     --cm-*   = Check-in Mood/Emotion gradient stops
+     --ci-*   = Check-in Icon colors
+     --checkin-btn-* = Check-in action button gradient stops
+     --mtss-stat-*   = MTSS stat card gradient stops
+     --mtss-glow-*   = MTSS decorative ambient glow colors
+     --mtss-heading-* = MTSS form/panel heading gradient stops
+     --mtss-chart-*  = MTSS SVG/chart data colors
+     --mtss-panel-*  = MTSS card/panel background colors
+     --dash-weather-* = Dashboard weather analysis icon colors
+   ================================================================ */
+
+:root {
+
+  /* ──────────────────────────────────────────────────────────────
+     DAILY CHECK-IN — WEATHER GRADIENT STOPS
+     Usage in Tailwind: from-[var(--cw-sunny-from)] via-[var(--cw-sunny-via)] to-[var(--cw-sunny-to)]
+     ────────────────────────────────────────────────────────────── */
+  --cw-sunny-from:        #fde68a;
+  --cw-sunny-via:         #fbbf24;
+  --cw-sunny-to:          #f59e0b;
+
+  --cw-partly-cloudy-from: #e2e8f0;
+  --cw-partly-cloudy-via:  #cbd5f5;
+  --cw-partly-cloudy-to:   #94a3b8;
+
+  --cw-light-rain-from:   #bfdbfe;
+  --cw-light-rain-via:    #93c5fd;
+  --cw-light-rain-to:     #38bdf8;
+
+  --cw-thunderstorms-from: #fca5a5;
+  --cw-thunderstorms-via:  #f97316;
+  --cw-thunderstorms-to:   #fbbf24;
+
+  --cw-tornado-from:      #e5e7eb;
+  --cw-tornado-via:       #cbd5f5;
+  --cw-tornado-to:        #94a3b8;
+
+  --cw-snowy-from:        #e0f2fe;
+  --cw-snowy-via:         #bfdbfe;
+  --cw-snowy-to:          #93c5fd;
+
+  --cw-rainbow-from:      #fbcfe8;
+  --cw-rainbow-via:       #a78bfa;
+  --cw-rainbow-to:        #6ee7b7;
+
+  --cw-foggy-from:        #e2e8f0;
+  --cw-foggy-via:         #c7d2fe;
+  --cw-foggy-to:          #d1d5db;
+
+  --cw-heatwave-from:     #fecaca;
+  --cw-heatwave-via:      #fb7185;
+  --cw-heatwave-to:       #f97316;
+
+  --cw-windy-from:        #bae6fd;
+  --cw-windy-via:         #7dd3fc;
+  --cw-windy-to:          #22d3ee;
+
+  /* ──────────────────────────────────────────────────────────────
+     DAILY CHECK-IN — WEATHER ICON COLORS
+     Usage: style={{ color: 'var(--ci-sun)' }}
+     ────────────────────────────────────────────────────────────── */
+  --ci-sun:         #f59e0b;
+  --ci-cloud:       #9ca3af;
+  --ci-cloud-rain:  #0ea5e9;
+  --ci-zap:         #f97316;
+  --ci-tornado:     #6b7280;
+  --ci-snowflake:   #60a5fa;
+  --ci-rainbow:     #a78bfa;
+  --ci-cloud-fog:   #9ca3af;
+  --ci-wind:        #06b6d4;
+  --ci-flame:       #fb923c;
+
+  /* ──────────────────────────────────────────────────────────────
+     DAILY CHECK-IN — MOOD / EMOTION GRADIENT STOPS
+     Usage in Tailwind: from-[var(--cm-happy-from)] via-[var(--cm-happy-via)] to-[var(--cm-happy-to)]
+     ────────────────────────────────────────────────────────────── */
+  --cm-happy-from:       #fde68a;
+  --cm-happy-via:        #fbbf24;
+  --cm-happy-to:         #fb7185;
+
+  --cm-excited-from:     #fbcfe8;
+  --cm-excited-via:      #f472b6;
+  --cm-excited-to:       #a855f7;
+
+  --cm-calm-from:        #bbf7d0;
+  --cm-calm-via:         #6ee7b7;
+  --cm-calm-to:          #34d399;
+
+  --cm-hopeful-from:     #bae6fd;
+  --cm-hopeful-via:      #a78bfa;
+  --cm-hopeful-to:       #fbcfe8;
+
+  --cm-sad-from:         #bfdbfe;
+  --cm-sad-via:          #818cf8;
+  --cm-sad-to:           #38bdf8;
+
+  --cm-anxious-from:     #ddd6fe;
+  --cm-anxious-via:      #a5b4fc;
+  --cm-anxious-to:       #93c5fd;
+
+  --cm-angry-from:       #fecaca;
+  --cm-angry-via:        #f87171;
+  --cm-angry-to:         #fb7185;
+
+  --cm-fear-from:        #e2e8f0;
+  --cm-fear-via:         #c4b5fd;
+  --cm-fear-to:          #a5b4fc;
+
+  --cm-overwhelmed-from: #fecdd3;
+  --cm-overwhelmed-via:  #c4b5fd;
+  --cm-overwhelmed-to:   #93c5fd;
+
+  --cm-tired-from:       #e2e8f0;
+  --cm-tired-via:        #cbd5f5;
+  --cm-tired-to:         #a5b4fc;
+
+  --cm-hungry-from:      #fde68a;
+  --cm-hungry-via:       #fcd34d;
+  --cm-hungry-to:        #f59e0b;
+
+  --cm-lonely-from:      #e0f2fe;
+  --cm-lonely-via:       #c4b5fd;
+  --cm-lonely-to:        #e9d5ff;
+
+  --cm-bored-from:       #e5e7eb;
+  --cm-bored-via:        #cbd5f5;
+  --cm-bored-to:         #d1d5db;
+
+  --cm-scattered-from:   #c7d2fe;
+  --cm-scattered-via:    #a5b4fc;
+  --cm-scattered-to:     #fbcfe8;
+
+  /* ──────────────────────────────────────────────────────────────
+     DAILY CHECK-IN — ACTION BUTTON GRADIENT STOPS
+     Usage in Tailwind: from-[var(--checkin-btn-manual-from)] ...
+     ────────────────────────────────────────────────────────────── */
+  --checkin-btn-manual-from: #ff9ad5;
+  --checkin-btn-manual-via:  #ffd1a3;
+  --checkin-btn-manual-to:   #7dd3fc;
+
+  --checkin-btn-ai-from:     #60a5fa;
+  --checkin-btn-ai-via:      #a78bfa;
+  --checkin-btn-ai-to:       #fbcfe8;
+
+  --checkin-btn-submit-from: #ff58c2;
+  --checkin-btn-submit-via:  #ffb347;
+  --checkin-btn-submit-to:   #7dd3fc;
+
+  --checkin-btn-chat-from:   #22d3ee;
+  --checkin-btn-chat-via:    #3b82f6;
+  --checkin-btn-chat-to:     #a855f7;
+
+  /* ──────────────────────────────────────────────────────────────
+     MTSS — STAT CARD GRADIENT STOPS
+     Usage in Tailwind: from-[var(--mtss-stat-indigo-from)] via-[var(--mtss-stat-indigo-via)] to-[var(--mtss-stat-indigo-to)]
+     ────────────────────────────────────────────────────────────── */
+  --mtss-stat-indigo-from: #6366f1;
+  --mtss-stat-indigo-via:  #818cf8;
+  --mtss-stat-indigo-to:   #a78bfa;
+
+  --mtss-stat-amber-from:  #f59e0b;
+  --mtss-stat-amber-via:   #f97316;
+  --mtss-stat-amber-to:    #ef4444;
+
+  --mtss-stat-teal-from:   #10b981;
+  --mtss-stat-teal-via:    #14b8a6;
+  --mtss-stat-teal-to:     #06b6d4;
+
+  /* ──────────────────────────────────────────────────────────────
+     MTSS — DECORATIVE AMBIENT GLOW COLORS
+     Usage in Tailwind: from-[var(--mtss-glow-pink)]/25
+     ────────────────────────────────────────────────────────────── */
+  --mtss-glow-pink:   #f472b6;
+  --mtss-glow-blue:   #60a5fa;
+  --mtss-glow-cyan:   #22d3ee;
+  --mtss-glow-purple: #a855f7;
+
+  /* ──────────────────────────────────────────────────────────────
+     MTSS — FORM/PANEL HEADING GRADIENT STOPS
+     Light mode: from-[var(--mtss-heading-light-from)] via-[var(--mtss-heading-light-via)] to-[var(--mtss-heading-light-to)]
+     Dark mode:  dark:from-white dark:via-[var(--mtss-heading-dark-via)] dark:to-[var(--mtss-heading-dark-to)]
+     ────────────────────────────────────────────────────────────── */
+  --mtss-heading-light-from: #0f172a;
+  --mtss-heading-light-via:  #334155;
+  --mtss-heading-light-to:   #2563eb;
+  --mtss-heading-dark-via:   #c7d2fe;
+  --mtss-heading-dark-to:    #f472b6;
+
+  /* ──────────────────────────────────────────────────────────────
+     MTSS — CHART & SVG DATA COLORS
+     Usage in SVG: stopColor="var(--mtss-chart-emerald-from)"
+     Usage in circles: fill="var(--mtss-chart-emerald-to)"
+     ────────────────────────────────────────────────────────────── */
+  --mtss-chart-emerald-from: #6ee7b7;
+  --mtss-chart-emerald-to:   #22c55e;
+  --mtss-chart-rose-from:    #fb7185;
+  --mtss-chart-rose-to:      #f97316;
+
+  /* ──────────────────────────────────────────────────────────────
+     MTSS — CARD / PANEL BACKGROUND STOPS
+     Usage in Tailwind: from-[var(--mtss-panel-warm)]/90 via-white to-[var(--mtss-panel-cool)]/85
+     ────────────────────────────────────────────────────────────── */
+  --mtss-panel-warm: #fff7ed;
+  --mtss-panel-cool: #eff6ff;
+  --mtss-panel-gray: #f8fafc;
+  --mtss-panel-cyan: #ecfeff;
+  --mtss-panel-sky:  #e0f2fe;
+
+  /* ──────────────────────────────────────────────────────────────
+     DASHBOARD — WEATHER PATTERN ANALYSIS ICON COLORS
+     Used in WeatherPatternAnalysis.jsx style={{ color: weatherColors[type] }}
+     ────────────────────────────────────────────────────────────── */
+  --dash-weather-sunny:   #fbbf24;
+  --dash-weather-cloudy:  #6b7280;
+  --dash-weather-rain:    #3b82f6;
+  --dash-weather-storm:   #7c3aed;
+  --dash-weather-tornado: #dc2626;
+  --dash-weather-snow:    #06b6d4;
+
+}
