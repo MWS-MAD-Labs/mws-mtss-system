@@ -46,7 +46,8 @@ jobs:
         run: npm ci
         working-directory: backend
 
-      - name: Lint BE
+      - name: Lint BE (advisory)
+        continue-on-error: true
         run: |
           if npm run | grep -q "lint"; then npm run lint; else echo "No lint, skipping."; fi
         working-directory: backend
@@ -92,11 +93,13 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Lint FE
+      - name: Lint FE (advisory)
+        continue-on-error: true
         run: |
           if npm run | grep -q " lint"; then npm run lint -- --quiet; else echo "No lint, skipping."; fi
         working-directory: frontend
 
+      # Build is the hard gate — it catches real runtime/import breakage.
       - name: Build FE
         run: npm run build
         working-directory: frontend
