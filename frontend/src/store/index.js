@@ -3,6 +3,7 @@ import authReducer from './slices/authSlice';
 import userReducer from './slices/userSlice';
 import mtssReducer from './slices/mtssSlice';
 import aiChatReducer from './slices/aiChatSlice';
+import checkinReducer from './slices/checkinSlice';
 
 export const store = configureStore({
     reducer: {
@@ -10,6 +11,10 @@ export const store = configureStore({
         users: userReducer,
         mtss: mtssReducer,
         aiChat: aiChatReducer,
+        // Registered for the shared ProfilePage, which reads state.checkin.
+        // Check-in thunks degrade gracefully (rejected) since the MTSS backend
+        // does not expose check-in endpoints.
+        checkin: checkinReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
