@@ -1,64 +1,13 @@
-let staffRoutePrefetchPromise = null;
-let studentRoutePrefetchPromise = null;
-let visionStackPrefetchPromise = null;
+// No-op stub for mws-mtss-system.
+//
+// The MTSS product has no face-scan / emotional check-in flow, so there are no
+// VerificationPage / StudentFaceScanPage / faceDetectionService modules to
+// prefetch. The shared RoleSelectionPage still imports these helpers on hover
+// intent, so we keep the exported API surface but make every call a no-op.
+// This also keeps the heavy face-api / vision ML stack out of the MTSS bundle.
 
-const runWhenIdle = (task) => {
-    if (typeof window === 'undefined') {
-        task();
-        return;
-    }
+const resolved = () => Promise.resolve();
 
-    if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(() => task(), { timeout: 1200 });
-        return;
-    }
-
-    setTimeout(task, 180);
-};
-
-const prefetchVisionStack = () => {
-    if (!visionStackPrefetchPromise) {
-        visionStackPrefetchPromise = import('@/services/faceDetectionService')
-            .then((mod) => mod.preloadVisionStack?.())
-            .catch((error) => {
-                visionStackPrefetchPromise = null;
-                throw error;
-            });
-    }
-
-    return visionStackPrefetchPromise;
-};
-
-export const prefetchStaffFaceScanOnIntent = () => {
-    if (!staffRoutePrefetchPromise) {
-        staffRoutePrefetchPromise = import('@/pages/VerificationPage').catch((error) => {
-            staffRoutePrefetchPromise = null;
-            throw error;
-        });
-    }
-
-    runWhenIdle(() => {
-        prefetchVisionStack().catch(() => {
-            // best effort only
-        });
-    });
-
-    return staffRoutePrefetchPromise;
-};
-
-export const prefetchStudentFaceScanOnIntent = () => {
-    if (!studentRoutePrefetchPromise) {
-        studentRoutePrefetchPromise = import('@/pages/StudentFaceScanPage').catch((error) => {
-            studentRoutePrefetchPromise = null;
-            throw error;
-        });
-    }
-
-    runWhenIdle(() => {
-        prefetchVisionStack().catch(() => {
-            // best effort only
-        });
-    });
-
-    return studentRoutePrefetchPromise;
-};
+export const prefetchVisionStack = resolved;
+export const prefetchStaffFaceScanOnIntent = resolved;
+export const prefetchStudentFaceScanOnIntent = resolved;
