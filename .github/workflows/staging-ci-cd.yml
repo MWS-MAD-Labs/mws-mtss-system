@@ -104,7 +104,8 @@ jobs:
         run: npm run build
         working-directory: frontend
         env:
-          VITE_API_BASE: /api/v1
+          VITE_API_BASE: /mtss/api/v1
+          VITE_BASE_PATH: /mtss/
 
   # ─────────────────────────────────────────
   # BUILD & PUSH — Backend Image
@@ -203,7 +204,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=mtss-system-fe
           platforms: linux/amd64
           build-args: |
-            VITE_API_BASE=/api/v1
+            VITE_API_BASE=/mtss/api/v1
+            VITE_BASE_PATH=/mtss/
 
       - name: Summary FE
         run: |

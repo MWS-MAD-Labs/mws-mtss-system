@@ -297,11 +297,13 @@ export const downloadBlobWithAudit = (blob, filename, report, actor = {}) => {
     console.info("[AuditLog] DOCX download", entry);
 
     try {
+        // Base-aware: di bawah gateway, API ada di <base>api/v1 (mis. /mtss/api/v1).
+        const auditUrl = `${import.meta.env.BASE_URL}api/v1/audit/events`;
         const payload = JSON.stringify(entry);
         const sent = typeof navigator.sendBeacon === "function"
-            && navigator.sendBeacon("/api/v1/audit/events", new Blob([payload], { type: "application/json" }));
+            && navigator.sendBeacon(auditUrl, new Blob([payload], { type: "application/json" }));
         if (!sent) {
-            fetch("/api/v1/audit/events", {
+            fetch(auditUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: payload,

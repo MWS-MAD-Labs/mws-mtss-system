@@ -3,7 +3,13 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// MTSS dilayani di bawah path /mtss/ oleh gateway "1 aplikasi".
+// Semua asset, SPA route, dan PWA scope harus berprefix base ini.
+// Bisa di-override via VITE_BASE_PATH (mis. '/' untuk dev standalone).
+const BASE_PATH = process.env.VITE_BASE_PATH || '/mtss/'
+
 export default defineConfig({
+    base: BASE_PATH,
     plugins: [
         react(),
         VitePWA({
@@ -19,8 +25,8 @@ export default defineConfig({
                 background_color: '#ffffff',
                 display: 'standalone',
                 orientation: 'portrait-primary',
-                scope: '/',
-                start_url: '/',
+                scope: BASE_PATH,
+                start_url: BASE_PATH,
                 icons: [
                     {
                         src: 'Millennia.webp',
@@ -94,7 +100,7 @@ export default defineConfig({
                         }
                     },
                     {
-                        urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+                        urlPattern: ({ url }) => url.pathname.startsWith('/mtss/api/'),
                         handler: 'NetworkFirst',
                         options: {
                             cacheName: 'api-cache',
@@ -106,8 +112,8 @@ export default defineConfig({
                         }
                     }
                 ],
-                navigateFallback: '/index.html',
-                navigateFallbackDenylist: [/^\/api\//, /^\/auth\//, /^\/socket\.io\//],
+                navigateFallback: '/mtss/index.html',
+                navigateFallbackDenylist: [/^\/mtss\/api\//, /^\/mtss\/auth\//, /^\/mtss\/socket\.io\//],
                 // Disable auto service worker registration since we handle it manually
                 skipWaiting: true,
                 clientsClaim: true

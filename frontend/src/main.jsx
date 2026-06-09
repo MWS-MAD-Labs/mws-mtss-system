@@ -50,10 +50,15 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// MTSS dilayani di bawah /mtss oleh gateway. Router basename harus cocok
+// dengan vite `base` (import.meta.env.BASE_URL = '/mtss/'). Buang trailing
+// slash untuk basename React Router (mis. '/mtss').
+const ROUTER_BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
         <Provider store={store}>
-            <BrowserRouter>
+            <BrowserRouter basename={ROUTER_BASENAME}>
                 <App />
                 <Toaster />
             </BrowserRouter>
