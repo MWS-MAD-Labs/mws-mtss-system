@@ -2,7 +2,6 @@ import { Suspense, lazy, memo, useEffect, useMemo, useRef, useState } from 'reac
 import { useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import AppHelmet from '@/components/app/AppHelmet';
-import SkipLink from '@/components/app/SkipLink';
 import RouteConfig from '@/components/app/RouteConfig';
 
 const BackgroundDecor = lazy(() => import('@/components/app/BackgroundDecor'));
@@ -92,7 +91,6 @@ const App = memo(() => {
     return (
         <>
             <AppHelmet />
-            <SkipLink />
 
             <div className="relative min-h-screen bg-background text-foreground">
                 {showEnhancements && (
