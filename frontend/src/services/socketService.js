@@ -61,12 +61,13 @@ class SocketService {
         }
 
         const rawBase = import.meta.env.VITE_API_BASE || '/api/v1';
-        // Buang suffix /api/v1 → dapat base prefix (mis. '/mtss' atau '' untuk root).
+        // Strip the /api/v1 suffix → the base prefix (e.g. '/mtss', or '' for root).
         const basePrefix = rawBase.replace(/\/api(?:\/v\d+)?\/?$/, '');
 
-        // Connect ke origin saat ini; socket.io PATH harus berprefix base agar
-        // cocok dengan proxy gateway/nginx (/mtss/socket.io → backend /socket.io).
-        // Jangan kirim base sebagai URL — itu akan ditafsirkan sebagai namespace.
+        // Connect to the current origin; the socket.io PATH must be prefixed with
+        // the base so it matches the gateway/nginx proxy (/mtss/socket.io →
+        // backend /socket.io). Do not pass the base as a URL — socket.io would
+        // treat it as a namespace.
         this.socket = io({
             path: `${basePrefix}/socket.io`,
             transports: ['websocket', 'polling'],

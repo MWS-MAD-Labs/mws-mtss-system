@@ -50,9 +50,9 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// MTSS dilayani di bawah /mtss oleh gateway. Router basename harus cocok
-// dengan vite `base` (import.meta.env.BASE_URL = '/mtss/'). Buang trailing
-// slash untuk basename React Router (mis. '/mtss').
+// MTSS is served under /mtss by the gateway. The router basename must match
+// vite `base` (import.meta.env.BASE_URL = '/mtss/'). Drop the trailing slash
+// for the React Router basename (e.g. '/mtss').
 const ROUTER_BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 ReactDOM.createRoot(document.getElementById('root')).render(

@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// MTSS dilayani di bawah path /mtss/ oleh gateway "1 aplikasi".
-// Semua asset, SPA route, dan PWA scope harus berprefix base ini.
-// Bisa di-override via VITE_BASE_PATH (mis. '/' untuk dev standalone).
+// MTSS is served under the /mtss/ path by the "one app" gateway.
+// Every asset, SPA route, and PWA scope must be prefixed with this base.
+// Override with VITE_BASE_PATH (e.g. '/' for standalone dev).
 const BASE_PATH = process.env.VITE_BASE_PATH || '/mtss/'
 
 export default defineConfig({
