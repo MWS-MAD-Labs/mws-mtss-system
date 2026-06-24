@@ -1,10 +1,10 @@
-name: MTSS System — Staging CI/CD
+name: MTSS System - Production CI/CD
 
 on:
   push:
-    branches: ["staging"]
+    branches: ["main"]
   pull_request:
-    branches: ["staging"]
+    branches: ["main"]
   workflow_dispatch:
 
 env:
@@ -18,9 +18,6 @@ permissions:
   packages: write
 
 jobs:
-  # ─────────────────────────────────────────
-  # BACKEND: Quality Gate
-  # ─────────────────────────────────────────
   test-be:
     name: BE Quality Gate
     runs-on: ubuntu-latest
@@ -76,9 +73,6 @@ jobs:
           GOOGLE_AI_API_KEY: dummy-api-key-for-ci
           AGENT_ROUTER_TOKEN: dummy-agent-router-token-for-ci
 
-  # ─────────────────────────────────────────
-  # FRONTEND: Quality Gate
-  # ─────────────────────────────────────────
   test-fe:
     name: FE Quality Gate
     runs-on: ubuntu-latest
@@ -101,7 +95,6 @@ jobs:
           if npm run | grep -q " lint"; then npm run lint -- --quiet; else echo "No lint, skipping."; fi
         working-directory: frontend
 
-      # Build is the hard gate — it catches real runtime/import breakage.
       - name: Build FE
         run: npm run build
         working-directory: frontend
@@ -109,14 +102,11 @@ jobs:
           VITE_API_BASE: /mtss/api/v1
           VITE_BASE_PATH: /mtss/
 
-  # ─────────────────────────────────────────
-  # BUILD & PUSH — Backend Image
-  # ─────────────────────────────────────────
   build-be:
     name: Build & Push BE Image
     runs-on: ubuntu-latest
     needs: [test-be]
-    if: github.ref == 'refs/heads/staging'
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
@@ -133,15 +123,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker metadata — BE
+      - name: Docker metadata - BE
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.BE_IMAGE }}
           tags: |
-            type=raw,value=staging
-            type=sha,prefix=staging-
-            type=raw,value=staging-${{ github.run_number }}
+            type=raw,value=production
+            type=sha,prefix=production-
+            type=raw,value=production-${{ github.run_number }}
 
       - name: Build and push BE
         uses: docker/build-push-action@v6
@@ -151,23 +141,20 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=mtss-system-be
-          cache-to: type=gha,mode=max,scope=mtss-system-be
+          cache-from: type=gha,scope=mtss-system-be-production
+          cache-to: type=gha,mode=max,scope=mtss-system-be-production
           platforms: linux/amd64
 
       - name: Summary BE
         run: |
-          echo "## 🐳 MTSS System — Backend Image" >> $GITHUB_STEP_SUMMARY
+          echo "## MTSS System - Backend Production Image" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:** \`${{ steps.meta.outputs.tags }}\`" >> $GITHUB_STEP_SUMMARY
 
-  # ─────────────────────────────────────────
-  # BUILD & PUSH — Frontend Image
-  # ─────────────────────────────────────────
   build-fe:
     name: Build & Push FE Image
     runs-on: ubuntu-latest
     needs: [test-fe]
-    if: github.ref == 'refs/heads/staging'
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
@@ -184,15 +171,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker metadata — FE
+      - name: Docker metadata - FE
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.FE_IMAGE }}
           tags: |
-            type=raw,value=staging
-            type=sha,prefix=staging-
-            type=raw,value=staging-${{ github.run_number }}
+            type=raw,value=production
+            type=sha,prefix=production-
+            type=raw,value=production-${{ github.run_number }}
 
       - name: Build and push FE
         uses: docker/build-push-action@v6
@@ -202,8 +189,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=mtss-system-fe
-          cache-to: type=gha,mode=max,scope=mtss-system-fe
+          cache-from: type=gha,scope=mtss-system-fe-production
+          cache-to: type=gha,mode=max,scope=mtss-system-fe-production
           platforms: linux/amd64
           build-args: |
             VITE_API_BASE=/mtss/api/v1
@@ -211,14 +198,11 @@ jobs:
 
       - name: Summary FE
         run: |
-          echo "## 🐳 MTSS System — Frontend Image" >> $GITHUB_STEP_SUMMARY
+          echo "## MTSS System - Frontend Production Image" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:** \`${{ steps.meta.outputs.tags }}\`" >> $GITHUB_STEP_SUMMARY
 
-  # ─────────────────────────────────────────
-  # DEPLOY — Trigger Komodo Stack Redeploy
-  # ─────────────────────────────────────────
   deploy:
-    name: Deploy to Komodo (Staging)
+    name: Deploy to Komodo (Production)
     runs-on: ubuntu-latest
     needs: [build-be, build-fe]
     if: |
@@ -226,18 +210,22 @@ jobs:
       needs.build-be.result == 'success' &&
       needs.build-fe.result == 'success'
     steps:
-      - name: Trigger Komodo — mws-mtss-system stack
+      - name: Trigger Komodo - mws-mtss-system production stack
+        id: deploy_komodo
         env:
-          KOMODO_WEBHOOK_URL: ${{ secrets.KOMODO_STAGING_WEBHOOK_URL || secrets.KOMODO_WEBHOOK_URL }}
-          KOMODO_WEBHOOK_SECRET: ${{ secrets.KOMODO_STAGING_WEBHOOK_SECRET || secrets.KOMODO_WEBHOOK_SECRET }}
+          KOMODO_WEBHOOK_URL: ${{ secrets.KOMODO_PRODUCTION_WEBHOOK_URL }}
+          KOMODO_WEBHOOK_SECRET: ${{ secrets.KOMODO_PRODUCTION_WEBHOOK_SECRET }}
         run: |
           if [ -z "$KOMODO_WEBHOOK_URL" ] || [ -z "$KOMODO_WEBHOOK_SECRET" ]; then
-            echo "Missing staging Komodo webhook secrets."
-            echo "Set KOMODO_STAGING_WEBHOOK_URL/KOMODO_STAGING_WEBHOOK_SECRET, or keep the legacy KOMODO_WEBHOOK_URL/KOMODO_WEBHOOK_SECRET."
-            exit 1
+            echo "Production Komodo webhook secrets are not configured yet; skipping production redeploy."
+            echo "Set KOMODO_PRODUCTION_WEBHOOK_URL and KOMODO_PRODUCTION_WEBHOOK_SECRET after the production stack exists."
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+            echo "## MTSS System Production Deploy" >> "$GITHUB_STEP_SUMMARY"
+            echo "Production images can be built, but the Komodo redeploy was skipped because production webhook secrets are not configured yet." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
 
-          BODY='{"ref":"refs/heads/staging","repository":{"name":"mws-mtss-system"},"tag":"staging","environment":"staging"}'
+          BODY='{"ref":"refs/heads/main","repository":{"name":"mws-mtss-system"},"tag":"production","environment":"production"}'
           SIGNATURE=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "$KOMODO_WEBHOOK_SECRET" | awk '{print "sha256="$2}')
           HTTP_STATUS=$(curl -s -o /tmp/komodo_resp.txt -w "%{http_code}" \
             -X POST \
@@ -248,10 +236,13 @@ jobs:
           echo "Komodo response [HTTP $HTTP_STATUS]:"
           cat /tmp/komodo_resp.txt
           [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ] || exit 1
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
 
       - name: Deployment summary
+        if: steps.deploy_komodo.outputs.deployed == 'true'
         run: |
-          echo "## 🚀 MTSS System Deployed to Staging" >> $GITHUB_STEP_SUMMARY
-          echo "- **BE image:** \`ghcr.io/${{ env.BE_IMAGE }}:staging-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **FE image:** \`ghcr.io/${{ env.FE_IMAGE }}:staging-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Komodo stack:** \`mws-mtss-system\`" >> $GITHUB_STEP_SUMMARY
+          echo "## MTSS System Production Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** https://app.millenniaws.sch.id/mtss/" >> $GITHUB_STEP_SUMMARY
+          echo "- **BE image:** \`ghcr.io/${{ env.BE_IMAGE }}:production-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **FE image:** \`ghcr.io/${{ env.FE_IMAGE }}:production-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Komodo stack:** \`mws-mtss-system-production\`" >> $GITHUB_STEP_SUMMARY
