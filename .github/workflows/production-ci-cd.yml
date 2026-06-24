@@ -214,15 +214,16 @@ jobs:
         id: deploy_komodo
         env:
           KOMODO_WEBHOOK_URL: ${{ secrets.KOMODO_PRODUCTION_WEBHOOK_URL }}
-          KOMODO_WEBHOOK_SECRET: ${{ secrets.KOMODO_PRODUCTION_WEBHOOK_SECRET }}
+          KOMODO_WEBHOOK_SECRET: ${{ secrets.KOMODO_PRODUCTION_WEBHOOK_SECRET || secrets.KOMODO_STAGING_WEBHOOK_SECRET || secrets.KOMODO_WEBHOOK_SECRET }}
         run: |
-          if [ -z "$KOMODO_WEBHOOK_URL" ] || [ -z "$KOMODO_WEBHOOK_SECRET" ]; then
-            echo "Production Komodo webhook secrets are not configured yet; skipping production redeploy."
-            echo "Set KOMODO_PRODUCTION_WEBHOOK_URL and KOMODO_PRODUCTION_WEBHOOK_SECRET after the production stack exists."
-            echo "deployed=false" >> "$GITHUB_OUTPUT"
-            echo "## MTSS System Production Deploy" >> "$GITHUB_STEP_SUMMARY"
-            echo "Production images can be built, but the Komodo redeploy was skipped because production webhook secrets are not configured yet." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+          if [ -z "$KOMODO_WEBHOOK_URL" ]; then
+            KOMODO_WEBHOOK_URL="https://komo.mws.web.id/listener/github/stack/mws-mtss-system-production/deploy"
+          fi
+
+          if [ -z "$KOMODO_WEBHOOK_SECRET" ]; then
+            echo "Missing Komodo webhook secret."
+            echo "Set KOMODO_PRODUCTION_WEBHOOK_SECRET, KOMODO_STAGING_WEBHOOK_SECRET, or the legacy KOMODO_WEBHOOK_SECRET."
+            exit 1
           fi
 
           BODY='{"ref":"refs/heads/main","repository":{"name":"mws-mtss-system"},"tag":"production","environment":"production"}'

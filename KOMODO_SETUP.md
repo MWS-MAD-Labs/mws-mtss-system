@@ -38,19 +38,23 @@ Required GitHub Actions secrets:
 
 ## Production Stack
 
-Create a new Komodo stack for production/main:
+Production/main is deployed from a dedicated Komodo stack:
 
 | Field | Value |
 |---|---|
 | Stack name | `mws-mtss-system-production` |
-| Source | Manual compose |
-| Branch that triggers it | `main` |
+| Komodo stack id | `6a3b86751309552867cc4205` |
+| Source | Git repo |
+| Repo | `MWS-MAD-Labs/mws-mtss-system` |
+| Branch | `main` |
+| Run directory | `deploy` |
+| Compose file | `production.compose.yml` |
 | Images | `ghcr.io/mws-mad-labs/mws-mtss-system-{be,fe}:production` |
 | Gateway network | `mws-unified-prod` |
 | Gateway hostname | `https://app.millenniaws.sch.id` |
 | Path | `/mtss/` |
+| Webhook URL | `https://komo.mws.web.id/listener/github/stack/mws-mtss-system-production/deploy` |
 
-Paste `deploy/production.compose.yml` into the Komodo stack compose editor.
 Deploy the production gateway first so the external Docker network
 `mws-unified-prod` exists.
 
@@ -58,8 +62,9 @@ Required GitHub Actions secrets:
 
 | Secret name | Notes |
 |---|---|
-| `KOMODO_PRODUCTION_WEBHOOK_URL` | Production stack webhook URL |
-| `KOMODO_PRODUCTION_WEBHOOK_SECRET` | Production stack webhook secret |
+| `KOMODO_PRODUCTION_WEBHOOK_URL` | Optional override for the production stack webhook URL |
+| `KOMODO_PRODUCTION_WEBHOOK_SECRET` | Preferred production stack webhook secret |
+| `KOMODO_STAGING_WEBHOOK_SECRET` / `KOMODO_WEBHOOK_SECRET` | Supported fallback when the production stack uses the existing webhook secret |
 
 ## Environment Variables
 
