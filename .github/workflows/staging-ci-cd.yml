@@ -223,8 +223,7 @@ jobs:
     needs: [build-be, build-fe]
     if: |
       always() &&
-      needs.build-be.result == 'success' &&
-      needs.build-fe.result == 'success'
+      (needs.build-be.result == 'success' || needs.build-fe.result == 'success')
     steps:
       - name: Trigger Komodo — mws-mtss-system stack
         env:
