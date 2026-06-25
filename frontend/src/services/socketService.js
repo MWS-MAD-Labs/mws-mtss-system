@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { getApiBaseUrl } from '@/lib/apiBase';
 
 class SocketService {
     constructor() {
@@ -60,7 +61,7 @@ class SocketService {
             return this.socket;
         }
 
-        const rawBase = import.meta.env.VITE_API_BASE || '/api/v1';
+        const rawBase = getApiBaseUrl();
         // Strip the /api/v1 suffix → the base prefix (e.g. '/mtss', or '' for root).
         const basePrefix = rawBase.replace(/\/api(?:\/v\d+)?\/?$/, '');
 

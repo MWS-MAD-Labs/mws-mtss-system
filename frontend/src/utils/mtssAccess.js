@@ -1,5 +1,6 @@
 const NATIVE_MTSS_ADMIN_ROLES = new Set(["directorate", "superadmin", "admin"]);
-const NATIVE_MTSS_TEACHER_ROLES = new Set(["teacher", "se_teacher"]);
+const NATIVE_MTSS_LEADER_ROLES = new Set(["head_unit", "principal"]);
+const NATIVE_MTSS_TEACHER_ROLES = new Set(["teacher", "se_teacher", "staff", "support_staff", "counselor"]);
 const DEFAULT_MTSS_LEADER_EMAILS = new Set([
     "aria@millennia21.id",
     "faisal@millennia21.id",
@@ -36,6 +37,18 @@ const buildFallbackMtssAccess = (user = {}) => {
             canAccessAdmin: true,
             canManageConfig: true,
             accessLevel: "admin",
+            effectiveRole: role,
+            source: "frontend_fallback",
+        };
+    }
+
+    if (NATIVE_MTSS_LEADER_ROLES.has(role)) {
+        return {
+            hasAccess: true,
+            isReadOnly: false,
+            canAccessAdmin: true,
+            canManageConfig: true,
+            accessLevel: "leader",
             effectiveRole: role,
             source: "frontend_fallback",
         };
@@ -94,7 +107,7 @@ export const canAccessMtssAdmin = (user = null) => getMtssAccessProfile(user).ca
 export const getDefaultMtssRoute = (user = null) => {
     const profile = getMtssAccessProfile(user);
     if (!profile.hasAccess) return null;
-    if (profile.accessLevel === "observer") return "/mtss/observer";
-    if (profile.canAccessAdmin) return "/mtss/admin";
-    return "/mtss/teacher";
+    if (profile.accessLevel === "observer") return "/observer";
+    if (profile.canAccessAdmin) return "/admin";
+    return "/teacher";
 };

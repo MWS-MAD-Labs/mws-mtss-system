@@ -1,4 +1,5 @@
 import { hasMtssAccess } from "@/utils/mtssAccess";
+import { getBasePath } from "@/lib/apiBase";
 
 const PENDING_AUTH_REDIRECT_KEY = "pending_auth_redirect";
 
@@ -12,6 +13,11 @@ export const sanitizeRedirectPath = (value) => {
 
     if (trimmed.startsWith("/auth/callback")) {
         return null;
+    }
+
+    const basePath = getBasePath();
+    if (basePath && (trimmed === basePath || trimmed.startsWith(`${basePath}/`))) {
+        return trimmed.slice(basePath.length) || "/";
     }
 
     return trimmed;
@@ -51,6 +57,6 @@ export const getDefaultPostLoginPath = (userOrRole) => {
         return "/support-hub";
     }
 
-    // staff, support_staff, and other non-MTSS roles go directly to check-in method selection
+    // Unknown/non-support roles go directly to check-in method selection.
     return "/select-role";
 };

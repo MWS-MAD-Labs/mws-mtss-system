@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import socketService from '@/services/socketService';
+import { getApiBaseUrl } from '@/lib/apiBase';
 import { NODE_META } from '../constants/nodes';
 import { SIM_FLOWS } from '../constants/simFlows';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
+const API_BASE = getApiBaseUrl();
 const ALLOWED_TELEMETRY_ROLES = new Set(['admin', 'superadmin', 'directorate', 'head_unit']);
 
 function getStoredAuthToken() {
