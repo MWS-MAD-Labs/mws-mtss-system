@@ -115,7 +115,7 @@ const authorize = (...roles) => {
 
 // Admin and above roles
 const requireAdmin = authorize('admin', 'superadmin', 'directorate');
-const requireMTSSAdmin = authorize('admin', 'superadmin', 'directorate', 'head_unit');
+const requireMTSSAdmin = authorize('admin', 'superadmin', 'directorate', 'head_unit', 'principal');
 const requireMTSSAccess = (req, res, next) => {
     if (!req.user) {
         return sendError(res, 'Authentication required', 401);

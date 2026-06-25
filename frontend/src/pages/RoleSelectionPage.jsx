@@ -428,7 +428,9 @@ const RoleSelection = memo(() => {
 
   const isTeacherRole = user && ['teacher', 'se_teacher'].includes(user.role);
   const isPrincipalRole = user && ['head_unit', 'directorate', 'admin', 'superadmin'].includes(user.role);
-  const hasSupportHubAccess = user && ['teacher', 'se_teacher', 'head_unit', 'directorate', 'admin', 'superadmin'].includes(user.role);
+  const supportHubRoles = ['staff', 'support_staff', 'nurse', 'counselor', 'teacher', 'se_teacher', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin'];
+  const normalizedUserRole = String(user?.role || '').trim().toLowerCase();
+  const hasSupportHubAccess = user && supportHubRoles.includes(normalizedUserRole);
   const studentDashboardFeatures = isPrincipalRole
     ? ["Student emotional overview by grade and class", "Needs-support spotlight for faster follow up", "Unit-aligned scope for each principal", "Quick search and daily refresh monitoring"]
     : ["Class-scoped student check-ins", "Daily submission tracking", "Needs support highlights", "Quick search by student"];
