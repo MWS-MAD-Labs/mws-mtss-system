@@ -1,6 +1,7 @@
 const DEFAULT_DASHBOARD_ROLES = new Set(['directorate', 'superadmin', 'admin', 'head_unit']);
 const MTSS_NATIVE_ADMIN_ROLES = new Set(['directorate', 'superadmin', 'admin']);
-const MTSS_NATIVE_TEACHER_ROLES = new Set(['teacher', 'se_teacher']);
+const MTSS_NATIVE_LEADER_ROLES = new Set(['head_unit']);
+const MTSS_NATIVE_TEACHER_ROLES = new Set(['teacher', 'se_teacher', 'staff', 'support_staff', 'counselor']);
 const MTSS_DEFAULT_LEADER_EMAILS = new Set([
     'aria@millennia21.id',
     'faisal@millennia21.id',
@@ -183,6 +184,15 @@ const buildMtssAccessProfile = (user) => {
             effectiveRole: normalizedRole,
             source: 'native_role',
             reason: 'Native MTSS admin role'
+        };
+    }
+
+    if (MTSS_NATIVE_LEADER_ROLES.has(normalizedRole)) {
+        return {
+            ...getMtssAccessLevelConfig('leader', user),
+            effectiveRole: normalizedRole,
+            source: 'native_role',
+            reason: 'Native MTSS leader role'
         };
     }
 

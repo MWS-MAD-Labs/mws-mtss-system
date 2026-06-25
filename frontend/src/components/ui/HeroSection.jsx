@@ -7,6 +7,7 @@ import HeroAuthCard from "@/components/ui/HeroAuthCard";
 import Logo from "./Millennia.webp";
 import { Sparkles, ShieldCheck, Smartphone } from "lucide-react";
 import { consumePendingRedirect, getDefaultPostLoginPath } from "@/utils/authRedirect";
+import { getApiBaseUrl } from "@/lib/apiBase";
 
 const FEATURES = [
   { icon: '🧠', label: 'AI Emotional Wellness' },
@@ -32,7 +33,7 @@ const HeroSection = memo(() => {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleGoogleSignIn = useCallback(() => {
-    const apiBase = import.meta.env.VITE_API_BASE || "/api/v1";
+    const apiBase = getApiBaseUrl();
     const backendUrl = apiBase.replace(/\/api(?:\/v\d+)?\/?$/, "");
     window.location.href = `${backendUrl}/auth/google`;
   }, []);

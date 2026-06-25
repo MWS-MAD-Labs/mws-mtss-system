@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { startGlobalLoading, stopGlobalLoading } from '@/lib/loadingManager';
+import { getApiBaseUrl } from '@/lib/apiBase';
 
-// Default to versioned API to match backend routing
-const API_BASE_URL = import.meta.env.VITE_API_BASE || '/api/v1';
+// Base-aware: standalone uses /api/v1, gateway build under /mtss uses /mtss/api/v1.
+const API_BASE_URL = getApiBaseUrl();
 
 // Create axios instance with default config
 const api = axios.create({
