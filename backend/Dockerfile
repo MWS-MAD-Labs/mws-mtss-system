@@ -9,6 +9,9 @@ FROM node:18-alpine AS runner
 
 WORKDIR /app
 
+ARG BUILD_ID=dev
+ENV BUILD_ID=$BUILD_ID
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
