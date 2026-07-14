@@ -6,6 +6,8 @@ WORKDIR /app
 # Accept build args
 ARG VITE_API_BASE
 ENV VITE_API_BASE=$VITE_API_BASE
+ARG VITE_BUILD_ID=dev
+ENV VITE_BUILD_ID=$VITE_BUILD_ID
 # The path the gateway serves MTSS under (default /mtss/)
 ARG VITE_BASE_PATH=/mtss/
 ENV VITE_BASE_PATH=$VITE_BASE_PATH

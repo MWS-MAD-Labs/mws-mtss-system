@@ -144,6 +144,8 @@ jobs:
           cache-from: type=gha,scope=mtss-system-be-production
           cache-to: type=gha,mode=max,scope=mtss-system-be-production
           platforms: linux/amd64
+          build-args: |
+            BUILD_ID=${{ github.sha }}
 
       - name: Summary BE
         run: |
@@ -195,6 +197,7 @@ jobs:
           build-args: |
             VITE_API_BASE=/mtss/api/v1
             VITE_BASE_PATH=/mtss/
+            VITE_BUILD_ID=${{ github.sha }}
 
       - name: Summary FE
         run: |
@@ -246,4 +249,5 @@ jobs:
           echo "- **URL:** https://app.millenniaws.sch.id/mtss/" >> $GITHUB_STEP_SUMMARY
           echo "- **BE image:** \`ghcr.io/${{ env.BE_IMAGE }}:production-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **FE image:** \`ghcr.io/${{ env.FE_IMAGE }}:production-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Komodo stack:** \`mws-mtss-system-production\`" >> $GITHUB_STEP_SUMMARY

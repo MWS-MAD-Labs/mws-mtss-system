@@ -83,6 +83,7 @@ app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'ok',
         service: 'integra-learn-backend',
+        buildId: process.env.BUILD_ID || 'dev',
         phase: initializationState.phase,
         timestamp: new Date().toISOString()
     });

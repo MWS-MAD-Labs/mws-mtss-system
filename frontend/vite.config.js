@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Every asset, SPA route, and PWA scope must be prefixed with this base.
 // Override with VITE_BASE_PATH (e.g. '/' for standalone dev).
 const BASE_PATH = process.env.VITE_BASE_PATH || '/mtss/'
+const BUILD_ID = process.env.VITE_BUILD_ID || 'dev'
 
 export default defineConfig({
     base: BASE_PATH,
@@ -59,7 +60,7 @@ export default defineConfig({
                             /\/assets\/vendor-(tfjs|mediapipe)-.*\.js$/.test(url.pathname),
                         handler: 'CacheFirst',
                         options: {
-                            cacheName: 'ai-vision-vendors',
+                            cacheName: `ai-vision-vendors-${BUILD_ID}`,
                             expiration: {
                                 maxEntries: 8,
                                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
@@ -70,7 +71,7 @@ export default defineConfig({
                         urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
                         handler: 'CacheFirst',
                         options: {
-                            cacheName: 'google-fonts-cache',
+                            cacheName: `google-fonts-cache-${BUILD_ID}`,
                             expiration: {
                                 maxEntries: 10,
                                 maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
@@ -81,7 +82,7 @@ export default defineConfig({
                         urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
                         handler: 'CacheFirst',
                         options: {
-                            cacheName: 'google-fonts-cache',
+                            cacheName: `google-fonts-cache-${BUILD_ID}`,
                             expiration: {
                                 maxEntries: 10,
                                 maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
@@ -92,7 +93,7 @@ export default defineConfig({
                         urlPattern: /^https:\/\/unpkg\.com\/leaflet@1\.9\.4\/.*/i,
                         handler: 'CacheFirst',
                         options: {
-                            cacheName: 'leaflet-cache',
+                            cacheName: `leaflet-cache-${BUILD_ID}`,
                             expiration: {
                                 maxEntries: 50,
                                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
@@ -103,7 +104,7 @@ export default defineConfig({
                         urlPattern: ({ url }) => url.pathname.startsWith('/mtss/api/'),
                         handler: 'NetworkFirst',
                         options: {
-                            cacheName: 'api-cache',
+                            cacheName: `api-cache-${BUILD_ID}`,
                             expiration: {
                                 maxEntries: 100,
                                 maxAgeSeconds: 60 * 60 * 24 // 24 hours
