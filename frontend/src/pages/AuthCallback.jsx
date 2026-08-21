@@ -43,7 +43,15 @@ const AuthCallback = () => {
                 const redirectParam = hashParams.get('redirect');
                 const safeRedirect = sanitizeRedirectPath(redirectParam);
                 const pendingRedirect = consumePendingRedirect();
-                const target = pendingRedirect || safeRedirect || getDefaultPostLoginPath(canonicalUser);
+                const target = safeRedirect || pendingRedirect || getDefaultPostLoginPath(canonicalUser);
+
+                console.info('MTSS auth callback redirect resolved', {
+                    authMethod: canonicalUser.authMethod || null,
+                    redirectParam,
+                    safeRedirect,
+                    pendingRedirect,
+                    target
+                });
 
                 // Remove sensitive token/user params from URL before leaving callback route
                 window.history.replaceState({}, document.title, '/auth/callback');

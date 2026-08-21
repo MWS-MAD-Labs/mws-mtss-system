@@ -7,6 +7,9 @@ const UserStudent = require('../models/UserStudent');
 const { sendSuccess, sendError } = require('../utils/response');
 const { hasDashboardAccess, hasMtssAccess } = require('../utils/accessControl');
 const { buildRequestUser } = require('../middleware/auth');
+const { verifyHubRelayToken } = require('../utils/hubSsoRelay');
+const { resolveOrProvisionSsoUser } = require('../utils/ssoUserResolution');
+const { createUserAwareRateLimiter } = require('../middleware/rateLimiter');
 
 // Session middleware is only needed for Google OAuth flow.
 // Email/password login and JWT-based routes do NOT require sessions.
@@ -20,6 +23,24 @@ const buildOAuthMiddleware = () => {
     ];
 };
 const oauthMiddleware = buildOAuthMiddleware();
+const ssoLimiter = createUserAwareRateLimiter({ windowMinutes: 1, max: 20, skip: () => false });
+
+const isCentralLookupError = (error) => {
+    const baseUrl = error?.config?.baseURL;
+    const path = error?.config?.url;
+    return Boolean(
+        baseUrl === process.env.MWS_DATA_CENTER_API_URL ||
+        (typeof path === 'string' && /^\/(employees|students)\//.test(path))
+    );
+};
+
+const getDefaultMtssRedirectTarget = (user) => {
+    const profile = user?.mtssAccess || {};
+    if (!profile.hasAccess) return '/select-role';
+    if (profile.accessLevel === 'observer') return '/observer';
+    if (profile.canAccessAdmin) return '/admin';
+    return '/teacher';
+};
 
 const ensureGoogleOAuthConfigured = (req, res, next) => {
     if (passport.googleOAuthConfigured) {
@@ -144,6 +165,80 @@ router.get('/google/callback',
         }
     }
 );
+
+// Hub token-relay SSO handoff. Hub authenticates Google once, then sends a
+// short-lived audience-scoped token here. MTSS verifies only that email
+// assertion and re-resolves the user from Central/local DB before creating
+// its own JWT.
+router.get('/sso', ssoLimiter, async (req, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5176/mtss';
+    const { token } = req.query;
+
+    if (!token || typeof token !== 'string') {
+        return res.redirect(`${frontendUrl}/?error=sso_missing_token`);
+    }
+
+    let payload;
+    try {
+        payload = verifyHubRelayToken(token);
+    } catch (error) {
+        console.error('❌ MTSS Hub SSO relay token verification failed:', error.message);
+        return res.redirect(`${frontendUrl}/?error=sso_invalid_token`);
+    }
+
+    try {
+        const dbUser = await resolveOrProvisionSsoUser(payload.sub);
+
+        if (!dbUser) {
+            console.log('❌ No active central record for MTSS Hub SSO email:', payload.sub);
+            return res.redirect(`${frontendUrl}/?error=sso_account_not_found`);
+        }
+
+        if (!dbUser.isActive) {
+            console.error('❌ Inactive user attempted MTSS Hub SSO login:', {
+                email: dbUser.email,
+                model: dbUser.constructor?.modelName,
+                isActive: dbUser.isActive
+            });
+            return res.redirect(`${frontendUrl}/?error=account_inactive`);
+        }
+
+        const token7d = jwt.sign(
+            { userId: dbUser._id, email: dbUser.email, role: dbUser.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        const userDataForFrontend = {
+            ...buildRequestUser(dbUser),
+            lastLogin: dbUser.lastLogin,
+            isActive: dbUser.isActive,
+            emailVerified: dbUser.emailVerified,
+            validatedAt: new Date().toISOString(),
+            authMethod: 'hub_sso'
+        };
+
+        const redirectTarget = getDefaultMtssRedirectTarget(userDataForFrontend);
+        const redirectUrl = `${frontendUrl}/auth/callback#token=${encodeURIComponent(token7d)}&user=${encodeURIComponent(JSON.stringify(userDataForFrontend))}&redirect=${encodeURIComponent(redirectTarget)}`;
+
+        console.log('✅ MTSS Hub SSO login successful:', {
+            email: dbUser.email,
+            role: dbUser.role,
+            redirectTarget
+        });
+        res.redirect(redirectUrl);
+    } catch (error) {
+        const centralLookupFailed = isCentralLookupError(error);
+        console.error('❌ MTSS Hub SSO handoff error:', {
+            email: payload.sub,
+            centralLookupFailed,
+            status: error?.response?.status,
+            path: error?.config?.url,
+            message: error?.message
+        });
+        res.redirect(`${frontendUrl}/?error=${centralLookupFailed ? 'sso_central_lookup_failed' : 'sso_failed'}`);
+    }
+});
 
 // Manual login route
 router.post('/login', require('../middleware/validation').validate(require('../utils/validationSchemas').userLoginSchema), async (req, res) => {

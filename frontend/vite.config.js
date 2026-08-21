@@ -221,8 +221,35 @@ export default defineConfig({
         }
     },
     server: {
-        port: 5174,
+        port: 5176,
         proxy: {
+            // The app is served under BASE_PATH ('/mtss/'), so the client calls
+            // /mtss/api, /mtss/auth and /mtss/socket.io. Mirror the production
+            // gateway (frontend/nginx.conf) and strip the prefix before
+            // forwarding to the backend. Keep the unprefixed entries below for
+            // standalone dev (VITE_BASE_PATH='/').
+            '/mtss/api': {
+                target: 'http://localhost:3004',
+                changeOrigin: true,
+                secure: false,
+                rewrite: (p) => p.replace(/^\/mtss/, '')
+            },
+            '/mtss/auth': {
+                target: 'http://localhost:3004',
+                changeOrigin: true,
+                secure: false,
+                // /mtss/auth/callback is an SPA route, not a backend route.
+                bypass: (req) =>
+                    req.url?.startsWith('/mtss/auth/callback') ? '/mtss/index.html' : undefined,
+                rewrite: (p) => p.replace(/^\/mtss/, '')
+            },
+            '/mtss/socket.io': {
+                target: 'http://localhost:3004',
+                changeOrigin: true,
+                secure: false,
+                ws: true,
+                rewrite: (p) => p.replace(/^\/mtss/, '')
+            },
             '/api': {
                 target: 'http://localhost:3004',
                 changeOrigin: true,
