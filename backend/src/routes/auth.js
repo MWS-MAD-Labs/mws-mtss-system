@@ -301,7 +301,21 @@ router.post('/logout', (req, res) => {
             if (err) console.error('Passport logout error:', err);
         });
     }
-    sendSuccess(res, 'Logged out successfully');
+
+    // Signing out here should also end the Hub session, otherwise the user
+    // lands back on the hub still logged in and one click re-enters this app.
+    //
+    // Hub's session is a cookie on Hub's domain, so only the browser can
+    // clear it - no server-to-server call can. We hand the client a URL to
+    // navigate to instead of trying to do it from here.
+    const hubBaseUrl = process.env.HUB_BASE_URL;
+    const hubLogoutUrl = hubBaseUrl
+        ? `${hubBaseUrl.replace(/\/$/, '')}/auth/logout?redirect=${encodeURIComponent(
+              process.env.FRONTEND_URL || 'https://app.millenniaws.sch.id/mtss'
+          )}`
+        : null;
+
+    sendSuccess(res, 'Logged out successfully', hubLogoutUrl ? { hubLogoutUrl } : null);
 });
 
 // Get current user info

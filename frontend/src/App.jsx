@@ -17,6 +17,7 @@ const App = memo(() => {
     const location = useLocation();
     const aosRef = useRef(null);
     const [showEnhancements, setShowEnhancements] = useState(false);
+    
 
     useEffect(() => {
         let isDisposed = false;
