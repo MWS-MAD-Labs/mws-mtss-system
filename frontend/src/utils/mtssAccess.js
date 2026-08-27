@@ -1,12 +1,18 @@
 const NATIVE_MTSS_ADMIN_ROLES = new Set(["directorate", "superadmin", "admin"]);
-const NATIVE_MTSS_LEADER_ROLES = new Set(["head_unit", "principal"]);
+// 'principal' was dropped here to match accessControl.js (the backend, the
+// authoritative check) - MTSS never actually stores that role value itself,
+// Hub's "principal" access tag maps onto 'head_unit' during SSO sync (same
+// leader tier, same permissions), so a stray "principal" role on a user
+// object here would otherwise be treated as valid by this fallback but
+// rejected by the backend that actually gates every API call.
+const NATIVE_MTSS_LEADER_ROLES = new Set(["head_unit"]);
 const NATIVE_MTSS_TEACHER_ROLES = new Set(["teacher", "se_teacher", "staff", "support_staff", "counselor"]);
-const DEFAULT_MTSS_LEADER_EMAILS = new Set([
-    "aria@millennia21.id",
-    "faisal@millennia21.id",
-    "kholida@millennia21.id",
-    "latifah@millennia21.id",
-]);
+// No default leader allowlist here anymore - Central's job_level for MTSS's
+// leadership team is literally "Head Unit" today, which the SSO sync (see
+// mws-mtss-system's jobLevelRoleMapping.js) already derives to role
+// 'head_unit', already recognized above. The observer allowlist below stays:
+// it deliberately *caps* someone whose Central title implies more (see
+// accessControl.js), which Central has no way to express.
 const DEFAULT_MTSS_OBSERVER_EMAILS = new Set([
     "mahrukh@millennia21.id",
 ]);
@@ -62,18 +68,6 @@ const buildFallbackMtssAccess = (user = {}) => {
             canManageConfig: false,
             accessLevel: "teacher",
             effectiveRole: role,
-            source: "frontend_fallback",
-        };
-    }
-
-    if (DEFAULT_MTSS_LEADER_EMAILS.has(email)) {
-        return {
-            hasAccess: true,
-            isReadOnly: false,
-            canAccessAdmin: true,
-            canManageConfig: true,
-            accessLevel: "leader",
-            effectiveRole: "head_unit",
             source: "frontend_fallback",
         };
     }

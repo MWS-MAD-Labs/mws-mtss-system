@@ -3,8 +3,8 @@ const MentorAssignment = require('../models/MentorAssignment');
 const MTSSStudent = require('../models/MTSSStudent');
 const User = require('../models/User');
 const { summarizeAssignmentsForStudents, formatRosterStudent } = require('../utils/mtssStudentHelpers');
+const { PILOT_FEEDBACK_ADMIN_EMAILS } = require('../utils/pilotFeedbackAccess');
 
-const PILOT_FEEDBACK_ADMIN_EMAILS = ['faisal@millennia21.id'];
 let cachedPilotFeedbackAdminIds = [];
 let cachedPilotFeedbackAdminFetchedAt = 0;
 
@@ -144,7 +144,7 @@ const getPilotFeedbackAdminIds = async () => {
     }
 
     const admins = await User.find({
-        email: { $in: PILOT_FEEDBACK_ADMIN_EMAILS },
+        email: { $in: Array.from(PILOT_FEEDBACK_ADMIN_EMAILS) },
         isActive: true
     })
         .select('_id')

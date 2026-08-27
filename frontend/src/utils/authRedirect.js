@@ -1,4 +1,4 @@
-import { hasMtssAccess } from "@/utils/mtssAccess";
+import { hasMtssAccess, getDefaultMtssRoute } from "@/utils/mtssAccess";
 import { getBasePath } from "@/lib/apiBase";
 
 const PENDING_AUTH_REDIRECT_KEY = "pending_auth_redirect";
@@ -54,7 +54,7 @@ export const getDefaultPostLoginPath = (userOrRole) => {
     }
 
     if (hasMtssAccess(user || { role: normalizedRole })) {
-        return "/support-hub";
+        return getDefaultMtssRoute(user || { role: normalizedRole }) || "/select-role";
     }
 
     // Unknown/non-support roles go directly to check-in method selection.

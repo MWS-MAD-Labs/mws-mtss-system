@@ -2,6 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { hasEmotionalDashboardAccess } from '@/utils/accessControl';
 import { storePendingRedirect } from '@/utils/authRedirect';
+import { getDefaultMtssRoute, hasMtssAccess } from '@/utils/mtssAccess';
 
 const ProtectedRoute = ({
     children,
@@ -13,12 +14,12 @@ const ProtectedRoute = ({
     const { user, isAuthenticated, loading } = useSelector((state) => state.auth);
     const location = useLocation();
 
-    // Role-aware fallback: students → student hub, MTSS roles → support hub, others (staff/support_staff) → check-in selection
-    const mtssHubRoles = ['teacher', 'se_teacher', 'head_unit', 'directorate', 'admin', 'superadmin'];
+    // Role-aware fallback: students → student hub, MTSS roles → their own
+    // dashboard directly, others (staff/support_staff) → check-in selection.
     const fallbackPath = user?.role === 'student'
         ? '/student/support-hub'
-        : mtssHubRoles.includes(user?.role)
-            ? '/support-hub'
+        : hasMtssAccess(user)
+            ? (getDefaultMtssRoute(user) || '/select-role')
             : '/select-role';
 
     // Show loading while checking authentication

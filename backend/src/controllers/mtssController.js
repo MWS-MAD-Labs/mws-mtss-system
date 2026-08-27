@@ -42,7 +42,6 @@ const TYPE_ALIAS_MAP = {
 };
 const MTSS_MENTOR_ROLES = ['staff', 'teacher', 'support_staff', 'head_unit', 'admin', 'directorate'];
 const DUPLICATE_BLOCKING_STATUSES = ['active', 'paused'];
-const JH_GRADE_WIDE_EXCEPTION_USERS = new Set(['himawan', 'hasan']);
 const CLASS_SCOPED_UNITS = new Set(['elementary', 'kindergarten', 'pelangi']);
 const PLAN_EDITABLE_FIELDS = new Set([
     'focusAreas',
@@ -875,25 +874,17 @@ const isClassScopedTeacherInUnit = (viewer = {}) => {
     });
 };
 
-const resolveRosterGradeScopeForViewer = (viewer = {}) => {
-    const lowerUnit = (viewer.unit || '').toLowerCase();
-    const usernameKey = (viewer.username || '').trim().toLowerCase();
-    const nameKey = (viewer.name || '').trim().toLowerCase();
-    const isJhWideException =
-        lowerUnit === 'junior high' &&
-        (
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(usernameKey) ||
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(nameKey) ||
-            nameKey.includes('himawan') ||
-            nameKey.includes('hasan')
-        );
-
-    if (isJhWideException) {
-        return deriveGradesForUnit(viewer.unit || 'Junior High');
-    }
-
-    return deriveAllowedGradesForUser(viewer);
-};
+// A JH subject specialist whose class label has no grade number (e.g.
+// "Junior High - Coding") gets classes[].grade = "Junior High" from
+// parseAssignmentLabel. deriveAllowedGradesForUser passes that straight
+// through, but buildGradeFilterClauses already expands a bare unit name
+// into every grade in that unit via deriveGradesForUnit - so this already
+// resolves to Grade 7/8/9 with no extra handling needed. (Verified: a
+// per-name allowlist used to sit here for two JH teachers whose labels have
+// no grade number; it produced byte-identical grade filters to this plain
+// path, and missed a third teacher with the same "Junior High - <subject>"
+// pattern who was never added to it.)
+const resolveRosterGradeScopeForViewer = (viewer = {}) => deriveAllowedGradesForUser(viewer);
 
 const ensureStudentsWithinViewerScope = async (studentIds = [], viewer = {}) => {
     if (!studentIds.length || isMTSSAdminRole(viewer?.role)) return;
@@ -910,19 +901,7 @@ const ensureStudentsWithinViewerScope = async (studentIds = [], viewer = {}) => 
         $and: [{ $or: gradeClauses }]
     };
 
-    const lowerUnit = (viewer.unit || '').toLowerCase();
-    const usernameKey = (viewer.username || '').trim().toLowerCase();
-    const nameKey = (viewer.name || '').trim().toLowerCase();
-    const isJhWideException =
-        lowerUnit === 'junior high' &&
-        (
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(usernameKey) ||
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(nameKey) ||
-            nameKey.includes('himawan') ||
-            nameKey.includes('hasan')
-        );
-
-    const useClassScopedFilter = !isJhWideException && isClassScopedTeacherInUnit(viewer);
+    const useClassScopedFilter = isClassScopedTeacherInUnit(viewer);
     if (useClassScopedFilter) {
         const allowedClasses = deriveAllowedClassNamesForUser(viewer);
         const classClauses = buildClassFilterClauses(allowedClasses);

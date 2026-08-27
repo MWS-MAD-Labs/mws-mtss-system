@@ -25,7 +25,14 @@ function verifyHubRelayToken(token) {
   }
   cacheService.markSsoJtiSeen(payload.jti);
 
-  return payload;
+  // tags/source are Hub's own access-tag verdict for this person (see
+  // AppsService.accessTagsFor in mws-hub) - default defensively so an older
+  // Hub deployment that hasn't rolled the new claims out yet degrades to
+  // "no tags" instead of throwing here.
+  return {
+    ...payload,
+    tags: Array.isArray(payload.tags) ? payload.tags : [],
+  };
 }
 
 module.exports = { verifyHubRelayToken };

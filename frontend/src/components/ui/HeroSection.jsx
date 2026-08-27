@@ -7,7 +7,6 @@ import HeroAuthCard from "@/components/ui/HeroAuthCard";
 import Logo from "./Millennia.webp";
 import { Sparkles, ShieldCheck, Smartphone } from "lucide-react";
 import { consumePendingRedirect, getDefaultPostLoginPath } from "@/utils/authRedirect";
-import { getApiBaseUrl } from "@/lib/apiBase";
 
 const FEATURES = [
   { icon: '🧠', label: 'AI Emotional Wellness' },
@@ -32,10 +31,14 @@ const HeroSection = memo(() => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Google sign-in goes through Hub, not a Google OAuth flow of our own: Hub
+  // owns the identity/role source of truth (Central) and hands MTSS a
+  // short-lived relay token via /auth/sso. This is the same "one door" every
+  // other satellite app uses - MTSS must not keep a parallel login path that
+  // can drift from Central.
   const handleGoogleSignIn = useCallback(() => {
-    const apiBase = getApiBaseUrl();
-    const backendUrl = apiBase.replace(/\/api(?:\/v\d+)?\/?$/, "");
-    window.location.href = `${backendUrl}/auth/google`;
+    const hubBaseUrl = import.meta.env.VITE_HUB_BASE_URL || "http://localhost:5175";
+    window.location.href = `${hubBaseUrl.replace(/\/$/, "")}/apps/mtss/launch`;
   }, []);
 
   const handleEmailLogin = useCallback(async (e) => {

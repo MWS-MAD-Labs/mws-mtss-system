@@ -1,0 +1,19 @@
+# Local-only MongoDB for `bun run dev`. Not part of the staging/production
+# compose files - those pull prebuilt images from GHCR and are unrelated to
+# this bare-metal dev workflow. Exists so MONGODB_URI in backend/.env never
+# has to point at the shared production Atlas cluster just to run this
+# backend locally - local testing (role sync, seeding, etc.) was previously
+# writing directly into real production user records.
+services:
+  mongo:
+    image: mongo:7
+    container_name: mws-mtss-system-mongo-dev
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    volumes:
+      - mtss-mongo-dev-data:/data/db
+
+volumes:
+  mtss-mongo-dev-data:
+    name: mws-mtss-system-mongo-dev-data
