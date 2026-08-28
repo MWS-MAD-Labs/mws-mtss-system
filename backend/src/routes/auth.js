@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const helmet = require('helmet');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const UserStudent = require('../models/UserStudent');
@@ -33,7 +34,17 @@ const getDefaultMtssRedirectTarget = (user) => {
 // short-lived audience-scoped token here. MTSS verifies only that email
 // assertion and re-resolves the user from Central/local DB before creating
 // its own JWT.
-router.get('/sso', ssoLimiter, async (req, res) => {
+//
+// app.js's global helmet() defaults Cross-Origin-Opener-Policy to
+// 'same-origin'. That header forces the browser to sever this navigation
+// into a brand-new browsing-context group, which breaks Hub's
+// window.open(url, name) tab reuse (see mws-hub's AppCard.tsx) - every
+// relaunch reopens a fresh tab instead of focusing the one already logged
+// in, no matter what name Hub asks for. Hub already severs window.opener by
+// hand right after opening, so COOP isn't this route's only tabnabbing
+// defense; scope the relaxation to just this transient redirect hop rather
+// than touching the app-wide default.
+router.get('/sso', helmet.crossOriginOpenerPolicy({ policy: 'unsafe-none' }), ssoLimiter, async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5176/mtss';
     const { token } = req.query;
 

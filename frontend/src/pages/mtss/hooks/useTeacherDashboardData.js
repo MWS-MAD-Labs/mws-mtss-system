@@ -211,6 +211,12 @@ const useTeacherDashboardData = (viewerUser = null) => {
     const [heroBadge, setHeroBadge] = useState(baseHero);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    // Assignments this viewer still owns (mentor or creator) whose student
+    // isn't in their current grade/unit roster - e.g. Central moved them
+    // from Junior High to SD mid-intervention. Surfaced separately so the
+    // dashboard can flag "this needs a look" without folding an
+    // out-of-scope student into the regular roster views.
+    const [outOfScopeAssignments, setOutOfScopeAssignments] = useState([]);
 
     const loadDashboard = useCallback(async ({ signal, silent = false } = {}) => {
         if (!silent) {
@@ -247,13 +253,44 @@ const useTeacherDashboardData = (viewerUser = null) => {
                     .map((student) => student?._id?.toString?.() || student?.id?.toString?.())
                     .filter(Boolean),
             );
+
+            const viewerId = (storedUser?.id || storedUser?._id)?.toString?.() || storedUser?.id || storedUser?._id;
+            const isOwnedByViewer = (assignment) => {
+                const mentorKey = assignment?.mentorId?._id?.toString?.() || assignment?.mentorId?.toString?.();
+                const creatorKey = assignment?.createdBy?._id?.toString?.() || assignment?.createdBy?.toString?.();
+                return Boolean(viewerId && (mentorKey === viewerId || creatorKey === viewerId));
+            };
+            const isInCurrentScope = (assignment) =>
+                (assignment.studentIds || []).some((student) => {
+                    const studentKey = student?._id?.toString?.() || student?.id?.toString?.() || student?.toString?.();
+                    return Boolean(studentKey && studentIdSet.has(studentKey));
+                });
+
+            // A viewer's own assignment (mentor or creator) always stays
+            // visible, even for a student whose grade fell out of the
+            // viewer's current scope - e.g. Central moved this teacher from
+            // Junior High to SD mid-intervention. Silently dropping it here
+            // would orphan a still-active intervention from the one
+            // person's dashboard who's supposed to be running it. Only
+            // assignments the viewer can merely edit (not own) still get
+            // scoped to their current roster.
             const scopedAssignments = studentIdSet.size
-                ? assignments.filter((assignment) =>
-                    (assignment.studentIds || []).some((student) => {
-                        const studentKey = student?._id?.toString?.() || student?.id?.toString?.() || student?.toString?.();
-                        return Boolean(studentKey && studentIdSet.has(studentKey));
-                    }))
+                ? assignments.filter((assignment) => isOwnedByViewer(assignment) || isInCurrentScope(assignment))
                 : assignments;
+
+            const outOfScope = studentIdSet.size
+                ? assignments.filter((assignment) => isOwnedByViewer(assignment) && !isInCurrentScope(assignment))
+                : [];
+            setOutOfScopeAssignments(
+                outOfScope.map((assignment) => ({
+                    assignmentId: assignment._id?.toString?.() || assignment.id || null,
+                    studentNames: (assignment.studentIds || [])
+                        .map((student) => student?.name || student?.studentName)
+                        .filter(Boolean),
+                    grade: assignment.studentIds?.[0]?.currentGrade || assignment.studentIds?.[0]?.grade || null,
+                })),
+            );
+
             const cards = buildStatCards(scopedAssignments);
             const assignmentSummary = mapAssignmentsToStudents(scopedAssignments, primaryName);
             const mergedStudents = mergeRosterWithAssignments(rosterStudents, assignmentSummary.students, segments);
@@ -336,6 +373,7 @@ const useTeacherDashboardData = (viewerUser = null) => {
         heroBadge,
         loading,
         error,
+        outOfScopeAssignments,
         refresh: () => loadDashboard(),
     };
 };

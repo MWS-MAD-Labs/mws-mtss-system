@@ -254,6 +254,7 @@ const hasMtssWriteAccess = (user) => {
 
 module.exports = {
     DEFAULT_DASHBOARD_ROLES: Array.from(DEFAULT_DASHBOARD_ROLES),
+    MTSS_NATIVE_TEACHER_ROLES: Array.from(MTSS_NATIVE_TEACHER_ROLES),
     buildDashboardAccessProfile,
     hasDashboardAccess,
     getEffectiveDashboardRole,
