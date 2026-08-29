@@ -176,9 +176,15 @@ router.post('/logout', (req, res) => {
     // clear it - no server-to-server call can. We hand the client a URL to
     // navigate to instead of trying to do it from here.
     const hubBaseUrl = process.env.HUB_BASE_URL;
+    // Trailing slash is load-bearing: this becomes a real top-level
+    // navigation, and the gateway/dev server serves this app at /mtss/,
+    // not /mtss (Vite's strict base-path match rejects the latter).
+    const frontendBase = (
+        process.env.FRONTEND_URL || 'https://app.millenniaws.sch.id/mtss'
+    ).replace(/\/+$/, '');
     const hubLogoutUrl = hubBaseUrl
         ? `${hubBaseUrl.replace(/\/$/, '')}/auth/logout?redirect=${encodeURIComponent(
-              process.env.FRONTEND_URL || 'https://app.millenniaws.sch.id/mtss'
+              `${frontendBase}/`
           )}`
         : null;
 
