@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { startGlobalLoading, stopGlobalLoading } from '@/lib/loadingManager';
-import { getApiBaseUrl } from '@/lib/apiBase';
+import { getApiBaseUrl, getBasePath } from '@/lib/apiBase';
 
 // Base-aware: standalone uses /api/v1, gateway build under /mtss uses /mtss/api/v1.
 const API_BASE_URL = getApiBaseUrl();
@@ -64,8 +64,12 @@ api.interceptors.response.use(
                     localStorage.removeItem('auth_token');
                     localStorage.removeItem('auth_user');
                     localStorage.removeItem('token');
-                    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-                        window.location.assign('/');
+                    // Gateway build serves this app under /mtss/, not site
+                    // root - '/' is a different (and here, non-existent)
+                    // route as far as this app's own router/dev server know.
+                    const homePath = `${getBasePath()}/`;
+                    if (typeof window !== 'undefined' && window.location.pathname !== homePath) {
+                        window.location.assign(homePath);
                     }
                 }
             }
