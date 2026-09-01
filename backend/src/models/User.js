@@ -12,8 +12,15 @@ const userSchema = new mongoose.Schema({
     password: {
         type: String,
         required: function () {
-            // Password is required only if not using Google OAuth
-            return !this.googleId;
+            // googleId dates from the old direct-Google OAuth flow (removed
+            // - Hub owns that now). Central-provisioned employees (current
+            // Hub SSO relay flow) never set googleId, so ssoProvisioned
+            // marks it explicitly - deliberately not keyed off employeeId,
+            // which means "has a Central employee number" and nothing about
+            // how the account authenticates; overloading it would silently
+            // make password optional for any manually-created account an
+            // admin later links to a real employeeId.
+            return !this.googleId && !this.ssoProvisioned;
         },
         minlength: 6
     },
@@ -29,12 +36,16 @@ const userSchema = new mongoose.Schema({
     },
     department: {
         type: String,
-        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE'],
+        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE', 'BRIDGE', 'RISE', 'SHIELD', 'SAFE', 'COMPASS'],
         trim: true
     },
     employeeId: {
         type: String,
         trim: true
+    },
+    ssoProvisioned: {
+        type: Boolean,
+        default: false
     },
     isActive: {
         type: Boolean,
@@ -63,7 +74,7 @@ const userSchema = new mongoose.Schema({
     },
     unit: {
         type: String,
-        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE'],
+        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE', 'BRIDGE', 'RISE', 'SHIELD', 'SAFE', 'COMPASS'],
         trim: true
     },
     jobPosition: {
@@ -72,7 +83,7 @@ const userSchema = new mongoose.Schema({
     },
     employmentStatus: {
         type: String,
-        enum: ['Permanent', 'Contract', 'Probation'],
+        enum: ['Permanent', 'Contract', 'Probation', 'Freelance', 'Part Time', 'WFH'],
         default: 'Permanent'
     },
     joinDate: {

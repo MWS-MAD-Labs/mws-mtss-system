@@ -1,149 +1,118 @@
 const express = require('express');
 const router = express.Router();
-const passport = require('../config/googleOAuth');
+const helmet = require('helmet');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const UserStudent = require('../models/UserStudent');
 const { sendSuccess, sendError } = require('../utils/response');
 const { hasDashboardAccess, hasMtssAccess } = require('../utils/accessControl');
 const { buildRequestUser } = require('../middleware/auth');
+const { verifyHubRelayToken } = require('../utils/hubSsoRelay');
+const { resolveOrProvisionSsoUser } = require('../utils/ssoUserResolution');
+const { createUserAwareRateLimiter } = require('../middleware/rateLimiter');
 
-// Session middleware is only needed for Google OAuth flow.
-// Email/password login and JWT-based routes do NOT require sessions.
-const buildOAuthMiddleware = () => {
-    const secret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
-    if (!secret) return [];
-    return [
-        require('express-session')({ secret, resave: false, saveUninitialized: false }),
-        passport.initialize(),
-        passport.session()
-    ];
-};
-const oauthMiddleware = buildOAuthMiddleware();
+const ssoLimiter = createUserAwareRateLimiter({ windowMinutes: 1, max: 20, skip: () => false });
 
-const ensureGoogleOAuthConfigured = (req, res, next) => {
-    if (passport.googleOAuthConfigured) {
-        return next();
-    }
-
-    const missingVariables = passport.googleOAuthStatus?.missingVariables || [];
-    const callbackURL = passport.googleOAuthStatus?.callbackURL || null;
-
-    return sendError(
-        res,
-        `Google OAuth is not configured${missingVariables.length ? `: missing ${missingVariables.join(', ')}` : ''}`,
-        503,
-        {
-            missingVariables,
-            callbackURL
-        }
+const isCentralLookupError = (error) => {
+    const baseUrl = error?.config?.baseURL;
+    const path = error?.config?.url;
+    return Boolean(
+        baseUrl === process.env.MWS_DATA_CENTER_API_URL ||
+        (typeof path === 'string' && /^\/(employees|students)\//.test(path))
     );
 };
 
-// Google OAuth routes
-router.get('/google',
-    ...oauthMiddleware,
-    ensureGoogleOAuthConfigured,
-    passport.authenticate('google', {
-        scope: ['profile', 'email'],
-        hd: 'millennia21.id' // Restrict to millennia21.id domain
-    })
-);
+const getDefaultMtssRedirectTarget = (user) => {
+    const profile = user?.mtssAccess || {};
+    if (!profile.hasAccess) return '/select-role';
+    if (profile.accessLevel === 'observer') return '/observer';
+    if (profile.canAccessAdmin) return '/admin';
+    return '/teacher';
+};
 
-router.get('/google/callback',
-    ...oauthMiddleware,
-    ensureGoogleOAuthConfigured,
-    passport.authenticate('google', { failureRedirect: '/?error=oauth_failed' }),
-    async (req, res) => {
-        try {
-            console.log('✅ Google OAuth successful for user:', req.user.email);
+// Hub token-relay SSO handoff. Hub authenticates Google once, then sends a
+// short-lived audience-scoped token here. MTSS verifies only that email
+// assertion and re-resolves the user from Central/local DB before creating
+// its own JWT.
+//
+// app.js's global helmet() defaults Cross-Origin-Opener-Policy to
+// 'same-origin'. That header forces the browser to sever this navigation
+// into a brand-new browsing-context group, which breaks Hub's
+// window.open(url, name) tab reuse (see mws-hub's AppCard.tsx) - every
+// relaunch reopens a fresh tab instead of focusing the one already logged
+// in, no matter what name Hub asks for. Hub already severs window.opener by
+// hand right after opening, so COOP isn't this route's only tabnabbing
+// defense; scope the relaxation to just this transient redirect hop rather
+// than touching the app-wide default.
+router.get('/sso', helmet.crossOriginOpenerPolicy({ policy: 'unsafe-none' }), ssoLimiter, async (req, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5176/mtss';
+    const { token } = req.query;
 
-            // Validate user exists in database and get authoritative user data
-            const userModel = req.user?.constructor?.modelName === 'UserStudent' ? UserStudent : User;
-            const dbUser = await userModel.findById(req.user._id).select('-password -googleProfile');
-
-            if (!dbUser) {
-                console.error('❌ User not found in database after OAuth:', req.user.email);
-                return res.redirect('/?error=user_not_found');
-            }
-
-            // Check if user is active
-            if (!dbUser.isActive) {
-                console.error('❌ Inactive user attempted OAuth login:', req.user.email);
-                return res.redirect('/?error=account_inactive');
-            }
-
-            // Update last login
-            dbUser.lastLogin = new Date();
-            await dbUser.save();
-
-            // Log role validation for security
-            console.log('🔐 Role validation for OAuth user:', {
-                email: dbUser.email,
-                role: dbUser.role,
-                isHeadUnit: dbUser.role === 'head_unit',
-                isDirectorate: dbUser.role === 'directorate',
-                department: dbUser.department,
-                unit: dbUser.unit
-            });
-
-            // Generate JWT token with database-validated user data
-            const token = jwt.sign(
-                {
-                    userId: dbUser._id,
-                    email: dbUser.email,
-                    role: dbUser.role
-                },
-                process.env.JWT_SECRET,
-                { expiresIn: '7d' }
-            );
-
-            // Send database-validated user data to frontend
-            const userDataForFrontend = {
-                ...buildRequestUser(dbUser),
-                lastLogin: dbUser.lastLogin,
-                isActive: dbUser.isActive,
-                emailVerified: dbUser.emailVerified,
-                // Add validation metadata
-                validatedAt: new Date().toISOString(),
-                authMethod: 'google_oauth'
-            };
-
-            // Redirect to frontend with validated user data
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-            const redirectTarget = dbUser.role === 'student'
-                ? '/emotional-checkin'
-                : (userDataForFrontend.mtssAccess?.hasAccess ? '/support-hub' : '/select-role');
-            const redirectUrl = `${frontendUrl}/auth/callback#token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(userDataForFrontend))}&redirect=${encodeURIComponent(redirectTarget)}`;
-
-            const canViewDashboard = hasDashboardAccess(userDataForFrontend);
-
-            // Debug log for FRONTEND_URL configuration
-            console.log('🌐 OAuth redirect config:', {
-                FRONTEND_URL_ENV: process.env.FRONTEND_URL || 'NOT SET (using fallback)',
-                NODE_ENV: process.env.NODE_ENV || 'NOT SET',
-                frontendUrl,
-                redirectTarget
-            });
-
-            console.log('🔄 Redirecting to frontend with database-validated user data');
-            console.log('📋 User role for dashboard access:', {
-                role: dbUser.role,
-                dashboardRole: userDataForFrontend.dashboardRole,
-                delegatedFrom: userDataForFrontend.dashboardAccess?.delegatedFromEmail || null,
-                hasDashboardAccess: canViewDashboard,
-                hasMtssAccess: hasMtssAccess(userDataForFrontend),
-                mtssRole: userDataForFrontend.mtssRole || null
-            });
-
-            res.redirect(redirectUrl);
-
-        } catch (error) {
-            console.error('❌ OAuth callback error:', error);
-            res.redirect('/?error=oauth_failed');
-        }
+    if (!token || typeof token !== 'string') {
+        return res.redirect(`${frontendUrl}/?error=sso_missing_token`);
     }
-);
+
+    let payload;
+    try {
+        payload = verifyHubRelayToken(token);
+    } catch (error) {
+        console.error('❌ MTSS Hub SSO relay token verification failed:', error.message);
+        return res.redirect(`${frontendUrl}/?error=sso_invalid_token`);
+    }
+
+    try {
+        const dbUser = await resolveOrProvisionSsoUser(payload.sub, { tags: payload.tags });
+
+        if (!dbUser) {
+            console.log('❌ No active central record for MTSS Hub SSO email:', payload.sub);
+            return res.redirect(`${frontendUrl}/?error=sso_account_not_found`);
+        }
+
+        if (!dbUser.isActive) {
+            console.error('❌ Inactive user attempted MTSS Hub SSO login:', {
+                email: dbUser.email,
+                model: dbUser.constructor?.modelName,
+                isActive: dbUser.isActive
+            });
+            return res.redirect(`${frontendUrl}/?error=account_inactive`);
+        }
+
+        const token7d = jwt.sign(
+            { userId: dbUser._id, email: dbUser.email, role: dbUser.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        const userDataForFrontend = {
+            ...buildRequestUser(dbUser),
+            lastLogin: dbUser.lastLogin,
+            isActive: dbUser.isActive,
+            emailVerified: dbUser.emailVerified,
+            validatedAt: new Date().toISOString(),
+            authMethod: 'hub_sso'
+        };
+
+        const redirectTarget = getDefaultMtssRedirectTarget(userDataForFrontend);
+        const redirectUrl = `${frontendUrl}/auth/callback#token=${encodeURIComponent(token7d)}&user=${encodeURIComponent(JSON.stringify(userDataForFrontend))}&redirect=${encodeURIComponent(redirectTarget)}`;
+
+        console.log('✅ MTSS Hub SSO login successful:', {
+            email: dbUser.email,
+            role: dbUser.role,
+            redirectTarget
+        });
+        res.redirect(redirectUrl);
+    } catch (error) {
+        const centralLookupFailed = isCentralLookupError(error);
+        console.error('❌ MTSS Hub SSO handoff error:', {
+            email: payload.sub,
+            centralLookupFailed,
+            status: error?.response?.status,
+            path: error?.config?.url,
+            message: error?.message
+        });
+        res.redirect(`${frontendUrl}/?error=${centralLookupFailed ? 'sso_central_lookup_failed' : 'sso_failed'}`);
+    }
+});
 
 // Manual login route
 router.post('/login', require('../middleware/validation').validate(require('../utils/validationSchemas').userLoginSchema), async (req, res) => {
@@ -199,14 +168,48 @@ router.post('/login', require('../middleware/validation').validate(require('../u
 });
 
 // Logout — JWT auth is stateless; client drops the token.
-// Passport session logout only applies when OAuth session is active.
 router.post('/logout', (req, res) => {
-    if (typeof req.logout === 'function') {
-        req.logout((err) => {
-            if (err) console.error('Passport logout error:', err);
-        });
-    }
-    sendSuccess(res, 'Logged out successfully');
+    // Signing out here should also end the Hub session, otherwise the user
+    // lands back on the hub still logged in and one click re-enters this app.
+    //
+    // Hub's session is a cookie on Hub's domain, so only the browser can
+    // clear it - no server-to-server call can. We hand the client a URL to
+    // navigate to instead of trying to do it from here.
+    const hubBaseUrl = process.env.HUB_BASE_URL;
+    // Trailing slash is load-bearing: this becomes a real top-level
+    // navigation, and the gateway/dev server serves this app at /mtss/,
+    // not /mtss (Vite's strict base-path match rejects the latter).
+    const frontendBase = (
+        process.env.FRONTEND_URL || 'https://app.millenniaws.sch.id/mtss'
+    ).replace(/\/+$/, '');
+    const hubLogoutUrl = hubBaseUrl
+        ? `${hubBaseUrl.replace(/\/$/, '')}/auth/logout?redirect=${encodeURIComponent(
+              `${frontendBase}/`
+          )}`
+        : null;
+
+    sendSuccess(res, 'Logged out successfully', hubLogoutUrl ? { hubLogoutUrl } : null);
+});
+
+// The other half of Hub <-> MTSS logout: MTSS's session is a self-contained
+// JWT in this app's own localStorage, on this app's own origin - Hub's page
+// can never reach in and clear it directly (cross-origin). Hub loads this
+// page in a hidden iframe when the person signs out there, so signing out
+// of Hub actually signs out of every satellite app they opened, not just
+// Hub itself (see mintRelayToken's sibling concern - own-origin-only
+// storage - documented in mws-hub/backend/src/type/catalog-type.ts).
+//
+// No auth middleware: this must work whether or not a local session exists.
+// Helmet's default X-Frame-Options: SAMEORIGIN would otherwise block Hub
+// from framing this at all, so it's replaced here with a CSP frame-ancestors
+// scoped to Hub's own origin specifically - not a blanket "allow everyone".
+router.get('/logout-silent', (req, res) => {
+    const hubOrigin = (process.env.HUB_BASE_URL || '').replace(/\/$/, '');
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('Content-Security-Policy', `frame-ancestors 'self'${hubOrigin ? ` ${hubOrigin}` : ''}`);
+    res.type('html').send(
+        `<!doctype html><html><body><script>try{localStorage.removeItem('auth_token');localStorage.removeItem('auth_user');}catch(e){}</script></body></html>`
+    );
 });
 
 // Get current user info

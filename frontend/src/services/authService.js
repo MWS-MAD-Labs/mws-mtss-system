@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { startGlobalLoading, stopGlobalLoading } from '@/lib/loadingManager';
-import { getApiBaseUrl } from '@/lib/apiBase';
+import { getApiBaseUrl, getBasePath } from '@/lib/apiBase';
 
 // Base-aware: standalone uses /api/v1, gateway build under /mtss uses /mtss/api/v1.
 const API_BASE_URL = getApiBaseUrl();
@@ -64,8 +64,12 @@ api.interceptors.response.use(
                     localStorage.removeItem('auth_token');
                     localStorage.removeItem('auth_user');
                     localStorage.removeItem('token');
-                    if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-                        window.location.assign('/');
+                    // Gateway build serves this app under /mtss/, not site
+                    // root - '/' is a different (and here, non-existent)
+                    // route as far as this app's own router/dev server know.
+                    const homePath = `${getBasePath()}/`;
+                    if (typeof window !== 'undefined' && window.location.pathname !== homePath) {
+                        window.location.assign(homePath);
                     }
                 }
             }
@@ -82,6 +86,16 @@ export const login = async (email, password) => {
 
 export const logout = async () => {
     const response = await api.post('/auth/logout');
+
+    // The backend tells us where to go so the Hub session ends too. It has to
+    // be a real navigation: Hub's cookie lives on Hub's domain, so nothing
+    // this app calls from the background can clear it. Every caller of
+    // logout() gets this for free by living in one place.
+    const hubLogoutUrl = response?.data?.data?.hubLogoutUrl;
+    if (hubLogoutUrl) {
+        window.location.assign(hubLogoutUrl);
+    }
+
     return response;
 };
 

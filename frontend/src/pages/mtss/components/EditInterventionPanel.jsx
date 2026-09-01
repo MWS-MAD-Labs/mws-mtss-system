@@ -108,9 +108,9 @@ const EditInterventionPanel = memo(({
 
     return (
         <section
+            // No data-aos: this panel unmounts/remounts on every tab
+            // switch, so an entrance fade would replay every click.
             className="mtss-theme relative overflow-hidden rounded-[36px] border border-cyan-200/60 dark:border-cyan-500/30 bg-gradient-to-br from-cyan-50/85 via-white/85 to-blue-50/80 dark:from-cyan-950/30 dark:via-slate-900/55 dark:to-blue-950/25 shadow-[0_30px_90px_rgba(8,145,178,0.18)] p-6 sm:p-8 space-y-6 backdrop-blur-2xl"
-            data-aos="fade-up"
-            data-aos-duration="700"
         >
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute -top-16 -left-10 h-56 w-56 bg-gradient-to-br from-cyan-300/25 via-blue-300/20 to-transparent blur-[110px]" />

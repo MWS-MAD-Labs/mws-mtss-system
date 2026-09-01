@@ -6,6 +6,8 @@ const winston = require('winston');
 
 // Import configurations
 const connectDB = require('./config/database');
+const employeeDeactivationSync = require('./jobs/employeeDeactivationSync');
+const studentDeactivationSync = require('./jobs/studentDeactivationSync');
 const googleAI = require('./config/googleAI');
 const openRouterChat = require('./config/openRouterChat');
 const { initSocket } = require('./config/socket');
@@ -83,6 +85,7 @@ app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'ok',
         service: 'integra-learn-backend',
+        buildId: process.env.BUILD_ID || 'dev',
         phase: initializationState.phase,
         timestamp: new Date().toISOString()
     });
@@ -126,6 +129,13 @@ const initializeApp = async () => {
 
         // Connect to MongoDB
         await connectDB();
+
+        // Periodically mirror Central's active employee roster, so someone
+        // deactivated there loses MTSS access within minutes instead of
+        // only re-syncing at their next login (an SSO session is a
+        // self-contained 7-day JWT otherwise).
+        employeeDeactivationSync.start();
+        studentDeactivationSync.start();
 
         // Test Google AI connection (with graceful fallback for overload and quota)
         try {

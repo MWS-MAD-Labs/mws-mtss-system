@@ -14,6 +14,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="msapplication-TileColor" content="#1e40af" />
     <meta name="msapplication-config" content="/browserconfig.xml" />
+    <meta name="mws-build-id" content="%VITE_BUILD_ID%" />
 
     <!-- PWA Links -->
     <link rel="manifest" href="/manifest.json" />
@@ -32,7 +33,7 @@
     <!-- Force-update stale service workers on version bump -->
     <script>
         (function () {
-            var SW_VERSION = '3';
+            var SW_VERSION = '%VITE_BUILD_ID%';
             if (localStorage.getItem('sw_version') !== SW_VERSION && 'serviceWorker' in navigator) {
                 localStorage.setItem('sw_version', SW_VERSION);
                 navigator.serviceWorker.getRegistrations().then(function (regs) {

@@ -14,6 +14,9 @@ export const fetchMentorAssignments = (params = {}, config = {}) =>
 export const fetchMyAssignedStudents = (config = {}) =>
     api.get('/mtss/mentor-assignments/my/students', config).then(withData);
 
+export const fetchAssignmentsNeedingReassignment = (config = {}) =>
+    api.get('/mtss/mentor-assignments/needs-reassignment', config).then(withData);
+
 export const fetchTierMetadata = (config = {}) => api.get('/mtss/tiers', config).then(withData);
 
 export const fetchStrategies = (params = {}, config = {}) =>
@@ -163,6 +166,7 @@ export const uploadEvidenceAttachments = async (files = [], onProgress) => {
 export default {
     fetchMentorAssignments,
     fetchMyAssignedStudents,
+    fetchAssignmentsNeedingReassignment,
     fetchTierMetadata,
     fetchStrategies,
     fetchMtssStudents,

@@ -1,9 +1,10 @@
-import { LayoutDashboard, Users2, UserCheck, LineChart as LineChartIcon, Building2, Sparkles, Shield, Activity, Star } from "lucide-react";
+import { LayoutDashboard, Users2, UserCheck, LineChart as LineChartIcon, Building2, Sparkles, Shield, Activity, Star, UserCog } from "lucide-react";
 
 export const adminTabs = [
     { key: "overview", label: "System Overview", icon: LayoutDashboard },
     { key: "students", label: "All Students", icon: Users2 },
     { key: "mentors", label: "Manage Mentors", icon: UserCheck },
+    { key: "reassignment", label: "Needs Reassignment", icon: UserCog },
     { key: "analytics", label: "Analytics Lab", icon: LineChartIcon },
 ];
 

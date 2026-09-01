@@ -2,22 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { hasEmotionalDashboardAccess } from '@/utils/accessControl';
 import { storePendingRedirect } from '@/utils/authRedirect';
-import { hasMtssAccess } from '@/utils/mtssAccess';
-
-const normalizeRole = (role = '') => String(role || '').trim().toLowerCase();
-const SUPPORT_HUB_ROLES = new Set([
-    'staff',
-    'support_staff',
-    'nurse',
-    'counselor',
-    'teacher',
-    'se_teacher',
-    'head_unit',
-    'principal',
-    'directorate',
-    'admin',
-    'superadmin',
-]);
+import { getDefaultMtssRoute, hasMtssAccess } from '@/utils/mtssAccess';
 
 const ProtectedRoute = ({
     children,
@@ -28,13 +13,13 @@ const ProtectedRoute = ({
 }) => {
     const { user, isAuthenticated, loading } = useSelector((state) => state.auth);
     const location = useLocation();
-    const userRole = normalizeRole(user?.role);
 
-    // Role-aware fallback: students -> student hub, support/MTSS roles -> support hub, others -> check-in selection
-    const fallbackPath = userRole === 'student'
+    // Role-aware fallback: students → student hub, MTSS roles → their own
+    // dashboard directly, others (staff/support_staff) → check-in selection.
+    const fallbackPath = user?.role === 'student'
         ? '/student/support-hub'
-        : SUPPORT_HUB_ROLES.has(userRole) || hasMtssAccess(user || { role: userRole })
-            ? '/support-hub'
+        : hasMtssAccess(user)
+            ? (getDefaultMtssRoute(user) || '/select-role')
             : '/select-role';
 
     // Show loading while checking authentication
@@ -61,8 +46,7 @@ const ProtectedRoute = ({
 
     const hasRoleRule = allowedRoles.length > 0;
     const hasDepartmentRule = allowedDepartments.length > 0;
-    const normalizedAllowedRoles = allowedRoles.map(normalizeRole);
-    const roleAllowed = !hasRoleRule || normalizedAllowedRoles.includes(userRole);
+    const roleAllowed = !hasRoleRule || allowedRoles.includes(user?.role);
     const departmentAllowed = !hasDepartmentRule || allowedDepartments.includes(user?.department);
 
     if (accessMatch === 'any' && (hasRoleRule || hasDepartmentRule)) {

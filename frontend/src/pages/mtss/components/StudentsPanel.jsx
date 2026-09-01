@@ -244,14 +244,15 @@ const StudentsPanel = memo(({ students, TierPill, ProgressBadge, onRefresh, onEd
 
             <FilterBar activeTier={activeTier} setActiveTier={setActiveTier} query={query} setQuery={setQuery} />
 
+            {/* No data-aos on this section or the table below: this panel
+                unmounts/remounts on every tab switch, so an entrance fade
+                would replay every click. */}
             <section
                 className="rounded-[32px] border border-white/40 bg-white/95 dark:bg-slate-900/40 p-6 space-y-4 shadow-[0_14px_48px_rgba(15,23,42,0.14)]"
-                data-aos="fade-up"
-                data-aos-delay="80"
             >
                 <RosterHeader visible={visibleStudents.length} total={filteredStudents.length} />
 
-                <div data-aos="fade-up" data-aos-delay="120">
+                <div>
                         <StudentsTable
                             students={visibleStudents}
                             TierPill={TierPill}

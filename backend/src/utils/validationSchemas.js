@@ -329,6 +329,10 @@ const mentorAssignmentCreateSchema = Joi.object({
 });
 
 const mentorAssignmentUpdateSchema = Joi.object({
+    // Admin-only reassignment (see mtssController.js's updateMentorAssignment
+    // - a regular mentor/creator can't move their own assignment onto
+    // someone else).
+    mentorId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
     focusAreas: Joi.array().items(Joi.string().trim().min(1)).min(1).optional(),
     tier: Joi.string().valid('tier1', 'tier2', 'tier3').optional(),
     status: Joi.string().valid('active', 'paused', 'completed', 'closed').optional(),

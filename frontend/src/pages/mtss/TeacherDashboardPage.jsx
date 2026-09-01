@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import QuickUpdateModal from "./components/QuickUpdateModal";
 import SubjectPickerModal from "./components/SubjectPickerModal";
 import PilotTaskHintBanner from "./components/PilotTaskHintBanner";
+import OutOfScopeAssignmentsBanner from "./components/OutOfScopeAssignmentsBanner";
 import TeacherDashboardPanels from "./components/TeacherDashboardPanels";
 import TeacherDashboardStatus from "./components/TeacherDashboardStatus";
 import useTeacherDashboardActions from "./hooks/useTeacherDashboardActions";
@@ -84,6 +85,7 @@ const TeacherDashboardPage = memo(() => {
         heroBadge,
         loading: dataLoading,
         error: dataError,
+        outOfScopeAssignments,
         refresh,
     } = useTeacherDashboardData(effectiveTeacherUser);
     // Compute allowed tabs before the state hook so requestedTab validation
@@ -284,6 +286,8 @@ const TeacherDashboardPage = memo(() => {
                 {showGlobalPilotGuide && (
                     <PilotTaskHintBanner guide={pilotGuide} actionLabel="Use this path next" />
                 )}
+
+                <OutOfScopeAssignmentsBanner assignments={outOfScopeAssignments} />
 
                 <TeacherDashboardStatus loading={dataLoading} error={dataError} onRetry={refresh} />
 
