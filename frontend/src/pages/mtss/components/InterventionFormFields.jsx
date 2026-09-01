@@ -32,7 +32,7 @@ const InterventionFormFields = memo(({
 
     return (
         <>
-            <div className="grid md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="90">
+            <div className="grid md:grid-cols-2 gap-4">
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>
                         Student Name
@@ -62,7 +62,7 @@ const InterventionFormFields = memo(({
                 </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="120">
+            <div className="grid md:grid-cols-2 gap-4">
                     <div className={`${fieldWrap} flex flex-col gap-2`}>
                         <label className={labelClass}>
                             Subject / Focus Area
@@ -94,7 +94,7 @@ const InterventionFormFields = memo(({
                 </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="150">
+            <div className="grid md:grid-cols-2 gap-4">
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>
                         Strategy Library
@@ -124,12 +124,12 @@ const InterventionFormFields = memo(({
                 </div>
             </div>
 
-            <div className={`${fieldWrap} flex flex-col gap-2`} data-aos="fade-up" data-aos-delay="170">
+            <div className={`${fieldWrap} flex flex-col gap-2`}>
                 <label className={labelClass}>Goal</label>
                 <textarea className={textareaFieldClass} placeholder="Describe the intervention goal..." value={formState.goal} onChange={(e) => onChange("goal", e.target.value)} />
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="190">
+            <div className="grid md:grid-cols-2 gap-4">
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>Start Date</label>
                     <input type="date" className={fieldClass} value={formState.startDate} onChange={(e) => onChange("startDate", e.target.value)} />
@@ -146,7 +146,7 @@ const InterventionFormFields = memo(({
             </div>
 
             {formState.monitorFrequency === "Custom" && (
-                <div className="flex flex-col gap-3 p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-900/20 border border-blue-200/40 dark:border-blue-700/30" data-aos="fade-up" data-aos-delay="165">
+                <div className="flex flex-col gap-3 p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-900/20 border border-blue-200/40 dark:border-blue-700/30">
                     <label className={labelClass}>Select Days</label>
                     <div className="flex flex-wrap gap-2">
                         {WEEKDAYS.map((day) => {
@@ -183,7 +183,7 @@ const InterventionFormFields = memo(({
                 </div>
             )}
 
-            <div className="grid md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="210">
+            <div className="grid md:grid-cols-2 gap-4">
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>Monitoring Method</label>
                     <select className={fieldClass} value={formState.monitorMethod} onChange={(e) => onChange("monitorMethod", e.target.value)}>
@@ -199,7 +199,7 @@ const InterventionFormFields = memo(({
                 </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4" data-aos="fade-up" data-aos-delay="230">
+            <div className="grid md:grid-cols-2 gap-4">
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>Baseline Score</label>
                     <div className="flex gap-2">

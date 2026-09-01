@@ -100,9 +100,12 @@ const InterventionFormPanel = memo(({
 
     return (
         <section
+            // No data-aos here: this panel fully unmounts and remounts on
+            // every tab switch (see TeacherDashboardPanels), so an
+            // entrance fade would replay from invisible every single
+            // click - exactly the flicker this is avoiding, not a nice
+            // touch.
             className="mtss-theme relative overflow-hidden rounded-[36px] border border-white/50 dark:border-white/10 bg-white/75 dark:bg-slate-900/50 shadow-[0_30px_90px_rgba(15,23,42,0.18)] p-6 sm:p-8 space-y-6 backdrop-blur-2xl"
-            data-aos="fade-up"
-            data-aos-duration="700"
         >
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute -top-20 -left-10 h-56 w-56 bg-gradient-to-br from-[var(--mtss-glow-pink)]/25 via-[var(--mtss-glow-blue)]/20 to-transparent blur-[120px]" />
@@ -114,7 +117,7 @@ const InterventionFormPanel = memo(({
                     <PilotTaskHintBanner guide={pilotGuide} actionLabel="Complete this form in order" />
                 )}
 
-                <header className="space-y-2" data-aos="fade-up" data-aos-delay="60">
+                <header className="space-y-2">
                     <div className="inline-flex items-center gap-2 rounded-full bg-white/80 dark:bg-white/10 border border-white/60 dark:border-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.4em] text-slate-600 dark:text-slate-200">
                         <Sparkles className="w-4 h-4 text-primary" />
                         Plan Builder

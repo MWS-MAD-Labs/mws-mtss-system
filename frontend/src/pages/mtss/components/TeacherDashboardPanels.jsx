@@ -1,16 +1,22 @@
-import { memo, Suspense, lazy, useMemo } from "react";
+import { memo, useMemo } from "react";
 import { TierPill, ProgressBadge } from "./StatusPills";
+import DashboardOverview from "./DashboardOverview";
+import StudentsPanel from "./StudentsPanel";
+import InterventionFormPanel from "./InterventionFormPanel";
+import EditInterventionPanel from "./EditInterventionPanel";
+import ProgressFormPanel from "./ProgressFormPanel";
 
-const DashboardOverview = lazy(() => import("./DashboardOverview"));
-const StudentsPanel = lazy(() => import("./StudentsPanel"));
-const InterventionFormPanel = lazy(() => import("./InterventionFormPanel"));
-const EditInterventionPanel = lazy(() => import("./EditInterventionPanel"));
-const ProgressFormPanel = lazy(() => import("./ProgressFormPanel"));
-
-const PanelFallback = () => (
-    <div className="glass glass-card p-8 text-center text-muted-foreground animate-pulse">Loading panel...</div>
-);
-
+// Plain imports, not React.lazy(): activeTab below fully unmounts whichever
+// panel isn't showing, so switching back to a previously-visited tab
+// re-mounts its component from scratch every time. A lazy component
+// re-suspends on every fresh mount regardless of whether its chunk is
+// already cached - promise resolution is always a microtask tick away, so
+// Suspense's fallback flashes for a frame on every single tab switch, not
+// just the first. Prefetching (this file used to do that) only removes the
+// network cost, not that per-mount flash. Since every panel is small
+// enough to prefetch instantly anyway, there's no real code-splitting
+// benefit left to trade for that recurring flicker - plain imports never
+// suspend at all.
 const TeacherDashboardPanels = memo(
     ({
         activeTab,
@@ -135,7 +141,7 @@ const TeacherDashboardPanels = memo(
             textareaClass,
         ]);
 
-        return <Suspense fallback={<PanelFallback />}>{panelContent}</Suspense>;
+        return panelContent;
     },
 );
 

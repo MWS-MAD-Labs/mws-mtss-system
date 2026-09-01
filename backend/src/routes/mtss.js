@@ -11,6 +11,7 @@ const {
     deleteStrategy,
     createMentorAssignment,
     getMentorAssignments,
+    getAssignmentsNeedingReassignment,
     getMentorAssignmentById,
     updateMentorAssignment,
     getMyAssignedStudents,
@@ -77,6 +78,9 @@ router.get('/pilot-feedback', requireScopedMTSSAdmin, listPilotFeedbackSessions)
 router.post('/upload-evidence', requireMTSSWriteAccess, evidenceUpload.array('evidence', MAX_FILES), uploadEvidence);
 
 router.get('/mentor-assignments', requireMTSSAccess, getMentorAssignments);
+// Must come before the /:id route below - same path shape, and Express
+// matches registration order, so /:id would otherwise swallow this first.
+router.get('/mentor-assignments/needs-reassignment', requireScopedMTSSAdmin, getAssignmentsNeedingReassignment);
 router.get('/mentor-assignments/:id', requireMTSSAccess, getMentorAssignmentById);
 // Allow teachers to create intervention plans for students (they must assign themselves as mentor)
 router.post('/mentor-assignments', requireMTSSWriteAccess, validate(mentorAssignmentCreateSchema), createMentorAssignment);

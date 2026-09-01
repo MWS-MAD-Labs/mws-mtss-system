@@ -57,7 +57,6 @@ const TIER_CODES = ['tier1', 'tier2', 'tier3'];
 const STATUS_SET = new Set(INTERVENTION_STATUSES);
 const PRIVILEGED_ROLES = new Set(['admin', 'superadmin', 'directorate']);
 const UNIT_LEVEL_ROLES = new Set(['head_unit']); // Principals who see all students in their unit
-const JH_GRADE_WIDE_EXCEPTION_USERS = new Set(['himawan', 'hasan']);
 const CLASS_SCOPED_UNITS = new Set(['elementary', 'kindergarten', 'pelangi']);
 const INTERVENTION_TYPE_META = new Map(INTERVENTION_TYPES.map((entry) => [entry.key, entry]));
 const FOCUS_TYPE_MATCHERS = [
@@ -289,23 +288,20 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
 
     // JH teachers remain grade-wide. Elementary/Kindergarten homeroom + SE teachers
     // are class-scoped (grade + class) so roster visibility matches their classroom.
-    const lowerUnit = (viewer.unit || '').toLowerCase();
-    const usernameKey = (viewer.username || '').trim().toLowerCase();
-    const nameKey = (viewer.name || '').trim().toLowerCase();
-    const isJhWideException =
-        lowerUnit === 'junior high' &&
-        (
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(usernameKey) ||
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(nameKey) ||
-            nameKey.includes('himawan') ||
-            nameKey.includes('hasan')
-        );
+    //
+    // A JH subject specialist whose class label has no grade number (e.g.
+    // "Junior High - Coding") gets classes[].grade = "Junior High" from
+    // parseAssignmentLabel. deriveAllowedGradesForUser passes that straight
+    // through, but buildGradeFilterClauses (below) already expands a bare
+    // unit name into every grade in that unit via deriveGradesForUnit - so
+    // this already resolves to Grade 7/8/9 with no extra handling needed.
+    // (Verified: a per-name allowlist used to sit here for two JH teachers
+    // whose labels have no grade number; it produced byte-identical grade
+    // filters to the plain path above, and missed a third teacher with the
+    // same "Junior High - <subject>" pattern who was never added to it.)
+    const allowedGrades = deriveAllowedGradesForUser(viewer);
 
-    const allowedGrades = isJhWideException
-        ? deriveGradesForUnit(viewer.unit || 'Junior High')
-        : deriveAllowedGradesForUser(viewer);
-
-    const useClassScopedFilter = !isJhWideException && isClassScopedTeacherInUnit(viewer);
+    const useClassScopedFilter = isClassScopedTeacherInUnit(viewer);
     const allowedClasses = useClassScopedFilter ? deriveAllowedClassNamesForUser(viewer) : [];
 
     const gradeClauses = buildGradeFilterClauses(allowedGrades);

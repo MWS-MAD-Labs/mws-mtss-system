@@ -7,9 +7,8 @@ import {
     normalizeClassLabel,
     KINDERGARTEN_CLASSES,
 } from "./teacherGradeUtils";
-import { FALLBACK_GRADE_MAP, UNIT_GRADE_MAP } from "./teacherSegmentConstants";
+import { UNIT_GRADE_MAP } from "./teacherSegmentConstants";
 
-const JH_GRADE_WIDE_EXCEPTION_USERS = new Set(["himawan", "hasan"]);
 const CLASS_SCOPED_UNITS = new Set(["elementary", "kindergarten", "pelangi"]);
 
 const collectClassNames = (user = {}) => {
@@ -36,24 +35,6 @@ const collectClassNames = (user = {}) => {
     return Array.from(classes).filter(Boolean);
 };
 
-const resolveFallbackGrades = (user = {}) => {
-    const candidates = [];
-    if (user.username) candidates.push(user.username.toLowerCase());
-    if (user.name) {
-        candidates.push(user.name.toLowerCase());
-        const firstToken = user.name.split(/[\s,]+/)[0];
-        if (firstToken) candidates.push(firstToken.toLowerCase());
-    }
-    if (user.email) {
-        const localPart = user.email.split("@")[0];
-        if (localPart) candidates.push(localPart.toLowerCase());
-    }
-    for (const candidate of candidates) {
-        if (FALLBACK_GRADE_MAP[candidate]) return FALLBACK_GRADE_MAP[candidate];
-    }
-    return [];
-};
-
 const parseJobPositionGrades = (jobPosition = "") => {
     if (!jobPosition) return [];
     const matches = [];
@@ -77,9 +58,6 @@ export const deriveTeacherSegments = (user = {}) => {
     const fromClasses = classGrades.map((cls) => normalizeGradeLabel(cls.grade)).filter(Boolean);
     const fromJob = parseJobPositionGrades(user?.jobPosition).map(normalizeGradeLabel).filter(Boolean);
     const unitGrades = UNIT_GRADE_MAP[user?.unit] || [];
-    const key = (user?.username || user?.name || "").toLowerCase();
-    const fallbackGradesExplicit = FALLBACK_GRADE_MAP[key] || [];
-    const fallbackGrades = fallbackGradesExplicit.length ? fallbackGradesExplicit : resolveFallbackGrades(user);
     let source = "all";
     let candidates = [];
 
@@ -89,30 +67,22 @@ export const deriveTeacherSegments = (user = {}) => {
     } else if (fromJob.length) {
         source = "job";
         candidates = fromJob;
-    } else if (fallbackGrades.length) {
-        source = "fallback";
-        candidates = fallbackGrades;
     } else if (unitGrades.length) {
         source = "unit";
         candidates = unitGrades;
     }
 
     let allowedGrades = Array.from(new Set(candidates.map(normalizeGradeLabel).filter(Boolean)));
-    const lowerUsername = (user?.username || "").toLowerCase().trim();
-    const lowerName = (user?.name || "").toLowerCase().trim();
     const lowerUnit = (user?.unit || "").toLowerCase();
-    const isJhWideException =
-        lowerUnit === "junior high" &&
-        (JH_GRADE_WIDE_EXCEPTION_USERS.has(lowerUsername) ||
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(lowerName) ||
-            lowerName.includes("himawan") ||
-            lowerName.includes("hasan"));
 
-    if (isJhWideException && UNIT_GRADE_MAP["Junior High"]?.length) {
-        allowedGrades = UNIT_GRADE_MAP["Junior High"].slice();
-        source = "jh-exception";
-    }
-
+    // A JH subject specialist whose class label has no grade number (e.g.
+    // "Junior High - Coding") produces a bare "Junior High" candidate here,
+    // which never matches /^grade\s*\d+/ below - so hasSpecificGrade is
+    // false and the unitGrades fallback already expands it to Grade 7/8/9.
+    // (Verified: a per-name allowlist used to sit here for two JH teachers
+    // whose labels have no grade number; it produced the identical
+    // allowedGrades to this plain path, and missed a third teacher with the
+    // same "Junior High - <subject>" pattern who was never added to it.)
     const hasSpecificGrade = allowedGrades.some(
         (grade) => /^grade\s*\d+/i.test(grade) || grade.toLowerCase().startsWith("kindergarten") || grade.toLowerCase().startsWith("kindy")
     );
@@ -156,5 +126,3 @@ export const deriveTeacherSegments = (user = {}) => {
         label: allowedGrades.length ? allowedGrades.join(", ") : user?.unit || "All Grades",
     };
 };
-
-export { FALLBACK_GRADE_MAP };

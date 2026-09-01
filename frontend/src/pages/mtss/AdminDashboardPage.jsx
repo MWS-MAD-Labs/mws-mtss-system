@@ -20,6 +20,7 @@ import {
 const AdminOverviewPanel = lazy(() => import("./admin/AdminOverviewPanel"));
 const AdminStudentsPanel = lazy(() => import("./admin/AdminStudentsPanel"));
 const AdminMentorsPanel = lazy(() => import("./admin/AdminMentorsPanel"));
+const AdminReassignmentPanel = lazy(() => import("./admin/AdminReassignmentPanel"));
 const AdminAnalyticsPanel = lazy(() => import("./admin/AdminAnalyticsPanel"));
 const AdminPilotFeedbackPanel = lazy(() => import("./admin/AdminPilotFeedbackPanel"));
 const AdminPilotSummaryReportPanel = lazy(() => import("./admin/AdminPilotSummaryReportPanel"));
@@ -177,6 +178,8 @@ const AdminDashboardPage = memo(() => {
                         students={students}
                     />
                 );
+            case "reassignment":
+                return <AdminReassignmentPanel />;
             case "analytics":
                 return (
                     <AdminAnalyticsPanel

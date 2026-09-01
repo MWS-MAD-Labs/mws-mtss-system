@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../store/slices/authSlice';
@@ -8,8 +8,19 @@ import { consumePendingRedirect, getDefaultPostLoginPath, sanitizeRedirectPath }
 const AuthCallback = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    // StrictMode double-invokes this effect in dev (mount, cleanup, mount
+    // again). The first run consumes the hash and strips it via
+    // history.replaceState below - the second run then reads an
+    // already-empty hash, sees no token, and navigates to the error page
+    // right after the first run already navigated to the real destination.
+    // Two competing navigations right after landing is exactly the visible
+    // "lands on /teacher, then flickers" this guard prevents.
+    const hasHandledRef = useRef(false);
 
     useEffect(() => {
+        if (hasHandledRef.current) return;
+        hasHandledRef.current = true;
+
         const handleCallback = async () => {
             try {
                 const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));

@@ -1,9 +1,21 @@
 const { lookupEmployeeByEmail } = require('../services/mwsDataCenterClient');
 
+// Central's employment_type is uppercase (PERMANENT, CONTRACT, PART_TIME,
+// PROBATION, FREELANCE, WFH) - see mws-data-center's EmploymentType enum.
+// Every value now has a slot in User.js's employmentStatus enum; keep the
+// two lists in sync if Central ever adds another EmploymentType value.
+const CENTRAL_EMPLOYMENT_STATUS_MAP = {
+    PERMANENT: 'Permanent',
+    CONTRACT: 'Contract',
+    PART_TIME: 'Part Time',
+    PROBATION: 'Probation',
+    FREELANCE: 'Freelance',
+    WFH: 'WFH',
+};
+
 const normalizeEmploymentStatus = (value) => {
-    const cleaned = typeof value === 'string' ? value.trim() : '';
-    if (['Permanent', 'Contract', 'Probation'].includes(cleaned)) return cleaned;
-    return undefined;
+    const cleaned = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    return CENTRAL_EMPLOYMENT_STATUS_MAP[cleaned];
 };
 
 async function syncEmployeeFromCentral(email) {
@@ -23,4 +35,4 @@ async function syncEmployeeFromCentral(email) {
     return fields;
 }
 
-module.exports = { syncEmployeeFromCentral };
+module.exports = { syncEmployeeFromCentral, normalizeEmploymentStatus };

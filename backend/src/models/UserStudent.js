@@ -12,7 +12,12 @@ const studentUserSchema = new mongoose.Schema({
     password: {
         type: String,
         required: function () {
-            return !this.googleId;
+            // googleId dates from the old direct-Google OAuth flow (removed
+            // - Hub owns that now). Central-provisioned students (current
+            // Hub SSO relay flow) never set googleId, and this model has no
+            // natural Central identity field to key off the way User.js
+            // uses employeeId, so ssoProvisioned marks it explicitly.
+            return !this.googleId && !this.ssoProvisioned;
         },
         minlength: 6
     },
@@ -76,16 +81,20 @@ const studentUserSchema = new mongoose.Schema({
     },
     department: {
         type: String,
-        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE'],
+        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE', 'BRIDGE', 'RISE', 'SHIELD', 'SAFE', 'COMPASS'],
         trim: true
     },
     unit: {
         type: String,
-        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE'],
+        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE', 'BRIDGE', 'RISE', 'SHIELD', 'SAFE', 'COMPASS'],
         trim: true
     },
     lastLogin: {
         type: Date
+    },
+    ssoProvisioned: {
+        type: Boolean,
+        default: false
     }
 }, {
     timestamps: true

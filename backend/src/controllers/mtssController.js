@@ -25,6 +25,7 @@ const {
     buildMentorSubjectCoverageRows,
     getMentorAssignmentFocusLabels
 } = require('../utils/mentorAssignmentPairingUtils');
+const { MTSS_NATIVE_TEACHER_ROLES } = require('../utils/accessControl');
 
 const TIER_ORDER = {
     tier1: 1,
@@ -40,9 +41,14 @@ const TYPE_ALIAS_MAP = {
     indonesian: ['indonesian', 'bahasa indonesia', 'bahasa', 'bi', 'indonesian language'],
     universal: ['universal', 'all', 'whole school', 'schoolwide']
 };
-const MTSS_MENTOR_ROLES = ['staff', 'teacher', 'support_staff', 'head_unit', 'admin', 'directorate'];
+// Derived from accessControl.js's canonical MTSS_NATIVE_TEACHER_ROLES
+// (teacher, se_teacher, staff, support_staff, counselor) plus the
+// leadership roles who can also mentor - a hand-duplicated list here had
+// drifted and silently excluded se_teacher/counselor, so a role that
+// legitimately has MTSS access still got "Selected mentor is not eligible
+// for assignments" trying to assign themselves as a mentor.
+const MTSS_MENTOR_ROLES = [...MTSS_NATIVE_TEACHER_ROLES, 'head_unit', 'admin', 'directorate'];
 const DUPLICATE_BLOCKING_STATUSES = ['active', 'paused'];
-const JH_GRADE_WIDE_EXCEPTION_USERS = new Set(['himawan', 'hasan']);
 const CLASS_SCOPED_UNITS = new Set(['elementary', 'kindergarten', 'pelangi']);
 const PLAN_EDITABLE_FIELDS = new Set([
     'focusAreas',
@@ -875,25 +881,17 @@ const isClassScopedTeacherInUnit = (viewer = {}) => {
     });
 };
 
-const resolveRosterGradeScopeForViewer = (viewer = {}) => {
-    const lowerUnit = (viewer.unit || '').toLowerCase();
-    const usernameKey = (viewer.username || '').trim().toLowerCase();
-    const nameKey = (viewer.name || '').trim().toLowerCase();
-    const isJhWideException =
-        lowerUnit === 'junior high' &&
-        (
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(usernameKey) ||
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(nameKey) ||
-            nameKey.includes('himawan') ||
-            nameKey.includes('hasan')
-        );
-
-    if (isJhWideException) {
-        return deriveGradesForUnit(viewer.unit || 'Junior High');
-    }
-
-    return deriveAllowedGradesForUser(viewer);
-};
+// A JH subject specialist whose class label has no grade number (e.g.
+// "Junior High - Coding") gets classes[].grade = "Junior High" from
+// parseAssignmentLabel. deriveAllowedGradesForUser passes that straight
+// through, but buildGradeFilterClauses already expands a bare unit name
+// into every grade in that unit via deriveGradesForUnit - so this already
+// resolves to Grade 7/8/9 with no extra handling needed. (Verified: a
+// per-name allowlist used to sit here for two JH teachers whose labels have
+// no grade number; it produced byte-identical grade filters to this plain
+// path, and missed a third teacher with the same "Junior High - <subject>"
+// pattern who was never added to it.)
+const resolveRosterGradeScopeForViewer = (viewer = {}) => deriveAllowedGradesForUser(viewer);
 
 const ensureStudentsWithinViewerScope = async (studentIds = [], viewer = {}) => {
     if (!studentIds.length || isMTSSAdminRole(viewer?.role)) return;
@@ -910,19 +908,7 @@ const ensureStudentsWithinViewerScope = async (studentIds = [], viewer = {}) => 
         $and: [{ $or: gradeClauses }]
     };
 
-    const lowerUnit = (viewer.unit || '').toLowerCase();
-    const usernameKey = (viewer.username || '').trim().toLowerCase();
-    const nameKey = (viewer.name || '').trim().toLowerCase();
-    const isJhWideException =
-        lowerUnit === 'junior high' &&
-        (
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(usernameKey) ||
-            JH_GRADE_WIDE_EXCEPTION_USERS.has(nameKey) ||
-            nameKey.includes('himawan') ||
-            nameKey.includes('hasan')
-        );
-
-    const useClassScopedFilter = !isJhWideException && isClassScopedTeacherInUnit(viewer);
+    const useClassScopedFilter = isClassScopedTeacherInUnit(viewer);
     if (useClassScopedFilter) {
         const allowedClasses = deriveAllowedClassNamesForUser(viewer);
         const classClauses = buildClassFilterClauses(allowedClasses);
@@ -1405,6 +1391,76 @@ const getMentorAssignments = async (req, res) => {
     }
 };
 
+// Admin-only: every active/paused assignment whose mentor's CURRENT grade
+// scope (derived the same way the teacher dashboard scopes "My Students",
+// see deriveAllowedGradesForUser) no longer covers the assigned student -
+// e.g. Central moved the mentor from Junior High to SD mid-intervention.
+// A mentor with no derivable grade scope at all (e.g. an admin-role
+// mentor) is never flagged - there's nothing to compare against, and
+// flagging them would just be noise.
+const getAssignmentsNeedingReassignment = async (req, res) => {
+    try {
+        const assignmentsRaw = await MentorAssignment.find({ status: { $in: ['active', 'paused'] } })
+            .populate('mentorId', 'name role email username jobPosition unit classes')
+            .lean();
+        const hydrated = await hydrateAssignmentStudents(assignmentsRaw);
+
+        // Candidate pool for the "reassign to" suggestions below - every
+        // active mentor-eligible user, not just the ones already carrying
+        // an assignment.
+        const candidateMentors = await User.find({
+            role: { $in: MTSS_MENTOR_ROLES },
+            isActive: true,
+        }).select('name unit jobPosition classes').lean();
+        const candidatesWithGrades = candidateMentors.map((mentor) => ({
+            id: mentor._id.toString(),
+            name: mentor.name,
+            allowedGrades: deriveAllowedGradesForUser(mentor),
+        }));
+
+        const flagged = hydrated
+            .filter((assignment) => assignment.mentorId?._id)
+            .filter((assignment) => {
+                const allowedGrades = deriveAllowedGradesForUser(assignment.mentorId);
+                if (!allowedGrades.length) return false;
+                const students = assignment.studentIds || [];
+                const inScope = students.some((student) =>
+                    allowedGrades.includes(normalizeGradeLabel(student.currentGrade || student.grade || '')));
+                return !inScope;
+            })
+            .map((assignment) => {
+                const currentMentorId = assignment.mentorId._id?.toString?.() || assignment.mentorId.toString();
+                const grade = normalizeGradeLabel(
+                    assignment.studentIds?.[0]?.currentGrade || assignment.studentIds?.[0]?.grade || '',
+                );
+                // Suggested mentors are scoped to the student's actual
+                // grade, not left as "everyone" - picking a reassignment
+                // target this way can't recreate the same out-of-scope
+                // problem by accident.
+                const eligibleMentors = grade
+                    ? candidatesWithGrades
+                        .filter((mentor) => mentor.id !== currentMentorId && mentor.allowedGrades.includes(grade))
+                        .map((mentor) => ({ id: mentor.id, name: mentor.name }))
+                    : [];
+
+                return {
+                    assignmentId: assignment._id?.toString?.() || assignment.id,
+                    mentorId: currentMentorId,
+                    mentorName: assignment.mentorId.name || 'Unknown',
+                    studentNames: (assignment.studentIds || []).map((student) => student.name).filter(Boolean),
+                    grade: assignment.studentIds?.[0]?.currentGrade || assignment.studentIds?.[0]?.grade || null,
+                    focus: Array.isArray(assignment.focusAreas) ? assignment.focusAreas.join(', ') : null,
+                    eligibleMentors,
+                };
+            });
+
+        sendSuccess(res, 'Assignments needing reassignment retrieved', { assignments: flagged });
+    } catch (error) {
+        console.error('Failed to fetch assignments needing reassignment:', error);
+        sendError(res, 'Failed to retrieve assignments needing reassignment', 500);
+    }
+};
+
 const getMentorAssignmentById = async (req, res) => {
     try {
         const assignmentRaw = await MentorAssignment.findById(req.params.id)
@@ -1560,6 +1616,22 @@ const updateMentorAssignment = async (req, res) => {
                 changedBy: req.user?.id || null,
             });
         };
+
+        // Reassignment (moving the intervention to a different mentor) is
+        // admin-only - the current mentor can't hand it off unilaterally,
+        // same reasoning as any other org reshuffle: someone with oversight
+        // of both people's caseloads makes that call, not either of them.
+        if (req.body.mentorId && req.body.mentorId !== assignment.mentorId?.toString()) {
+            if (!isAdmin) {
+                return sendError(res, 'Only an MTSS admin can reassign this intervention to a different mentor', 403);
+            }
+            const [oldMentor, newMentor] = await Promise.all([
+                User.findById(assignment.mentorId).select('name'),
+                ensureMentorEligibility(req.body.mentorId),
+            ]);
+            logChange('mentorId', 'Mentor', oldMentor?.name || 'Unassigned', newMentor.name);
+            assignment.mentorId = newMentor._id;
+        }
 
         const formatScoreForLog = (score) => {
             if (!score || score.value == null) return null;
@@ -2325,6 +2397,7 @@ module.exports = {
     deleteStrategy,
     createMentorAssignment,
     getMentorAssignments,
+    getAssignmentsNeedingReassignment,
     getMentorAssignmentById,
     updateMentorAssignment,
     getMyAssignedStudents,

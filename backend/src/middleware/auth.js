@@ -57,17 +57,6 @@ const authenticate = async (req, res, next) => {
         const authHeader = req.headers.authorization;
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            // OAuth flow fallback: /auth/me may arrive with valid passport session but
-            // without Authorization header. Only allow fallback when session user exists.
-            if (req.user && req.user._id) {
-                const sessionUser = await resolveUserByRoleAndId(req.user.role, req.user._id);
-
-                if (sessionUser && sessionUser.isActive) {
-                    req.user = buildRequestUser(sessionUser);
-                    return next();
-                }
-            }
-
             return sendError(res, 'Access token required', 401);
         }
 
