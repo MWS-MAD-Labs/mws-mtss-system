@@ -7,6 +7,7 @@ import HeroAuthCard from "@/components/ui/HeroAuthCard";
 import Logo from "./Millennia.webp";
 import { Sparkles, ShieldCheck, Smartphone } from "lucide-react";
 import { consumePendingRedirect, getDefaultPostLoginPath } from "@/utils/authRedirect";
+import { env } from "@/config/env";
 
 const FEATURES = [
   { icon: '🧠', label: 'AI Emotional Wellness' },
@@ -37,8 +38,7 @@ const HeroSection = memo(() => {
   // other satellite app uses - MTSS must not keep a parallel login path that
   // can drift from Central.
   const handleGoogleSignIn = useCallback(() => {
-    const hubBaseUrl = import.meta.env.VITE_HUB_BASE_URL || "http://localhost:5175";
-    window.location.href = `${hubBaseUrl.replace(/\/$/, "")}/apps/mtss/launch`;
+    window.location.href = `${env.hubBaseUrl.replace(/\/$/, "")}/apps/mtss/launch`;
   }, []);
 
   const handleEmailLogin = useCallback(async (e) => {
