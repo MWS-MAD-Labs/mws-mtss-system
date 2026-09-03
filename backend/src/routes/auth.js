@@ -14,10 +14,14 @@ const { createUserAwareRateLimiter } = require('../middleware/rateLimiter');
 const ssoLimiter = createUserAwareRateLimiter({ windowMinutes: 1, max: 20, skip: () => false });
 
 const isCentralLookupError = (error) => {
+    if (error?.isCentralLookupError) return true;
+
     const baseUrl = error?.config?.baseURL;
     const path = error?.config?.url;
+    const expectedBaseUrl = process.env.MWS_DATA_CENTER_API_URL;
+
     return Boolean(
-        baseUrl === process.env.MWS_DATA_CENTER_API_URL ||
+        (expectedBaseUrl && baseUrl === expectedBaseUrl) ||
         (typeof path === 'string' && /^\/(employees|students)\//.test(path))
     );
 };
@@ -208,7 +212,7 @@ router.get('/logout-silent', (req, res) => {
     res.removeHeader('X-Frame-Options');
     res.setHeader('Content-Security-Policy', `frame-ancestors 'self'${hubOrigin ? ` ${hubOrigin}` : ''}`);
     res.type('html').send(
-        `<!doctype html><html><body><script>try{localStorage.removeItem('auth_token');localStorage.removeItem('auth_user');}catch(e){}</script></body></html>`
+        `<!doctype html><html><body><script>try{localStorage.removeItem('auth_token');localStorage.removeItem('auth_user');localStorage.removeItem('token');sessionStorage.removeItem('auth_token');sessionStorage.removeItem('auth_user');sessionStorage.removeItem('token');}catch(e){}</script></body></html>`
     );
 });
 

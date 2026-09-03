@@ -1,9 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import HeroSection from "../components/ui/HeroSection";
 import Footer from "../components/ui/Footer";
 import InstallButton from "../components/ui/InstallButton";
+import { useToast } from "@/components/ui/use-toast";
 import { consumePendingRedirect, getDefaultPostLoginPath } from "@/utils/authRedirect";
 import {
   MWS_STUDENT_CARD_ASSET_IDS,
@@ -16,6 +17,45 @@ const bgPhoto = (id, w = 1920, h = 1080) =>
 // Cloudinary AI Background Removal — auto-removes background on the fly
 const cutoutPhoto = (id, w = 480) =>
   `${CLD_BASE}/e_background_removal/c_scale,w_${w},f_auto,q_auto/${id}`;
+
+const AUTH_ERROR_MESSAGES = {
+  sso_central_lookup_failed: {
+    title: "We couldn't verify your account",
+    description: "MTSS could not reach Central/Data Center to confirm your profile. Please try again in a moment or contact IT if it repeats.",
+  },
+  sso_account_not_found: {
+    title: "Account not found in Central",
+    description: "Your Hub sign-in worked, but MTSS could not find an active student or staff record for this email.",
+  },
+  sso_invalid_token: {
+    title: "Sign-in link expired",
+    description: "Please launch MTSS from Hub again so we can create a fresh secure sign-in session.",
+  },
+  sso_missing_token: {
+    title: "Sign-in link incomplete",
+    description: "Please launch MTSS from Hub again. The handoff did not include the secure sign-in token.",
+  },
+  sso_failed: {
+    title: "Sign-in failed",
+    description: "MTSS could not complete the Hub sign-in handoff. Please try again or contact IT if it repeats.",
+  },
+  account_inactive: {
+    title: "Account inactive",
+    description: "Your account exists but is currently inactive. Please contact IT or administration for access.",
+  },
+  missing_data: {
+    title: "Sign-in callback incomplete",
+    description: "MTSS did not receive the required sign-in data. Please launch MTSS from Hub again.",
+  },
+  missing_role: {
+    title: "Role missing",
+    description: "Your account was verified, but MTSS did not receive a valid role. Please contact IT.",
+  },
+  callback_failed: {
+    title: "Sign-in callback failed",
+    description: "MTSS could not finish saving your sign-in session. Please try again.",
+  },
+};
 
 /* ── Deterministic daily shuffle ── */
 const hashString = (value = "") => {
@@ -134,7 +174,33 @@ MinimalPhotoLayer.displayName = "MinimalPhotoLayer";
 const LandingPage = memo(function LandingPage() {
   const containerRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const { toast } = useToast();
+  const handledAuthErrorRef = useRef(false);
+
+  useEffect(() => {
+    if (handledAuthErrorRef.current) return;
+
+    const params = new URLSearchParams(location.search);
+    const errorCode = params.get("error");
+    const message = AUTH_ERROR_MESSAGES[errorCode];
+    if (!message) return;
+
+    handledAuthErrorRef.current = true;
+    toast({
+      ...message,
+      variant: "destructive",
+      duration: 8000,
+    });
+
+    params.delete("error");
+    navigate({
+      pathname: location.pathname,
+      search: params.toString() ? `?${params.toString()}` : "",
+      hash: location.hash,
+    }, { replace: true });
+  }, [location.hash, location.pathname, location.search, navigate, toast]);
 
   useEffect(() => {
     if (!isAuthenticated) return;

@@ -87,6 +87,10 @@ export const login = async (email, password) => {
 export const logout = async () => {
     const response = await api.post('/auth/logout');
 
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('token');
+
     // The backend tells us where to go so the Hub session ends too. It has to
     // be a real navigation: Hub's cookie lives on Hub's domain, so nothing
     // this app calls from the background can clear it. Every caller of
