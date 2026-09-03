@@ -1,5 +1,6 @@
 import api from './authService';
 import { getApiBaseUrl } from '@/lib/apiBase';
+import { getStoredAuthToken } from '@/utils/authStorage';
 
 const withData = (response) => response?.data?.data || {};
 
@@ -128,7 +129,7 @@ export const uploadEvidence = async (files, onProgress) => {
         const fd = new FormData();
         preparedFiles.forEach((f) => fd.append('evidence', f));
         xhr.open('POST', `${getApiBaseUrl()}/mtss/upload-evidence`);
-        const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+        const token = getStoredAuthToken();
         if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100));

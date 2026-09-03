@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../store/slices/authSlice';
 import PageLoader from '../components/PageLoader';
 import { consumePendingRedirect, getDefaultPostLoginPath, sanitizeRedirectPath } from '@/utils/authRedirect';
+import { setStoredAuthSession } from '@/utils/authStorage';
 
 const AuthCallback = () => {
     const navigate = useNavigate();
@@ -35,9 +36,6 @@ const AuthCallback = () => {
                 // Parse user data from hash fragment payload
                 const userFromQuery = JSON.parse(decodeURIComponent(userData));
 
-                // Persist token for API calls
-                localStorage.setItem('auth_token', token);
-
                 // Use OAuth callback payload directly to avoid auth reset loops.
                 let canonicalUser = userFromQuery;
 
@@ -47,8 +45,7 @@ const AuthCallback = () => {
                     return;
                 }
 
-                // Persist canonical user and update Redux
-                localStorage.setItem('auth_user', JSON.stringify(canonicalUser));
+                setStoredAuthSession({ token, user: canonicalUser });
                 dispatch(loginSuccess({ user: canonicalUser, token }));
 
                 const redirectParam = hashParams.get('redirect');

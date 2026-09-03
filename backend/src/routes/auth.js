@@ -212,7 +212,7 @@ router.get('/logout-silent', (req, res) => {
     res.removeHeader('X-Frame-Options');
     res.setHeader('Content-Security-Policy', `frame-ancestors 'self'${hubOrigin ? ` ${hubOrigin}` : ''}`);
     res.type('html').send(
-        `<!doctype html><html><body><script>try{localStorage.removeItem('auth_token');localStorage.removeItem('auth_user');localStorage.removeItem('token');sessionStorage.removeItem('auth_token');sessionStorage.removeItem('auth_user');sessionStorage.removeItem('token');}catch(e){}</script></body></html>`
+        `<!doctype html><html><body><script>try{localStorage.removeItem('mtss.auth_token');localStorage.removeItem('mtss.auth_user');sessionStorage.removeItem('mtss.auth_token');sessionStorage.removeItem('mtss.auth_user');}catch(e){}</script></body></html>`
     );
 });
 

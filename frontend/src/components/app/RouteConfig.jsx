@@ -6,6 +6,7 @@ import PageLoader from "@/components/PageLoader";
 import PageTransition from "./PageTransition";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { getMtssAccessProfile } from "@/utils/mtssAccess";
+import { getStoredAuthUser } from "@/utils/authStorage";
 
 const LandingPage = lazy(() => import(/* webpackPrefetch: true */ '@/pages/LandingPage'));
 const AuthCallback = lazy(() => import(/* webpackPrefetch: true */ '@/pages/AuthCallback'));
@@ -67,8 +68,7 @@ const MtssPreviewGate = memo(({ children }) => {
     const storedUser = useMemo(() => {
         if (typeof window === "undefined") return null;
         try {
-            const raw = localStorage.getItem("auth_user");
-            return raw ? JSON.parse(raw) : null;
+            return getStoredAuthUser();
         } catch {
             return null;
         }

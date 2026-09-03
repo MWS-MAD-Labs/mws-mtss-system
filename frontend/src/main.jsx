@@ -8,12 +8,13 @@ import '@/index.css';
 import { Toaster } from '@/components/ui/toaster';
 import { syncInitialTheme } from '@/lib/theme';
 import { fetchCurrentUser } from '@/store/slices/authSlice';
+import { clearStoredAuthSession, getStoredAuthToken, getStoredAuthUserRaw } from '@/utils/authStorage';
 
 syncInitialTheme();
 
 // Initialize auth state from localStorage
-const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-const user = localStorage.getItem('auth_user');
+const token = getStoredAuthToken();
+const user = getStoredAuthUserRaw();
 
 if (token && user) {
     try {
@@ -26,10 +27,7 @@ if (token && user) {
         store.dispatch(fetchCurrentUser());
     } catch (error) {
         console.error('Error parsing stored user data:', error);
-        // Clear invalid data
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('token');
-        localStorage.removeItem('auth_user');
+        clearStoredAuthSession();
     }
 }
 

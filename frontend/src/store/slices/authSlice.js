@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { login as loginApi, logout as logoutApi, getCurrentUser } from '../../services/authService';
+import { clearStoredAuthSession, setStoredAuthSession, setStoredAuthUser } from '@/utils/authStorage';
 
 // Async thunks
 export const loginUser = createAsyncThunk(
@@ -73,9 +74,7 @@ const authSlice = createSlice({
             state.isAuthenticated = true;
             state.loading = false;
             state.error = null;
-            // Store in localStorage
-            localStorage.setItem('auth_token', action.payload.token);
-            localStorage.setItem('auth_user', JSON.stringify(action.payload.user));
+            setStoredAuthSession(action.payload);
         },
         clearAuth: (state) => {
             state.user = null;
@@ -97,9 +96,7 @@ const authSlice = createSlice({
                 state.token = action.payload.token;
                 state.isAuthenticated = true;
                 state.error = null;
-                // Store in localStorage
-                localStorage.setItem('auth_token', action.payload.token);
-                localStorage.setItem('auth_user', JSON.stringify(action.payload.user));
+                setStoredAuthSession(action.payload);
             })
             .addCase(loginUser.rejected, (state, action) => {
                 state.loading = false;
@@ -116,10 +113,7 @@ const authSlice = createSlice({
                 state.token = null;
                 state.isAuthenticated = false;
                 state.error = null;
-                // Clear localStorage
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('auth_user');
-                localStorage.removeItem('token');
+                clearStoredAuthSession();
             })
             .addCase(logoutUser.rejected, (state, action) => {
                 state.loading = false;
@@ -128,9 +122,7 @@ const authSlice = createSlice({
                 state.user = null;
                 state.token = null;
                 state.isAuthenticated = false;
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('auth_user');
-                localStorage.removeItem('token');
+                clearStoredAuthSession();
             })
             // Fetch current user
             .addCase(fetchCurrentUser.pending, (state) => {
@@ -143,7 +135,7 @@ const authSlice = createSlice({
                 state.isAuthenticated = !!userData;
                 state.error = null;
                 if (userData) {
-                    localStorage.setItem('auth_user', JSON.stringify(userData));
+                    setStoredAuthUser(userData);
                 }
             })
             .addCase(fetchCurrentUser.rejected, (state, action) => {
@@ -167,9 +159,7 @@ const authSlice = createSlice({
                     state.isAuthenticated = false;
                     state.user = null;
                     state.token = null;
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('auth_user');
-                    localStorage.removeItem('token');
+                    clearStoredAuthSession();
                 }
             });
     },
