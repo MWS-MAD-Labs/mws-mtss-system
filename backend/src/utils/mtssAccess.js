@@ -1,9 +1,4 @@
 const KINDERGARTEN_GRADES = ['Kindergarten Pre-K', 'Kindergarten K1', 'Kindergarten K2', 'Kindergarten'];
-const KINDERGARTEN_CLASSES = [
-    'Kindergarten - Milky Way',
-    'Kindergarten - Bear Paw',
-    'Kindergarten - Starlight'
-].map((label) => label);
 
 const JUNIOR_HIGH_VARIANTS = {
     'Grade 7': ['Grade 7 - Helix'],
@@ -180,29 +175,28 @@ const deriveAllowedClassNamesForUser = (user = {}) => {
     (user.classes || []).forEach((cls) => {
         if (cls?.className) {
             const normalized = normalizeClassLabel(cls.className);
-            const lower = cls.className.toLowerCase();
-            const isGeneralKindergarten =
-                (normalized && normalized.toLowerCase() === 'kindergarten') ||
-                !normalized.startsWith('Kindergarten -');
-            const mentionsKindyBand = /kindy|kindergarten|pre[-\s]?k|k\s*1|k\s*2/.test(lower);
-            if (mentionsKindyBand && isGeneralKindergarten) {
-                KINDERGARTEN_CLASSES.forEach((className) => classes.add(normalizeClassLabel(className)));
-            } else if (normalized) {
+            if (normalized) {
                 classes.add(normalized);
             }
         }
     });
 
-    const unit = (user.unit || '').toLowerCase();
-    if (!classes.size && (unit === 'kindergarten' || unit === 'pelangi')) {
-        KINDERGARTEN_CLASSES.forEach((className) => classes.add(normalizeClassLabel(className)));
-    }
-
+    // No specific, real classroom name to scope to - user.classes is empty
+    // (the SSO provisioning flow that creates every account today never
+    // populates it; only the old one-time seed scripts did) or the label
+    // on hand doesn't resolve to one. KINDERGARTEN_CLASSES used to fill
+    // this gap with a hardcoded demo roster ("Milky Way"/"Bear Paw"/
+    // "Starlight") that matches no real classroom name in Central or the
+    // synced roster ("Kindergarten Pre-K A" etc) - every kindergarten
+    // homeroom teacher without an explicit classes[] entry got filtered
+    // down to zero real students instead of their grade's actual roster.
+    // Leaving this empty makes the caller (applyViewerScope) skip class-
+    // name scoping and fall back to grade-only, which still narrows to
+    // this teacher's real grade band instead of showing nothing.
     return Array.from(classes);
 };
 
 module.exports = {
-    KINDERGARTEN_CLASSES,
     KINDERGARTEN_GRADES,
     normalizeClassLabel,
     normalizeGradeLabel,
