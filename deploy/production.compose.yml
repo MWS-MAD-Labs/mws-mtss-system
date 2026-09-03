@@ -32,6 +32,8 @@ services:
     image: ghcr.io/mws-mad-labs/mws-mtss-system-fe:production
     container_name: mtss-system-fe-prod
     restart: unless-stopped
+    environment:
+      HUB_BASE_URL: https://app.mws.web.id
     depends_on:
       backend:
         condition: service_healthy

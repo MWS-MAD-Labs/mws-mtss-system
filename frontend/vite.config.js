@@ -50,6 +50,7 @@ export default defineConfig({
                 // Keep very heavy AI/vision chunks out of install-time precache.
                 // They should download only when users enter face-scan / AI flows.
                 globIgnores: [
+                    '**/env.js',
                     '**/assets/vendor-tfjs-*.js',
                     '**/assets/vendor-mediapipe-*.js'
                 ],

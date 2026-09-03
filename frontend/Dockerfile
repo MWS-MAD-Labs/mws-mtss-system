@@ -25,6 +25,8 @@ FROM nginx:1.27-alpine AS runner
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.d/40-runtime-env.sh /docker-entrypoint.d/40-runtime-env.sh
+RUN chmod +x /docker-entrypoint.d/40-runtime-env.sh
 
 # Copy built assets into the /mtss subdir so /mtss/* paths match naturally
 COPY --from=build /app/dist /usr/share/nginx/html/mtss
