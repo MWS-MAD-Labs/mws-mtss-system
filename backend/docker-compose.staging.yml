@@ -10,8 +10,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3003
-      FRONTEND_URL: https://app-stg.mws.web.id
+      FRONTEND_URL: https://app-stg.mws.web.id/mtss
       CORS_ORIGINS: https://app-stg.mws.web.id
+      HUB_BASE_URL: https://app-stg.mws.web.id
       OPENROUTER_APP_NAME: IntegraLearn AI Chat Staging
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3003/health >/dev/null 2>&1 || exit 1"]
