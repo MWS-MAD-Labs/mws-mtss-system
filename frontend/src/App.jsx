@@ -5,6 +5,7 @@ import AppHelmet from '@/components/app/AppHelmet';
 import RouteConfig from '@/components/app/RouteConfig';
 import { useCrossTabAuthSync } from '@/hooks/useCrossTabAuthSync';
 import { useHubAuthProbeResponder } from '@/hooks/useHubAuthProbeResponder';
+import { useSilentHubRelogin } from '@/hooks/useSilentHubRelogin';
 
 const BackgroundDecor = lazy(() => import('@/components/app/BackgroundDecor'));
 const WorkforceHumanisticLayer = lazy(() => import('@/components/app/WorkforceHumanisticLayer'));
@@ -22,6 +23,7 @@ const App = memo(() => {
 
     useCrossTabAuthSync();
     useHubAuthProbeResponder();
+    useSilentHubRelogin();
 
 
     useEffect(() => {
