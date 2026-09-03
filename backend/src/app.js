@@ -8,6 +8,8 @@ const winston = require('winston');
 const connectDB = require('./config/database');
 const employeeDeactivationSync = require('./jobs/employeeDeactivationSync');
 const studentDeactivationSync = require('./jobs/studentDeactivationSync');
+const mtssStudentRosterSync = require('./jobs/mtssStudentRosterSync');
+const teacherClassAssignmentSync = require('./jobs/teacherClassAssignmentSync');
 const googleAI = require('./config/googleAI');
 const openRouterChat = require('./config/openRouterChat');
 const { initSocket } = require('./config/socket');
@@ -136,6 +138,18 @@ const initializeApp = async () => {
         // self-contained 7-day JWT otherwise).
         employeeDeactivationSync.start();
         studentDeactivationSync.start();
+
+        // Periodically mirror Central's enrolled student roster into
+        // MTSSStudent, so "Crew Roster" reflects newly-registered/active
+        // students without someone having to run
+        // scripts/applyCentralStudentSync.js by hand.
+        mtssStudentRosterSync.start();
+
+        // Keeps each teacher's User.classes in sync with Central's real
+        // ClassTeacherAssignment data, so roster scoping (teacherSegmentUtils.js)
+        // filters by real class names instead of falling back to
+        // fictional placeholders.
+        teacherClassAssignmentSync.start();
 
         // Test Google AI connection (with graceful fallback for overload and quota)
         try {

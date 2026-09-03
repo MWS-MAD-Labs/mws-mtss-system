@@ -113,10 +113,32 @@ async function listActiveEmployees() {
   return employees;
 }
 
+// Central paginates at 100/page max (ClassTeacherAssignmentApiValidation.LIST)
+// and only ever returns currently-active assignments in the currently-active
+// academic year - same bulk-diff posture as listActiveEmployees().
+async function listClassTeacherAssignments() {
+  const client = getCentralClient();
+  const assignments = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const { data } = await client.get("/class-teacher-assignments", {
+      params: { page, size: 100 },
+    });
+    assignments.push(...data.data);
+    totalPages = data.paging.total_page;
+    page += 1;
+  } while (page <= totalPages);
+
+  return assignments;
+}
+
 module.exports = {
   lookupEmployeeByEmail,
   lookupStudentByEmail,
   listStudentsByStatus,
   listActiveEmployees,
+  listClassTeacherAssignments,
   getCentralClient,
 };

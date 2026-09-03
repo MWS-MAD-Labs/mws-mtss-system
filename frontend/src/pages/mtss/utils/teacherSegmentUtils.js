@@ -5,32 +5,23 @@
 import {
     normalizeGradeLabel,
     normalizeClassLabel,
-    KINDERGARTEN_CLASSES,
 } from "./teacherGradeUtils";
 import { UNIT_GRADE_MAP } from "./teacherSegmentConstants";
 
 const CLASS_SCOPED_UNITS = new Set(["elementary", "kindergarten", "pelangi"]);
 
+// Trusts Central's real class name as-is (via user.classes, synced by
+// teacherClassAssignmentSync.js) - no local guessing/fallback list. A
+// teacher with no synced assignment yet just gets an empty set here, which
+// falls back to grade-level scoping below rather than a made-up class.
 const collectClassNames = (user = {}) => {
     const classes = new Set();
     (user.classes || []).forEach((cls) => {
         if (cls?.className) {
             const normalized = normalizeClassLabel(cls.className);
-            const lower = cls.className.toLowerCase();
-            const mentionsKindyBand = /kindy|kindergarten|pre[-\s]?k|k\s*1|k\s*2/.test(lower);
-            const isGenericKindy = normalized.toLowerCase() === "kindergarten" || !normalized.startsWith("Kindergarten -");
-            if (mentionsKindyBand && isGenericKindy) {
-                KINDERGARTEN_CLASSES.forEach((className) => classes.add(className));
-            } else if (normalized) {
-                classes.add(normalized);
-            }
+            if (normalized) classes.add(normalized);
         }
     });
-
-    const unit = (user.unit || "").toLowerCase();
-    if (!classes.size && (unit === "kindergarten" || unit === "pelangi")) {
-        KINDERGARTEN_CLASSES.forEach((className) => classes.add(className));
-    }
 
     return Array.from(classes).filter(Boolean);
 };
@@ -104,10 +95,6 @@ export const deriveTeacherSegments = (user = {}) => {
 
     if ((lowerUnit === "kindergarten" || lowerUnit === "pelangi") && !allowedGrades.some((grade) => grade.toLowerCase() === "kindergarten")) {
         allowedGrades.push("Kindergarten");
-    }
-
-    if ((lowerUnit === "kindergarten" || lowerUnit === "pelangi") && !classNameSet.size) {
-        KINDERGARTEN_CLASSES.forEach((className) => classNameSet.add(className));
     }
 
     // Teacher dashboard roster uses grade-wide visibility for all teaching roles
