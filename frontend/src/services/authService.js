@@ -1,6 +1,7 @@
 import axios from "axios";
 import { startGlobalLoading, stopGlobalLoading } from "@/lib/loadingManager";
 import { getApiBaseUrl, getBasePath } from "@/lib/apiBase";
+import { clearStoredAuthSession, getStoredAuthToken } from "@/utils/authStorage";
 
 // Base-aware: standalone uses /api/v1, gateway build under /mtss uses /mtss/api/v1.
 const API_BASE_URL = getApiBaseUrl();
@@ -20,8 +21,7 @@ api.interceptors.request.use(
     if (!config?.skipGlobalLoading) {
       startGlobalLoading();
     }
-    const token =
-      localStorage.getItem("auth_token") || localStorage.getItem("token");
+    const token = getStoredAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -63,9 +63,7 @@ api.interceptors.response.use(
         const shouldResetAuth =
           !msg || authFailureHints.some((hint) => msg.includes(hint));
         if (shouldResetAuth) {
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("auth_user");
-          localStorage.removeItem("token");
+          clearStoredAuthSession();
           // Gateway build serves this app under /mtss/, not site
           // root - '/' is a different (and here, non-existent)
           // route as far as this app's own router/dev server know.
@@ -92,9 +90,7 @@ export const login = async (email, password) => {
 export const logout = async () => {
   const response = await api.post("/auth/logout");
 
-  localStorage.removeItem("auth_token");
-  localStorage.removeItem("auth_user");
-  localStorage.removeItem("token");
+  clearStoredAuthSession();
 
   // The backend tells us where to go so the Hub session ends too. It has to
   // be a real navigation: Hub's cookie lives on Hub's domain, so nothing

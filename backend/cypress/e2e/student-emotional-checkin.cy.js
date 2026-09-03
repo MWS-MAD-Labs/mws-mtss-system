@@ -59,9 +59,8 @@ const loginViaAPI = (email, password) => {
  */
 const setAuthInBrowser = (token, user) => {
     cy.window().then((win) => {
-        win.localStorage.setItem('auth_token', token);
-        win.localStorage.setItem('token', token);
-        win.localStorage.setItem('auth_user', JSON.stringify(user));
+        win.localStorage.setItem('mtss.auth_token', token);
+        win.localStorage.setItem('mtss.auth_user', JSON.stringify(user));
     });
 };
 
@@ -222,18 +221,16 @@ describe('Student Emotional Check-in - E2E Tests', () => {
 
             cy.visit(FRONTEND_URL, {
                 onBeforeLoad(win) {
-                    win.localStorage.setItem('auth_token', studentToken);
-                    win.localStorage.setItem('token', studentToken);
-                    win.localStorage.setItem('auth_user', JSON.stringify(studentUser));
+                    win.localStorage.setItem('mtss.auth_token', studentToken);
+                    win.localStorage.setItem('mtss.auth_user', JSON.stringify(studentUser));
                 }
             });
 
             // Navigate to profile page
             cy.visit(`${FRONTEND_URL}/profile`, {
                 onBeforeLoad(win) {
-                    win.localStorage.setItem('auth_token', studentToken);
-                    win.localStorage.setItem('token', studentToken);
-                    win.localStorage.setItem('auth_user', JSON.stringify(studentUser));
+                    win.localStorage.setItem('mtss.auth_token', studentToken);
+                    win.localStorage.setItem('mtss.auth_user', JSON.stringify(studentUser));
                 }
             });
 
@@ -278,9 +275,8 @@ describe('Student Emotional Check-in - E2E Tests', () => {
 
             cy.visit(`${FRONTEND_URL}/student/emotional-checkin`, {
                 onBeforeLoad(win) {
-                    win.localStorage.setItem('auth_token', studentToken);
-                    win.localStorage.setItem('token', studentToken);
-                    win.localStorage.setItem('auth_user', JSON.stringify(studentUser));
+                    win.localStorage.setItem('mtss.auth_token', studentToken);
+                    win.localStorage.setItem('mtss.auth_user', JSON.stringify(studentUser));
                 }
             });
 
@@ -295,9 +291,8 @@ describe('Student Emotional Check-in - E2E Tests', () => {
         it('should display check-in mode options', () => {
             cy.visit(`${FRONTEND_URL}/student/emotional-checkin`, {
                 onBeforeLoad(win) {
-                    win.localStorage.setItem('auth_token', studentToken);
-                    win.localStorage.setItem('token', studentToken);
-                    win.localStorage.setItem('auth_user', JSON.stringify(studentUser));
+                    win.localStorage.setItem('mtss.auth_token', studentToken);
+                    win.localStorage.setItem('mtss.auth_user', JSON.stringify(studentUser));
                 }
             });
 
@@ -310,9 +305,8 @@ describe('Student Emotional Check-in - E2E Tests', () => {
         it('should show check-in status badges', () => {
             cy.visit(`${FRONTEND_URL}/student/emotional-checkin`, {
                 onBeforeLoad(win) {
-                    win.localStorage.setItem('auth_token', studentToken);
-                    win.localStorage.setItem('token', studentToken);
-                    win.localStorage.setItem('auth_user', JSON.stringify(studentUser));
+                    win.localStorage.setItem('mtss.auth_token', studentToken);
+                    win.localStorage.setItem('mtss.auth_user', JSON.stringify(studentUser));
                 }
             });
 
@@ -333,9 +327,8 @@ describe('Student Emotional Check-in - E2E Tests', () => {
 
             cy.visit(`${FRONTEND_URL}/student/support-hub`, {
                 onBeforeLoad(win) {
-                    win.localStorage.setItem('auth_token', studentToken);
-                    win.localStorage.setItem('token', studentToken);
-                    win.localStorage.setItem('auth_user', JSON.stringify(studentUser));
+                    win.localStorage.setItem('mtss.auth_token', studentToken);
+                    win.localStorage.setItem('mtss.auth_user', JSON.stringify(studentUser));
                 }
             });
 
@@ -442,9 +435,8 @@ describe('Student Emotional Check-in - E2E Tests', () => {
         it('should load teacher emotional check-in dashboard page (Frontend)', () => {
             cy.visit(`${FRONTEND_URL}/emotional-checkin/teacher-dashboard`, {
                 onBeforeLoad(win) {
-                    win.localStorage.setItem('auth_token', teacherToken);
-                    win.localStorage.setItem('token', teacherToken);
-                    win.localStorage.setItem('auth_user', JSON.stringify(teacherUser));
+                    win.localStorage.setItem('mtss.auth_token', teacherToken);
+                    win.localStorage.setItem('mtss.auth_user', JSON.stringify(teacherUser));
                 }
             });
 

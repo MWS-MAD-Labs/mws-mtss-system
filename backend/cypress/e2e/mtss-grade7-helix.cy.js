@@ -101,8 +101,8 @@ describe('MTSS Grade 7 Helix - E2E Tests', () => {
             }).then((response) => {
                 expect(response.status).to.eq(200);
                 const token = response.body.data.token;
-                window.localStorage.setItem('token', token);
-                window.localStorage.setItem('user', JSON.stringify(response.body.data.user));
+                window.localStorage.setItem('mtss.auth_token', token);
+                window.localStorage.setItem('mtss.auth_user', JSON.stringify(response.body.data.user));
             });
         });
 
@@ -157,8 +157,8 @@ describe('MTSS Grade 7 Helix - E2E Tests', () => {
                 password: TEACHERS.abu.password
             }).then((response) => {
                 authToken = response.body.data.token;
-                window.localStorage.setItem('token', authToken);
-                window.localStorage.setItem('user', JSON.stringify(response.body.data.user));
+                window.localStorage.setItem('mtss.auth_token', authToken);
+                window.localStorage.setItem('mtss.auth_user', JSON.stringify(response.body.data.user));
             });
         });
 

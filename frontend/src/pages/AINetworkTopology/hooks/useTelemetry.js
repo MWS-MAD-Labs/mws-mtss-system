@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import socketService from '@/services/socketService';
 import { getApiBaseUrl } from '@/lib/apiBase';
+import { getStoredAuthToken as readStoredAuthToken, getStoredAuthUserRaw } from '@/utils/authStorage';
 import { NODE_META } from '../constants/nodes';
 import { SIM_FLOWS } from '../constants/simFlows';
 
@@ -8,23 +9,11 @@ const API_BASE = getApiBaseUrl();
 const ALLOWED_TELEMETRY_ROLES = new Set(['admin', 'superadmin', 'directorate', 'head_unit']);
 
 function getStoredAuthToken() {
-  return (
-    localStorage.getItem('auth_token')
-    || localStorage.getItem('token')
-    || sessionStorage.getItem('auth_token')
-    || sessionStorage.getItem('token')
-    || null
-  );
+  return readStoredAuthToken();
 }
 
 function getStoredAuthRole() {
-  const raw = (
-    localStorage.getItem('auth_user')
-    || localStorage.getItem('user')
-    || sessionStorage.getItem('auth_user')
-    || sessionStorage.getItem('user')
-    || null
-  );
+  const raw = getStoredAuthUserRaw();
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);

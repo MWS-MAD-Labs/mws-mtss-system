@@ -3,6 +3,7 @@
  */
 
 import { ClipboardCheck, ShieldCheck, Star } from "lucide-react";
+import { getStoredAuthUser } from "@/utils/authStorage";
 
 export const STAT_TEMPLATE = [
     { key: "active", label: "Active Interventions", shortLabel: "Active", sub: "Students in a boost bubble", icon: ShieldCheck, accent: "from-[#0ea5e9]/90 via-[#818cf8]/85 to-[#34d399]/80" },
@@ -29,7 +30,7 @@ export const slugify = (value) =>
 
 export const getStoredUser = () => {
     try {
-        return JSON.parse(localStorage.getItem("auth_user") || "null");
+        return getStoredAuthUser();
     } catch {
         return null;
     }

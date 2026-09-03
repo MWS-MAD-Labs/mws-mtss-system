@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { loginSuccess, clearAuth, fetchCurrentUser } from '@/store/slices/authSlice';
 import { consumePendingRedirect, getDefaultPostLoginPath } from '@/utils/authRedirect';
+import { AUTH_USER_KEY, getStoredAuthToken, getStoredAuthUserRaw, isAuthStorageKey } from '@/utils/authStorage';
 
 // Hub can silently refresh this app's session from a hidden iframe instead
 // of navigating this visible tab through the whole SSO redirect chain (see
@@ -19,10 +20,10 @@ export function useCrossTabAuthSync() {
 
     useEffect(() => {
         const handleStorage = (event) => {
-            if (event.key !== 'auth_token' && event.key !== 'auth_user') return;
+            if (!isAuthStorageKey(event.key)) return;
 
-            const token = localStorage.getItem('auth_token');
-            const userRaw = localStorage.getItem('auth_user');
+            const token = getStoredAuthToken();
+            const userRaw = getStoredAuthUserRaw();
 
             if (!token || !userRaw) {
                 dispatch(clearAuth());
@@ -33,7 +34,7 @@ export function useCrossTabAuthSync() {
             try {
                 user = JSON.parse(userRaw);
             } catch (error) {
-                console.error('useCrossTabAuthSync: could not parse auth_user', error);
+                console.error(`useCrossTabAuthSync: could not parse ${AUTH_USER_KEY}`, error);
                 return;
             }
 
