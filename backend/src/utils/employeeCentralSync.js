@@ -27,6 +27,7 @@ async function syncEmployeeFromCentral(email) {
         employeeId: centralEmployee.employee_id,
         jobPosition: centralEmployee.job_position,
         jobLevel: centralEmployee.job_level,
+        isTeachingRole: centralEmployee.is_teaching_role,
         employmentStatus: normalizeEmploymentStatus(centralEmployee.employment_type),
         department: centralEmployee.unit,
         unit: centralEmployee.unit

@@ -83,7 +83,11 @@ async function resolveOrProvisionSsoUser(rawEmail, relayClaims = {}) {
         return null;
     }
 
-    const derivedRole = deriveMtssRoleFromCentralTags(tags, centralFields.jobLevel);
+    const derivedRole = deriveMtssRoleFromCentralTags(
+        tags,
+        centralFields.jobLevel,
+        centralFields.isTeachingRole,
+    );
 
     if (user) {
         Object.assign(user, centralFields);

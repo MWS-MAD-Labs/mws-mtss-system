@@ -308,6 +308,16 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
     if (gradeClauses.length) {
         filter.$and = filter.$and || [];
         filter.$and.push({ $or: gradeClauses });
+    } else {
+        // No derivable grade/unit scope for this viewer (e.g. a
+        // non-teaching employee - wrong job position/unit for any known
+        // teaching band - whose account somehow reached the teacher
+        // dashboard). Explicit deny-all, same fallback as the student
+        // branch above, instead of silently skipping the filter and
+        // returning every student in the system.
+        filter.$and = filter.$and || [];
+        filter.$and.push({ _id: null });
+        return filter;
     }
 
     if (useClassScopedFilter && allowedClasses.length) {
@@ -1233,5 +1243,8 @@ module.exports = {
     createStudent,
     updateStudent,
     submitKindergartenMoodCheckin,
-    submitKindergartenHomeObservation
+    submitKindergartenHomeObservation,
+    // Exported for direct testing (see tests/smoke/) - a pure function,
+    // no need to spin up a full request/response cycle to exercise it.
+    applyViewerScope
 };

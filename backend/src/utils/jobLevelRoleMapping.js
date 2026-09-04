@@ -1,11 +1,12 @@
 // Once Hub's relayed tags say someone is teaching-adjacent staff at all
-// (tag "teacher" or the baseline "staff" every active employee gets), this
-// is the only place left that needs to know MTSS's own sub-classification -
-// se_teacher vs support_staff vs plain teacher matters for caseload/roster
-// logic elsewhere in this app, and Hub has no reason to know about it.
-// Unrecognized job_level values fall through to 'teacher' rather than
-// 'staff', so an unmapped title never loses MTSS access - it only loses the
-// cosmetic sub-label.
+// (tag "teacher" or the baseline "staff" every active employee gets) AND
+// Central's own is_teaching_role flag confirms this job_level is actually a
+// teaching one, this is the only place left that needs to know MTSS's own
+// sub-classification - se_teacher vs support_staff vs plain teacher matters
+// for caseload/roster logic elsewhere in this app, and Hub has no reason to
+// know about it. Unrecognized job_level values fall through to 'teacher'
+// rather than 'staff', so an unmapped teaching title never loses MTSS
+// access - it only loses the cosmetic sub-label.
 const TEACHER_FAMILY_BY_JOB_LEVEL = {
     'Teacher': 'teacher',
     'SE Teacher': 'se_teacher',
@@ -24,9 +25,17 @@ const TEACHER_FAMILY_BY_JOB_LEVEL = {
 // dropped everyone to 'staff', even a Principal or Head Unit).
 //
 // tags take the outer bucket (does this person get admin/leader access at
-// all); jobLevel only fine-tunes which flavor of teaching staff they are
-// once that bucket is 'teacher'.
-function deriveMtssRoleFromCentralTags(tags, jobLevel) {
+// all); within the 'teacher' bucket, isTeachingRole - Central's own
+// job_level.is_teaching_role flag, the same field class-service.ts/
+// pc-activity-service.ts/student-support-assignment-service.ts already
+// gate teacher/mentor eligibility on - decides whether this person is
+// actually teaching staff before jobLevel fine-tunes which flavor. Every
+// active employee carries the baseline 'employee'/'staff' tag from Hub
+// regardless of job, so without this check a non-teaching employee (e.g. a
+// MAD Lab developer, whose job_level matches nothing in
+// TEACHER_FAMILY_BY_JOB_LEVEL) used to fall through to the generic
+// 'teacher' default and reach the teacher dashboard.
+function deriveMtssRoleFromCentralTags(tags, jobLevel, isTeachingRole) {
     const tagSet = new Set(Array.isArray(tags) ? tags : []);
     const level = typeof jobLevel === 'string' ? jobLevel.trim() : '';
 
@@ -40,6 +49,7 @@ function deriveMtssRoleFromCentralTags(tags, jobLevel) {
     if (tagSet.has('head-unit') || tagSet.has('principal')) return 'head_unit';
     if (tagSet.has('admin')) return 'admin';
     if (tagSet.has('teacher') || tagSet.has('staff') || tagSet.has('employee')) {
+        if (!isTeachingRole) return 'staff';
         return TEACHER_FAMILY_BY_JOB_LEVEL[level] || 'teacher';
     }
 

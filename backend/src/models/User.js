@@ -81,6 +81,15 @@ const userSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    // Central's own is_teaching_role flag (job_level master data) - the
+    // authoritative "is this a teaching job level" signal Central itself
+    // gates class/mentor/support-assignment eligibility on. Synced
+    // read-only from Central on every SSO login; see jobLevelRoleMapping.js
+    // for how it decides the teacher-vs-staff split.
+    isTeachingRole: {
+        type: Boolean,
+        default: false
+    },
     employmentStatus: {
         type: String,
         enum: ['Permanent', 'Contract', 'Probation', 'Freelance', 'Part Time', 'WFH'],
