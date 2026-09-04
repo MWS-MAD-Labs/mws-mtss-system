@@ -45,11 +45,25 @@ async function syncTeacherClassAssignments() {
         const email = normalizeEmail(assignment.employee_email);
         if (!email) return;
         if (!classesByEmail.has(email)) classesByEmail.set(email, []);
-        classesByEmail.get(email).push({
-            grade: assignment.grade_name || undefined,
-            className: assignment.class_name || undefined,
-            subject: assignment.subject || undefined,
-            role: ROLE_LABELS[assignment.role] || undefined,
+        // A mixed-age room (see ClassAdditionalGrade) genuinely holds
+        // students at more than one grade - one classes[] entry per grade
+        // this class teaches (primary + every additional), all sharing the
+        // same className/subject/role, so mtssAccess.js's grade-based
+        // scoping (deriveAllowedGradesForUser) sees every grade the
+        // teacher's room actually contains instead of just the primary
+        // one. A student sitting in an additional grade would otherwise
+        // silently fall outside the teacher's roster.
+        const roomGrades = [
+            assignment.grade_name,
+            ...(assignment.additional_grade_names || []),
+        ].filter(Boolean);
+        roomGrades.forEach((grade) => {
+            classesByEmail.get(email).push({
+                grade,
+                className: assignment.class_name || undefined,
+                subject: assignment.subject || undefined,
+                role: ROLE_LABELS[assignment.role] || undefined,
+            });
         });
     });
 
