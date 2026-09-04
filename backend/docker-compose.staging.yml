@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/netslayer67/mws-app-be:staging-latest
+    image: ghcr.io/mws-mad-labs/mws-mtss-system-be:staging
     container_name: mws-backend-staging
     restart: unless-stopped
     env_file:
@@ -29,7 +29,7 @@ services:
       - mws-network
 
   frontend:
-    image: ghcr.io/netslayer67/mws-app-fe:staging-latest
+    image: ghcr.io/mws-mad-labs/mws-mtss-system-fe:staging
     container_name: mws-frontend-staging
     restart: unless-stopped
     env_file:
