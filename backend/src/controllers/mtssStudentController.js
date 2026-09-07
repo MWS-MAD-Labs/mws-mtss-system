@@ -14,7 +14,7 @@ const { INTERVENTION_TYPES, INTERVENTION_TYPE_KEYS, INTERVENTION_STATUSES } = re
 const {
     buildGradeFilterClauses,
     buildClassFilterClauses,
-    deriveAllowedGradesForUser,
+    deriveVerifiedGradesForUser,
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit
 } = require('../utils/mtssAccess');
@@ -291,7 +291,7 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
     //
     // A JH subject specialist whose class label has no grade number (e.g.
     // "Junior High - Coding") gets classes[].grade = "Junior High" from
-    // parseAssignmentLabel. deriveAllowedGradesForUser passes that straight
+    // parseAssignmentLabel. deriveVerifiedGradesForUser passes that straight
     // through, but buildGradeFilterClauses (below) already expands a bare
     // unit name into every grade in that unit via deriveGradesForUnit - so
     // this already resolves to Grade 7/8/9 with no extra handling needed.
@@ -299,7 +299,13 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
     // whose labels have no grade number; it produced byte-identical grade
     // filters to the plain path above, and missed a third teacher with the
     // same "Junior High - <subject>" pattern who was never added to it.)
-    const allowedGrades = deriveAllowedGradesForUser(viewer);
+    //
+    // deriveVerifiedGradesForUser (not deriveAllowedGradesForUser) - a
+    // teacher/SE teacher with no synced class assignment at all must see
+    // zero students, not their whole unit. See mtssAccess.js's comment on
+    // why that's now safe: teacherClassAssignmentSync.js keeps classes[]
+    // authoritatively in sync with Central every 15 minutes.
+    const allowedGrades = deriveVerifiedGradesForUser(viewer);
 
     const useClassScopedFilter = isClassScopedTeacherInUnit(viewer);
     const allowedClasses = useClassScopedFilter ? deriveAllowedClassNamesForUser(viewer) : [];

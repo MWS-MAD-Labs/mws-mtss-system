@@ -170,6 +170,32 @@ const deriveAllowedGradesForUser = (user = {}) => {
     return Array.from(grades).filter(Boolean);
 };
 
+// Same as deriveAllowedGradesForUser but without the "no specific classes ->
+// assume this person's whole unit" fallback. That fallback is correct for a
+// head_unit/leader's default scope (they're supposed to see their whole
+// unit), but wrong for "which students is this specific teacher/SE teacher
+// actually assigned to" - teacherClassAssignmentSync.js authoritatively
+// overwrites user.classes from Central every 15 minutes, including clearing
+// it to [] for someone Central shows no active assignment for, so an empty
+// result here now reliably means "Central confirms zero assignments," not
+// "we haven't synced yet." Used for the teacher roster itself
+// (mtssStudentController.js's applyViewerScope) and anything that must
+// match what that roster shows (the write-guard in
+// ensureStudentsWithinViewerScope, the reassignment-audit tool) - a person
+// with no verified assignment gets zero students, not their whole unit.
+const deriveVerifiedGradesForUser = (user = {}) => {
+    const grades = new Set();
+    (user.classes || []).forEach((cls) => {
+        if (cls?.grade) {
+            grades.add(normalizeGradeLabel(cls.grade));
+        }
+    });
+    const fromJob = user.jobPosition?.match(/grade\s*\d+|kindergarten\s*(pre[-\s]?k|k\s*1|k\s*2)?/gi) || [];
+    fromJob.forEach((entry) => grades.add(normalizeGradeLabel(entry)));
+
+    return Array.from(grades).filter(Boolean);
+};
+
 const deriveAllowedClassNamesForUser = (user = {}) => {
     const classes = new Set();
     (user.classes || []).forEach((cls) => {
@@ -203,6 +229,7 @@ module.exports = {
     buildGradeFilterClauses,
     buildClassFilterClauses,
     deriveAllowedGradesForUser,
+    deriveVerifiedGradesForUser,
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit
 };

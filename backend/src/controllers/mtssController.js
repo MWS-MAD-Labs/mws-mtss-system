@@ -15,6 +15,7 @@ const {
     buildClassFilterClauses,
     buildGradeFilterClauses,
     deriveAllowedGradesForUser,
+    deriveVerifiedGradesForUser,
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit,
     normalizeClassLabel,
@@ -883,7 +884,7 @@ const isClassScopedTeacherInUnit = (viewer = {}) => {
 
 // A JH subject specialist whose class label has no grade number (e.g.
 // "Junior High - Coding") gets classes[].grade = "Junior High" from
-// parseAssignmentLabel. deriveAllowedGradesForUser passes that straight
+// parseAssignmentLabel. deriveVerifiedGradesForUser passes that straight
 // through, but buildGradeFilterClauses already expands a bare unit name
 // into every grade in that unit via deriveGradesForUnit - so this already
 // resolves to Grade 7/8/9 with no extra handling needed. (Verified: a
@@ -891,7 +892,14 @@ const isClassScopedTeacherInUnit = (viewer = {}) => {
 // no grade number; it produced byte-identical grade filters to this plain
 // path, and missed a third teacher with the same "Junior High - <subject>"
 // pattern who was never added to it.)
-const resolveRosterGradeScopeForViewer = (viewer = {}) => deriveAllowedGradesForUser(viewer);
+//
+// deriveVerifiedGradesForUser (not deriveAllowedGradesForUser) - this feeds
+// ensureStudentsWithinViewerScope below, the write-guard for adding
+// interventions/notes. It must match the roster's own visibility rules
+// (mtssStudentController.js's applyViewerScope) exactly: a viewer with no
+// verified assignment gets denied here too, not granted their whole unit's
+// worth of write access to students their roster doesn't even show them.
+const resolveRosterGradeScopeForViewer = (viewer = {}) => deriveVerifiedGradesForUser(viewer);
 
 const ensureStudentsWithinViewerScope = async (studentIds = [], viewer = {}) => {
     if (!studentIds.length || isMTSSAdminRole(viewer?.role)) return;
@@ -1393,11 +1401,12 @@ const getMentorAssignments = async (req, res) => {
 
 // Admin-only: every active/paused assignment whose mentor's CURRENT grade
 // scope (derived the same way the teacher dashboard scopes "My Students",
-// see deriveAllowedGradesForUser) no longer covers the assigned student -
+// see deriveVerifiedGradesForUser) no longer covers the assigned student -
 // e.g. Central moved the mentor from Junior High to SD mid-intervention.
 // A mentor with no derivable grade scope at all (e.g. an admin-role
-// mentor) is never flagged - there's nothing to compare against, and
-// flagging them would just be noise.
+// mentor, or one with no verified Central assignment at all) is never
+// flagged - there's nothing to compare against, and flagging them would
+// just be noise.
 const getAssignmentsNeedingReassignment = async (req, res) => {
     try {
         const assignmentsRaw = await MentorAssignment.find({ status: { $in: ['active', 'paused'] } })
@@ -1415,13 +1424,13 @@ const getAssignmentsNeedingReassignment = async (req, res) => {
         const candidatesWithGrades = candidateMentors.map((mentor) => ({
             id: mentor._id.toString(),
             name: mentor.name,
-            allowedGrades: deriveAllowedGradesForUser(mentor),
+            allowedGrades: deriveVerifiedGradesForUser(mentor),
         }));
 
         const flagged = hydrated
             .filter((assignment) => assignment.mentorId?._id)
             .filter((assignment) => {
-                const allowedGrades = deriveAllowedGradesForUser(assignment.mentorId);
+                const allowedGrades = deriveVerifiedGradesForUser(assignment.mentorId);
                 if (!allowedGrades.length) return false;
                 const students = assignment.studentIds || [];
                 const inScope = students.some((student) =>
