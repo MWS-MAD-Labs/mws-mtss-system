@@ -120,6 +120,16 @@ const userSchema = new mongoose.Schema({
         subject: String,
         role: { type: String, enum: ['Homeroom Teacher', 'Subject Teacher', 'Special Education Teacher', 'Principal'] }
     }],
+    // SE teacher's students, kept in sync with Central's
+    // StudentSupportAssignment by studentSupportAssignmentSync.js every 15
+    // minutes (same authoritative-overwrite posture as classes above) - an
+    // SE teacher relates to students directly, not through a class roster,
+    // so this is what mtssStudentController.js's applyViewerScope scopes
+    // their "My Students" view by instead of classes/grade.
+    supportedStudentIds: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'MTSSStudent'
+    }],
     lastLogin: {
         type: Date
     },

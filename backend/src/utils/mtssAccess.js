@@ -170,32 +170,15 @@ const deriveAllowedGradesForUser = (user = {}) => {
     return Array.from(grades).filter(Boolean);
 };
 
-// Same as deriveAllowedGradesForUser but without the "no specific classes ->
-// assume this person's whole unit" fallback. That fallback is correct for a
-// head_unit/leader's default scope (they're supposed to see their whole
-// unit), but wrong for "which students is this specific teacher/SE teacher
-// actually assigned to" - teacherClassAssignmentSync.js authoritatively
-// overwrites user.classes from Central every 15 minutes, including clearing
-// it to [] for someone Central shows no active assignment for, so an empty
-// result here now reliably means "Central confirms zero assignments," not
-// "we haven't synced yet." Used for the teacher roster itself
-// (mtssStudentController.js's applyViewerScope) and anything that must
-// match what that roster shows (the write-guard in
-// ensureStudentsWithinViewerScope, the reassignment-audit tool) - a person
-// with no verified assignment gets zero students, not their whole unit.
-const deriveVerifiedGradesForUser = (user = {}) => {
-    const grades = new Set();
-    (user.classes || []).forEach((cls) => {
-        if (cls?.grade) {
-            grades.add(normalizeGradeLabel(cls.grade));
-        }
-    });
-    const fromJob = user.jobPosition?.match(/grade\s*\d+|kindergarten\s*(pre[-\s]?k|k\s*1|k\s*2)?/gi) || [];
-    fromJob.forEach((entry) => grades.add(normalizeGradeLabel(entry)));
-
-    return Array.from(grades).filter(Boolean);
-};
-
+// Every homeroom/supporting-homeroom/subject-teacher role is scoped by
+// real class name only now (see applyViewerScope in
+// mtssStudentController.js) - user.classes is empty exactly when Central
+// (via teacherClassAssignmentSync.js, which authoritatively overwrites it
+// every 15 minutes, including clearing it to [] for someone Central shows
+// no active assignment for) confirms this person has no active
+// assignment. A caller finding this empty should deny, not fall back to
+// grade or unit - see the KINDERGARTEN_CLASSES removal below for what
+// happened the one time this used a hardcoded fallback instead.
 const deriveAllowedClassNamesForUser = (user = {}) => {
     const classes = new Set();
     (user.classes || []).forEach((cls) => {
@@ -208,18 +191,33 @@ const deriveAllowedClassNamesForUser = (user = {}) => {
     });
 
     // No specific, real classroom name to scope to - user.classes is empty
-    // (the SSO provisioning flow that creates every account today never
-    // populates it; only the old one-time seed scripts did) or the label
-    // on hand doesn't resolve to one. KINDERGARTEN_CLASSES used to fill
-    // this gap with a hardcoded demo roster ("Milky Way"/"Bear Paw"/
-    // "Starlight") that matches no real classroom name in Central or the
-    // synced roster ("Kindergarten Pre-K A" etc) - every kindergarten
-    // homeroom teacher without an explicit classes[] entry got filtered
-    // down to zero real students instead of their grade's actual roster.
-    // Leaving this empty makes the caller (applyViewerScope) skip class-
-    // name scoping and fall back to grade-only, which still narrows to
-    // this teacher's real grade band instead of showing nothing.
+    // (Central confirms no active assignment) or the label on hand
+    // doesn't resolve to one. KINDERGARTEN_CLASSES used to fill this gap
+    // with a hardcoded demo roster ("Milky Way"/"Bear Paw"/"Starlight")
+    // that matches no real classroom name in Central or the synced roster
+    // ("Kindergarten Pre-K A" etc) - every kindergarten homeroom teacher
+    // without an explicit classes[] entry got filtered down to zero real
+    // students instead of a real fallback. Leaving this empty is correct
+    // now: the caller denies outright rather than falling back to
+    // anything broader.
     return Array.from(classes);
+};
+
+// Plain-JS equivalent of buildClassFilterClauses, for comparing a single
+// className string against a list of allowed class names outside of a
+// Mongo query (e.g. the reassignment-audit tool in mtssController.js,
+// which compares already-populated documents in memory rather than
+// building a new query).
+const classNameMatchesAllowed = (className = '', allowedClasses = []) => {
+    const normalized = normalizeClassLabel(className);
+    if (!normalized) return false;
+    return allowedClasses.some((allowed) => {
+        const regex = buildClassRegex(allowed);
+        if (!regex) return false;
+        return Array.isArray(regex)
+            ? regex.some((entry) => entry.test(normalized))
+            : regex.test(normalized);
+    });
 };
 
 module.exports = {
@@ -228,8 +226,8 @@ module.exports = {
     normalizeGradeLabel,
     buildGradeFilterClauses,
     buildClassFilterClauses,
+    classNameMatchesAllowed,
     deriveAllowedGradesForUser,
-    deriveVerifiedGradesForUser,
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit
 };

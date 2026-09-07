@@ -10,6 +10,7 @@ const employeeDeactivationSync = require('./jobs/employeeDeactivationSync');
 const studentDeactivationSync = require('./jobs/studentDeactivationSync');
 const mtssStudentRosterSync = require('./jobs/mtssStudentRosterSync');
 const teacherClassAssignmentSync = require('./jobs/teacherClassAssignmentSync');
+const studentSupportAssignmentSync = require('./jobs/studentSupportAssignmentSync');
 const googleAI = require('./config/googleAI');
 const openRouterChat = require('./config/openRouterChat');
 const { initSocket } = require('./config/socket');
@@ -150,6 +151,11 @@ const initializeApp = async () => {
         // filters by real class names instead of falling back to
         // fictional placeholders.
         teacherClassAssignmentSync.start();
+
+        // Same as above, but for SE teachers - Central's
+        // StudentSupportAssignment is per-student, not per-class, so this
+        // keeps User.supportedStudentIds in sync instead of classes.
+        studentSupportAssignmentSync.start();
 
         // Test Google AI connection (with graceful fallback for overload and quota)
         try {

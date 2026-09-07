@@ -14,8 +14,8 @@ const {
 const {
     buildClassFilterClauses,
     buildGradeFilterClauses,
+    classNameMatchesAllowed,
     deriveAllowedGradesForUser,
-    deriveVerifiedGradesForUser,
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit,
     normalizeClassLabel,
@@ -50,7 +50,6 @@ const TYPE_ALIAS_MAP = {
 // for assignments" trying to assign themselves as a mentor.
 const MTSS_MENTOR_ROLES = [...MTSS_NATIVE_TEACHER_ROLES, 'head_unit', 'admin', 'directorate'];
 const DUPLICATE_BLOCKING_STATUSES = ['active', 'paused'];
-const CLASS_SCOPED_UNITS = new Set(['elementary', 'kindergarten', 'pelangi']);
 const PLAN_EDITABLE_FIELDS = new Set([
     'focusAreas',
     'tier',
@@ -867,62 +866,36 @@ const ensureStudentsValid = async (studentIds) => {
     return students;
 };
 
-const isClassScopedTeacherInUnit = (viewer = {}) => {
-    const lowerUnit = (viewer.unit || '').toLowerCase();
-    if (!CLASS_SCOPED_UNITS.has(lowerUnit)) return false;
-
-    const lowerJobPosition = (viewer.jobPosition || '').toLowerCase();
-    if (lowerJobPosition.includes('homeroom') || lowerJobPosition.includes('special education')) {
-        return true;
-    }
-
-    return (viewer.classes || []).some((cls) => {
-        const role = (cls?.role || '').toLowerCase();
-        return role.includes('homeroom') || role.includes('special education');
-    });
-};
-
-// A JH subject specialist whose class label has no grade number (e.g.
-// "Junior High - Coding") gets classes[].grade = "Junior High" from
-// parseAssignmentLabel. deriveVerifiedGradesForUser passes that straight
-// through, but buildGradeFilterClauses already expands a bare unit name
-// into every grade in that unit via deriveGradesForUnit - so this already
-// resolves to Grade 7/8/9 with no extra handling needed. (Verified: a
-// per-name allowlist used to sit here for two JH teachers whose labels have
-// no grade number; it produced byte-identical grade filters to this plain
-// path, and missed a third teacher with the same "Junior High - <subject>"
-// pattern who was never added to it.)
-//
-// deriveVerifiedGradesForUser (not deriveAllowedGradesForUser) - this feeds
-// ensureStudentsWithinViewerScope below, the write-guard for adding
-// interventions/notes. It must match the roster's own visibility rules
-// (mtssStudentController.js's applyViewerScope) exactly: a viewer with no
-// verified assignment gets denied here too, not granted their whole unit's
-// worth of write access to students their roster doesn't even show them.
-const resolveRosterGradeScopeForViewer = (viewer = {}) => deriveVerifiedGradesForUser(viewer);
-
+// Must match the roster's own visibility rules (mtssStudentController.js's
+// applyViewerScope) exactly - a viewer with no verified assignment at all
+// gets denied here too, not granted broader write access to students their
+// own roster doesn't even show them. SE teachers relate to students
+// directly (Central's StudentSupportAssignment, synced into
+// supportedStudentIds), everyone else (homeroom/supporting-homeroom/
+// subject teacher) by real class name from classes[] - see the matching
+// comment in applyViewerScope for why grade/unit-wide scoping doesn't
+// belong here at all.
 const ensureStudentsWithinViewerScope = async (studentIds = [], viewer = {}) => {
     if (!studentIds.length || isMTSSAdminRole(viewer?.role)) return;
 
-    const allowedGrades = resolveRosterGradeScopeForViewer(viewer);
-    const gradeClauses = buildGradeFilterClauses(allowedGrades);
-    if (!gradeClauses.length) {
-        throw new Error('Your account has no MTSS grade access configured.');
-    }
-
     const uniqueStudentIds = Array.from(new Set(studentIds.map((id) => id?.toString?.() || String(id)).filter(Boolean)));
-    const scopeFilter = {
-        _id: { $in: uniqueStudentIds },
-        $and: [{ $or: gradeClauses }]
-    };
 
-    const useClassScopedFilter = isClassScopedTeacherInUnit(viewer);
-    if (useClassScopedFilter) {
+    let scopeFilter;
+    if (viewer.role === 'se_teacher') {
+        const supportedIds = Array.isArray(viewer.supportedStudentIds)
+            ? viewer.supportedStudentIds.filter(Boolean)
+            : [];
+        if (!supportedIds.length) {
+            throw new Error('Your account has no MTSS student access configured.');
+        }
+        scopeFilter = { _id: { $in: uniqueStudentIds }, $and: [{ _id: { $in: supportedIds } }] };
+    } else {
         const allowedClasses = deriveAllowedClassNamesForUser(viewer);
         const classClauses = buildClassFilterClauses(allowedClasses);
-        if (classClauses.length) {
-            scopeFilter.$and.push({ $or: classClauses });
+        if (!classClauses.length) {
+            throw new Error('Your account has no MTSS class access configured.');
         }
+        scopeFilter = { _id: { $in: uniqueStudentIds }, $and: [{ $or: classClauses }] };
     }
 
     const accessibleCount = await MTSSStudent.countDocuments(scopeFilter);
@@ -1399,18 +1372,40 @@ const getMentorAssignments = async (req, res) => {
     }
 };
 
-// Admin-only: every active/paused assignment whose mentor's CURRENT grade
-// scope (derived the same way the teacher dashboard scopes "My Students",
-// see deriveVerifiedGradesForUser) no longer covers the assigned student -
-// e.g. Central moved the mentor from Junior High to SD mid-intervention.
-// A mentor with no derivable grade scope at all (e.g. an admin-role
-// mentor, or one with no verified Central assignment at all) is never
-// flagged - there's nothing to compare against, and flagging them would
-// just be noise.
+// Whether a mentor's Central-verified scope (real class names for a
+// homeroom/supporting-homeroom/subject teacher, supportedStudentIds for an
+// SE teacher - the same split applyViewerScope uses) covers every one of
+// these students. Returns null (not false) when the mentor has no
+// derivable scope at all (e.g. an admin-role mentor) - "nothing to compare
+// against" is different from "compared and it doesn't cover them", and the
+// caller below treats them differently (never flag the former, that's just
+// noise).
+const mentorScopeCoversStudents = (mentor = {}, students = []) => {
+    if (mentor.role === 'se_teacher') {
+        const supportedIds = Array.isArray(mentor.supportedStudentIds)
+            ? mentor.supportedStudentIds.map(String)
+            : [];
+        if (!supportedIds.length) return null;
+        return students.every((student) => supportedIds.includes(String(student._id)));
+    }
+    const allowedClasses = deriveAllowedClassNamesForUser(mentor);
+    if (!allowedClasses.length) return null;
+    return students.every((student) =>
+        classNameMatchesAllowed(student.className || student.class || '', allowedClasses));
+};
+
+// Admin-only: every active/paused assignment whose mentor's CURRENT
+// Central-verified scope (derived the same way the teacher dashboard
+// scopes "My Students", see mentorScopeCoversStudents above) no longer
+// covers the assigned student - e.g. Central moved the mentor to a
+// different class mid-intervention. A mentor with no derivable scope at
+// all (e.g. an admin-role mentor, or one with no verified Central
+// assignment at all) is never flagged - there's nothing to compare
+// against, and flagging them would just be noise.
 const getAssignmentsNeedingReassignment = async (req, res) => {
     try {
         const assignmentsRaw = await MentorAssignment.find({ status: { $in: ['active', 'paused'] } })
-            .populate('mentorId', 'name role email username jobPosition unit classes')
+            .populate('mentorId', 'name role email username jobPosition unit classes supportedStudentIds')
             .lean();
         const hydrated = await hydrateAssignmentStudents(assignmentsRaw);
 
@@ -1420,36 +1415,29 @@ const getAssignmentsNeedingReassignment = async (req, res) => {
         const candidateMentors = await User.find({
             role: { $in: MTSS_MENTOR_ROLES },
             isActive: true,
-        }).select('name unit jobPosition classes').lean();
-        const candidatesWithGrades = candidateMentors.map((mentor) => ({
-            id: mentor._id.toString(),
-            name: mentor.name,
-            allowedGrades: deriveVerifiedGradesForUser(mentor),
-        }));
+        }).select('name role unit jobPosition classes supportedStudentIds').lean();
 
         const flagged = hydrated
             .filter((assignment) => assignment.mentorId?._id)
             .filter((assignment) => {
-                const allowedGrades = deriveVerifiedGradesForUser(assignment.mentorId);
-                if (!allowedGrades.length) return false;
                 const students = assignment.studentIds || [];
-                const inScope = students.some((student) =>
-                    allowedGrades.includes(normalizeGradeLabel(student.currentGrade || student.grade || '')));
-                return !inScope;
+                const covers = mentorScopeCoversStudents(assignment.mentorId, students);
+                return covers === false;
             })
             .map((assignment) => {
                 const currentMentorId = assignment.mentorId._id?.toString?.() || assignment.mentorId.toString();
-                const grade = normalizeGradeLabel(
-                    assignment.studentIds?.[0]?.currentGrade || assignment.studentIds?.[0]?.grade || '',
-                );
-                // Suggested mentors are scoped to the student's actual
-                // grade, not left as "everyone" - picking a reassignment
-                // target this way can't recreate the same out-of-scope
-                // problem by accident.
-                const eligibleMentors = grade
-                    ? candidatesWithGrades
-                        .filter((mentor) => mentor.id !== currentMentorId && mentor.allowedGrades.includes(grade))
-                        .map((mentor) => ({ id: mentor.id, name: mentor.name }))
+                const students = assignment.studentIds || [];
+                // Suggested mentors are scoped to these exact students, not
+                // left as "everyone" - picking a reassignment target this
+                // way can't recreate the same out-of-scope problem by
+                // accident.
+                const eligibleMentors = students.length
+                    ? candidateMentors
+                        .filter((mentor) => {
+                            if (mentor._id.toString() === currentMentorId) return false;
+                            return mentorScopeCoversStudents(mentor, students) === true;
+                        })
+                        .map((mentor) => ({ id: mentor._id.toString(), name: mentor.name }))
                     : [];
 
                 return {
@@ -1457,6 +1445,8 @@ const getAssignmentsNeedingReassignment = async (req, res) => {
                     mentorId: currentMentorId,
                     mentorName: assignment.mentorId.name || 'Unknown',
                     studentNames: (assignment.studentIds || []).map((student) => student.name).filter(Boolean),
+                    // Display only - the grade shown here is informational,
+                    // not what scope-matching above is based on.
                     grade: assignment.studentIds?.[0]?.currentGrade || assignment.studentIds?.[0]?.grade || null,
                     focus: Array.isArray(assignment.focusAreas) ? assignment.focusAreas.join(', ') : null,
                     eligibleMentors,

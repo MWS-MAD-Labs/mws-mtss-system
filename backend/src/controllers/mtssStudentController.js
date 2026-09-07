@@ -14,7 +14,6 @@ const { INTERVENTION_TYPES, INTERVENTION_TYPE_KEYS, INTERVENTION_STATUSES } = re
 const {
     buildGradeFilterClauses,
     buildClassFilterClauses,
-    deriveVerifiedGradesForUser,
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit
 } = require('../utils/mtssAccess');
@@ -57,7 +56,6 @@ const TIER_CODES = ['tier1', 'tier2', 'tier3'];
 const STATUS_SET = new Set(INTERVENTION_STATUSES);
 const PRIVILEGED_ROLES = new Set(['admin', 'superadmin', 'directorate']);
 const UNIT_LEVEL_ROLES = new Set(['head_unit']); // Principals who see all students in their unit
-const CLASS_SCOPED_UNITS = new Set(['elementary', 'kindergarten', 'pelangi']);
 const INTERVENTION_TYPE_META = new Map(INTERVENTION_TYPES.map((entry) => [entry.key, entry]));
 const FOCUS_TYPE_MATCHERS = [
     { key: 'ATTENDANCE', pattern: /attendance|absen|present|presence/i },
@@ -234,21 +232,6 @@ const sanitizeStudentPayload = (payload = {}) => {
     return sanitized;
 };
 
-const isClassScopedTeacherInUnit = (viewer = {}) => {
-    const lowerUnit = (viewer.unit || '').toLowerCase();
-    if (!CLASS_SCOPED_UNITS.has(lowerUnit)) return false;
-
-    const lowerJobPosition = (viewer.jobPosition || '').toLowerCase();
-    if (lowerJobPosition.includes('homeroom') || lowerJobPosition.includes('special education')) {
-        return true;
-    }
-
-    return (viewer.classes || []).some((cls) => {
-        const role = (cls?.role || '').toLowerCase();
-        return role.includes('homeroom') || role.includes('special education');
-    });
-};
-
 const applyViewerScope = (filter = {}, viewer = {}) => {
     // Directorate, admin, superadmin see all students
     if (!viewer || PRIVILEGED_ROLES.has(viewer.role)) {
@@ -286,52 +269,65 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
         return filter;
     }
 
-    // JH teachers remain grade-wide. Elementary/Kindergarten homeroom + SE teachers
-    // are class-scoped (grade + class) so roster visibility matches their classroom.
-    //
-    // A JH subject specialist whose class label has no grade number (e.g.
-    // "Junior High - Coding") gets classes[].grade = "Junior High" from
-    // parseAssignmentLabel. deriveVerifiedGradesForUser passes that straight
-    // through, but buildGradeFilterClauses (below) already expands a bare
-    // unit name into every grade in that unit via deriveGradesForUnit - so
-    // this already resolves to Grade 7/8/9 with no extra handling needed.
-    // (Verified: a per-name allowlist used to sit here for two JH teachers
-    // whose labels have no grade number; it produced byte-identical grade
-    // filters to the plain path above, and missed a third teacher with the
-    // same "Junior High - <subject>" pattern who was never added to it.)
-    //
-    // deriveVerifiedGradesForUser (not deriveAllowedGradesForUser) - a
-    // teacher/SE teacher with no synced class assignment at all must see
-    // zero students, not their whole unit. See mtssAccess.js's comment on
-    // why that's now safe: teacherClassAssignmentSync.js keeps classes[]
-    // authoritatively in sync with Central every 15 minutes.
-    const allowedGrades = deriveVerifiedGradesForUser(viewer);
-
-    const useClassScopedFilter = isClassScopedTeacherInUnit(viewer);
-    const allowedClasses = useClassScopedFilter ? deriveAllowedClassNamesForUser(viewer) : [];
-
-    const gradeClauses = buildGradeFilterClauses(allowedGrades);
-    if (gradeClauses.length) {
+    // SE teachers relate to students directly (StudentSupportAssignment in
+    // Central), not through a class roster - studentSupportAssignmentSync.js
+    // keeps supportedStudentIds authoritatively in sync with Central every
+    // 15 minutes, same cadence/posture as teacherClassAssignmentSync.js for
+    // classes[] below. No verified assignment at all means zero students,
+    // not a fallback to anything broader.
+    if (viewer.role === 'se_teacher') {
+        const supportedIds = Array.isArray(viewer.supportedStudentIds)
+            ? viewer.supportedStudentIds.filter(Boolean)
+            : [];
         filter.$and = filter.$and || [];
-        filter.$and.push({ $or: gradeClauses });
-    } else {
-        // No derivable grade/unit scope for this viewer (e.g. a
-        // non-teaching employee - wrong job position/unit for any known
-        // teaching band - whose account somehow reached the teacher
-        // dashboard). Explicit deny-all, same fallback as the student
-        // branch above, instead of silently skipping the filter and
-        // returning every student in the system.
-        filter.$and = filter.$and || [];
-        filter.$and.push({ _id: null });
+        if (supportedIds.length) {
+            filter.$and.push({ _id: { $in: supportedIds } });
+        } else {
+            filter.$and.push({ _id: null });
+        }
         return filter;
     }
 
-    if (useClassScopedFilter && allowedClasses.length) {
-        const classClauses = buildClassFilterClauses(allowedClasses);
-        if (classClauses.length) {
-            filter.$and = filter.$and || [];
-            filter.$and.push({ $or: classClauses });
-        }
+    // Homeroom, supporting homeroom, and subject teachers all get exactly
+    // the classes Central's own ClassTeacherAssignment says they teach -
+    // matched by real class name, not expanded to a whole grade or unit.
+    // This is deliberately uniform across every unit (Junior High included)
+    // - Central is the single source of truth for "who teaches what", so
+    // MTSS doesn't get to widen that on its own. A mixed-age room (see
+    // ClassAdditionalGrade, scoped to Kindergarten today) still works here
+    // with no separate grade handling: teacherClassAssignmentSync.js pushes
+    // one classes[] entry per grade the room holds, all sharing the same
+    // className, so matching by className alone already covers every grade
+    // physically in that room.
+    //
+    // deriveAllowedClassNamesForUser reads classes[], which
+    // teacherClassAssignmentSync.js keeps authoritatively in sync with
+    // Central every 15 minutes (always overwritten, including back to []
+    // for a teacher Central no longer shows any active assignment for) - a
+    // viewer with no verified assignment at all gets zero students, the
+    // same deny-all as the "can't identify this viewer" case above, not a
+    // fallback to their whole unit.
+    const allowedClasses = deriveAllowedClassNamesForUser(viewer);
+    const classClauses = buildClassFilterClauses(allowedClasses);
+
+    filter.$and = filter.$and || [];
+    if (classClauses.length) {
+        filter.$and.push({ $or: classClauses });
+        // A student with no current class assigned yet in Central isn't
+        // really "on anyone's roster" - excluding them here (rather than
+        // in the base filter, which head_unit/student/SE branches above
+        // don't need) keeps them out of every homeroom/subject-teacher
+        // view without hiding them from an admin/directorate-facing "all
+        // students" surface that might want exactly that population.
+        filter.$and.push({ className: { $exists: true, $nin: [null, ''] } });
+    } else {
+        // No derivable class scope for this viewer (e.g. a non-teaching
+        // employee whose account somehow reached the teacher dashboard, or
+        // a genuine teacher Central shows no active assignment for at
+        // all). Explicit deny-all, same fallback as the student branch
+        // above, instead of silently skipping the filter and returning
+        // every student in the system.
+        filter.$and.push({ _id: null });
     }
 
     return filter;

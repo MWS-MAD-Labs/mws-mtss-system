@@ -134,11 +134,33 @@ async function listClassTeacherAssignments() {
   return assignments;
 }
 
+// Same bulk-diff posture as listClassTeacherAssignments() - only currently
+// active StudentSupportAssignment rows (end_date null), paginated at
+// 100/page max.
+async function listStudentSupportAssignments() {
+  const client = getCentralClient();
+  const assignments = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const { data } = await client.get("/student-support-assignments", {
+      params: { page, size: 100 },
+    });
+    assignments.push(...data.data);
+    totalPages = data.paging.total_page;
+    page += 1;
+  } while (page <= totalPages);
+
+  return assignments;
+}
+
 module.exports = {
   lookupEmployeeByEmail,
   lookupStudentByEmail,
   listStudentsByStatus,
   listActiveEmployees,
   listClassTeacherAssignments,
+  listStudentSupportAssignments,
   getCentralClient,
 };
