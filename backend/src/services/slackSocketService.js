@@ -149,7 +149,16 @@ class SlackSocketService {
         });
     }
 
+    // Feature 2 (Slack support-request confirmation) disabled 2026-09-07:
+    // this read/wrote EmotionalCheckin/StudentEmotionalCheckin, which are
+    // meant to be owned by mws-daily-checkin, not MTSS - see
+    // routes/index.js's note for the fuller rationale. Body commented out
+    // rather than deleted in case this gets rebuilt through Central later.
     async handleMarkAsHandled(payload, action) {
+        winston.info('ℹ️ mark_handled action received but Feature 2 is disabled - ignoring', {
+            requestId: JSON.parse(action.value || '{}').requestId
+        });
+        /*
         try {
             const actionData = JSON.parse(action.value);
 
@@ -242,6 +251,7 @@ class SlackSocketService {
                 winston.error('❌ Failed to send error message to Slack:', slackError);
             }
         }
+        */
     }
 
     async sendDirectMessage(userId, message, blocks = null) {

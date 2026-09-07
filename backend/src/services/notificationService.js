@@ -364,6 +364,8 @@ class NotificationService {
         }
     }
 
+    // Feature 2 (support-request notification) disabled 2026-09-07 - see routes/index.js note.
+    /*
     // Create support request notification
     async createSupportRequestNotification(userId, supportRequest) {
         try {
@@ -385,6 +387,7 @@ class NotificationService {
             throw error;
         }
     }
+    */
 
     // Create system notification
     async createSystemNotification(userId, title, message, priority = 'low', metadata = {}) {
@@ -396,6 +399,8 @@ class NotificationService {
         }
     }
 
+    // Feature 2 (Slack/email support-request pipeline + confirmSupportRequest) disabled 2026-09-07 - see routes/index.js note.
+    /*
     // Send Slack notification for support requests
     async sendSlackNotification(supportRequest) {
         const {
@@ -1069,6 +1074,7 @@ class NotificationService {
             </div>
         `;
     }
+    */
 }
 
 module.exports = new NotificationService();

@@ -1,6 +1,8 @@
 const Notification = require('../models/Notification');
-const EmotionalCheckin = require('../models/EmotionalCheckin');
-const StudentEmotionalCheckin = require('../models/StudentEmotionalCheckin');
+// EmotionalCheckin/StudentEmotionalCheckin only used by the Feature 2
+// (support-request) functions disabled below.
+// const EmotionalCheckin = require('../models/EmotionalCheckin');
+// const StudentEmotionalCheckin = require('../models/StudentEmotionalCheckin');
 const notificationService = require('../services/notificationService');
 const { sendSuccess, sendError } = require('../utils/response');
 
@@ -124,71 +126,79 @@ const createSystemNotification = async (req, res) => {
     }
 };
 
-// Create a support request notification
-const createSupportRequestNotification = async (req, res) => {
-    try {
-        const { userId, supportRequest } = req.body;
-
-        // Validate required fields
-        if (!userId || !supportRequest) {
-            return sendError(res, 'userId and supportRequest are required', 400);
-        }
-
-        const notification = await notificationService.createSupportRequestNotification(
-            userId,
-            supportRequest
-        );
-
-        sendSuccess(res, 'Support request notification created successfully', notification, 201);
-    } catch (error) {
-        console.error('Error creating support request notification:', error);
-        sendError(res, 'Failed to create support request notification', 500);
-    }
-};
-
-// Handle Slack interactive actions (button clicks)
-const handleSlackAction = async (req, res) => {
-    try {
-        const payload = JSON.parse(req.body.payload);
-        const { action_id, value } = payload.actions[0];
-        const { requestId, action } = JSON.parse(value);
-
-        console.log('Slack action received:', { action_id, requestId, action });
-
-        const checkin = await StudentEmotionalCheckin.findById(requestId).select('supportContactUserId')
-            || await EmotionalCheckin.findById(requestId).select('supportContactUserId');
-        const assignedContactId = checkin?.supportContactUserId?.toString();
-        if (!assignedContactId) {
-            return res.json({
-                text: '❌ Failed to process the action: support contact not found.',
-                replace_original: false
-            });
-        }
-
-        // Confirm the support request
-        const result = await notificationService.confirmSupportRequest(requestId, assignedContactId, action);
-
-        if (result.success) {
-            // Send confirmation back to Slack
-            const response = {
-                text: `✅ Support request has been ${action}.`,
-                replace_original: true
-            };
-            res.json(response);
-        } else {
-            res.json({
-                text: '❌ Failed to process the action.',
-                replace_original: false
-            });
-        }
-    } catch (error) {
-        console.error('Slack action error:', error);
-        res.json({
-            text: '❌ An error occurred while processing your request.',
-            replace_original: false
-        });
-    }
-};
+// Feature 2 (support-request notification + Slack confirmation) disabled
+// 2026-09-07: both functions read/write EmotionalCheckin/
+// StudentEmotionalCheckin, which are meant to be owned by
+// mws-daily-checkin, not MTSS - see routes/index.js's note for the fuller
+// rationale (Central-source-of-truth rule, no app-to-app peer consumption).
+// Commented out rather than deleted in case this gets rebuilt through
+// Central later.
+//
+// // Create a support request notification
+// const createSupportRequestNotification = async (req, res) => {
+//     try {
+//         const { userId, supportRequest } = req.body;
+//
+//         // Validate required fields
+//         if (!userId || !supportRequest) {
+//             return sendError(res, 'userId and supportRequest are required', 400);
+//         }
+//
+//         const notification = await notificationService.createSupportRequestNotification(
+//             userId,
+//             supportRequest
+//         );
+//
+//         sendSuccess(res, 'Support request notification created successfully', notification, 201);
+//     } catch (error) {
+//         console.error('Error creating support request notification:', error);
+//         sendError(res, 'Failed to create support request notification', 500);
+//     }
+// };
+//
+// // Handle Slack interactive actions (button clicks)
+// const handleSlackAction = async (req, res) => {
+//     try {
+//         const payload = JSON.parse(req.body.payload);
+//         const { action_id, value } = payload.actions[0];
+//         const { requestId, action } = JSON.parse(value);
+//
+//         console.log('Slack action received:', { action_id, requestId, action });
+//
+//         const checkin = await StudentEmotionalCheckin.findById(requestId).select('supportContactUserId')
+//             || await EmotionalCheckin.findById(requestId).select('supportContactUserId');
+//         const assignedContactId = checkin?.supportContactUserId?.toString();
+//         if (!assignedContactId) {
+//             return res.json({
+//                 text: '❌ Failed to process the action: support contact not found.',
+//                 replace_original: false
+//             });
+//         }
+//
+//         // Confirm the support request
+//         const result = await notificationService.confirmSupportRequest(requestId, assignedContactId, action);
+//
+//         if (result.success) {
+//             // Send confirmation back to Slack
+//             const response = {
+//                 text: `✅ Support request has been ${action}.`,
+//                 replace_original: true
+//             };
+//             res.json(response);
+//         } else {
+//             res.json({
+//                 text: '❌ Failed to process the action.',
+//                 replace_original: false
+//             });
+//         }
+//     } catch (error) {
+//         console.error('Slack action error:', error);
+//         res.json({
+//             text: '❌ An error occurred while processing your request.',
+//             replace_original: false
+//         });
+//     }
+// };
 
 module.exports = {
     getUserNotifications,
@@ -197,6 +207,6 @@ module.exports = {
     markAllAsRead,
     deleteNotification,
     createSystemNotification,
-    createSupportRequestNotification,
-    handleSlackAction
+    // createSupportRequestNotification,
+    // handleSlackAction
 };
