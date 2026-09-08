@@ -92,11 +92,19 @@ async function syncStudentRoster() {
         if (existing.currentGrade !== central.current_grade) {
             update.currentGrade = central.current_grade;
         }
-        // Only apply a class when Central actually has one - most students
-        // aren't enrolled into a class there yet, and MTSS's own className
-        // stays authoritative until it does.
-        if (central.current_class && existing.className !== central.current_class) {
-            update.className = central.current_class;
+        // Central is authoritative either way, including when it now says
+        // "no class" - clearing className here, not just setting it, so a
+        // student who was un-enrolled or moved off this room in Central
+        // (a class reorganized, deleted, or re-rostered) stops showing up
+        // in that room's MTSS view instead of the stale name lingering
+        // forever. See exact-class-and-se-scope.test.js/
+        // no-verified-assignment-deny-all.test.js for the same "empty from
+        // Central means deny, not keep the old value" rule already applied
+        // to classes[]/supportedStudentIds.
+        const centralClassName = central.current_class || null;
+        const existingClassName = existing.className || null;
+        if (existingClassName !== centralClassName) {
+            update.className = centralClassName;
         }
         if (existing.name !== central.full_name) {
             update.name = central.full_name;

@@ -26,6 +26,13 @@ const buildRequestUser = (user) => {
         jobPosition: user.jobPosition,
         googleId: user.googleId,
         classes: user.classes || [],
+        // Read by applyViewerScope/ensureStudentsWithinViewerScope for
+        // se_teacher's per-student scoping (see mtssAccess.js) - without
+        // this, every request saw an empty array here regardless of what
+        // studentSupportAssignmentSync.js had actually synced onto the
+        // stored User document, and se_teacher's roster/write-guard denied
+        // everyone.
+        supportedStudentIds: user.supportedStudentIds || [],
         currentGrade: user.currentGrade,
         className: user.className,
         nickname: user.nickname,

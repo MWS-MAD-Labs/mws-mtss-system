@@ -79,6 +79,7 @@ router.get(
     try {
       const dbUser = await resolveOrProvisionSsoUser(payload.sub, {
         tags: payload.tags,
+        source: payload.source,
       });
 
       if (!dbUser) {

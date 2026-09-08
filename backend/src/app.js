@@ -133,29 +133,43 @@ const initializeApp = async () => {
         // Connect to MongoDB
         await connectDB();
 
+        // Dev-only override so a Central data fix (e.g. a roster/class
+        // correction) shows up in MTSS in ~1 minute instead of waiting out
+        // the real 5/15-minute intervals below - unset in staging/
+        // production, where each job's own DEFAULT_INTERVAL_MS still
+        // applies untouched. Remove SYNC_INTERVAL_MS from .env once these
+        // jobs don't need this tight a dev feedback loop anymore.
+        const syncIntervalOverrideMs = process.env.SYNC_INTERVAL_MS
+            ? Number(process.env.SYNC_INTERVAL_MS)
+            : undefined;
+        if (process.env.SYNC_INTERVAL_MS && Number.isNaN(syncIntervalOverrideMs)) {
+            winston.warn(`SYNC_INTERVAL_MS is set but not a valid number ("${process.env.SYNC_INTERVAL_MS}") - ignoring, jobs will use their own defaults`);
+        }
+        const syncInterval = Number.isFinite(syncIntervalOverrideMs) ? syncIntervalOverrideMs : undefined;
+
         // Periodically mirror Central's active employee roster, so someone
         // deactivated there loses MTSS access within minutes instead of
         // only re-syncing at their next login (an SSO session is a
         // self-contained 7-day JWT otherwise).
-        employeeDeactivationSync.start();
-        studentDeactivationSync.start();
+        employeeDeactivationSync.start(syncInterval);
+        studentDeactivationSync.start(syncInterval);
 
         // Periodically mirror Central's enrolled student roster into
         // MTSSStudent, so "Crew Roster" reflects newly-registered/active
         // students without someone having to run
         // scripts/applyCentralStudentSync.js by hand.
-        mtssStudentRosterSync.start();
+        mtssStudentRosterSync.start(syncInterval);
 
         // Keeps each teacher's User.classes in sync with Central's real
         // ClassTeacherAssignment data, so roster scoping (teacherSegmentUtils.js)
         // filters by real class names instead of falling back to
         // fictional placeholders.
-        teacherClassAssignmentSync.start();
+        teacherClassAssignmentSync.start(syncInterval);
 
         // Same as above, but for SE teachers - Central's
         // StudentSupportAssignment is per-student, not per-class, so this
         // keeps User.supportedStudentIds in sync instead of classes.
-        studentSupportAssignmentSync.start();
+        studentSupportAssignmentSync.start(syncInterval);
 
         // Test Google AI connection (with graceful fallback for overload and quota)
         try {
