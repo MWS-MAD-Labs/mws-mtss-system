@@ -101,17 +101,9 @@ const isGenericClassLabel = (value = "") => {
     return Boolean(canonical && Object.prototype.hasOwnProperty.call(SUBJECT_ALIAS_MAP, canonical));
 };
 
-const roleIncludes = (value = "", keyword = "") => normalizeText(value).includes(normalizeText(keyword));
-
 const isHomeroomRole = (value = "") => {
     const normalized = normalizeText(value);
     return normalized.includes("homeroom") || normalized.includes("class teacher");
-};
-
-const isSubjectRole = (value = "") => {
-    const normalized = normalizeText(value);
-    if (!normalized) return false;
-    return normalized.includes("subject") || normalized === "teacher" || normalized.includes("grade teacher");
 };
 
 const gradeMatches = (classGrade = "", student = {}) => {
@@ -133,17 +125,6 @@ const classMatches = (className = "", student = {}, { allowGenericLabel = false 
         const candidateToken = normalizeClassToken(candidate);
         return candidateToken === classToken || candidateToken.includes(classToken) || classToken.includes(candidateToken);
     });
-};
-
-const resolveAssignmentSubjectKeys = (assignmentOption = {}) => {
-    const candidates = [
-        assignmentOption?.focus,
-        ...(Array.isArray(assignmentOption?.focusAreas) ? assignmentOption.focusAreas : []),
-        assignmentOption?.strategyName,
-    ].filter(Boolean);
-
-    const keys = Array.from(new Set(candidates.map((value) => canonicalizeSubjectKey(value)).filter(Boolean)));
-    return keys.length ? keys : ["universal"];
 };
 
 const resolveClassSubjectKeys = (classAssignment = {}) => {
@@ -202,46 +183,21 @@ export const resolveEditableAssignmentOption = (student = {}) => {
     };
 };
 
+// Editing (or cancelling) a plan is creator/mentor/admin-only - see
+// isAssignmentOwnerOrAdmin in the backend's mtssController.js, the
+// authoritative gate the PUT actually enforces. The server always attaches
+// viewerCanEditPlan/viewerPermissions.canEditPlan computed from that same
+// rule, so this just reads it. There used to be a class/subject-matching
+// fallback here for when that flag was missing, but it granted edit access
+// to any homeroom or matching-subject teacher regardless of ownership -
+// exactly the "someone else's edit gets overwritten without permission"
+// problem the backend fix closes. Fail closed instead: no explicit flag
+// means we can't prove ownership from what's on hand, so no edit button.
 export const canUserEditPlanForStudent = (user = {}, student = {}, assignmentOption = resolveEditableAssignmentOption(student)) => {
     if (!assignmentOption?.assignmentId) return false;
 
     const explicit = readBooleanFlag(assignmentOption, "viewerCanEditPlan", "canEditPlan");
-    if (typeof explicit === "boolean") return explicit;
-
-    const assignments = Array.isArray(user?.classes) ? user.classes : [];
-    if (!assignments.length) return false;
-
-    const subjectKeys = resolveAssignmentSubjectKeys(assignmentOption);
-
-    const homeroomMatch = assignments.some((classAssignment) => {
-        const role = classAssignment?.role || user?.jobPosition || "";
-        if (!isHomeroomRole(role)) return false;
-        if (!classAssignment?.grade && !classAssignment?.className) return false;
-        return (
-            gradeMatches(classAssignment?.grade, student) &&
-            classMatches(classAssignment?.className, student, { allowGenericLabel: true })
-        );
-    });
-
-    if (homeroomMatch) return true;
-
-    if (subjectKeys.includes("universal")) return false;
-
-    return assignments.some((classAssignment) => {
-        const role = classAssignment?.role || user?.jobPosition || "";
-        if (!isSubjectRole(role) && !roleIncludes(user?.jobPosition, "subject")) return false;
-        if (!classAssignment?.grade && !classAssignment?.className) return false;
-        if (
-            !gradeMatches(classAssignment?.grade, student) ||
-            !classMatches(classAssignment?.className, student, { allowGenericLabel: true })
-        ) {
-            return false;
-        }
-
-        const classSubjects = resolveClassSubjectKeys(classAssignment);
-        if (!classSubjects.length) return false;
-        return classSubjects.some((subjectKey) => subjectKeys.includes(subjectKey));
-    });
+    return explicit === true;
 };
 
 export const resolveEditableAssignmentForUser = (user = {}, student = {}) => {

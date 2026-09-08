@@ -131,10 +131,24 @@ const authSlice = createSlice({
             .addCase(fetchCurrentUser.fulfilled, (state, action) => {
                 state.loading = false;
                 const userData = action.payload?.user || action.payload?.data?.user;
-                state.user = userData || null;
+                // Keep the existing object reference when nothing actually
+                // changed - callers that depend on `user` (or anything
+                // derived from it) in a useMemo/useCallback/useEffect array
+                // re-run every time this becomes a *new* object, even with
+                // identical field values. Dashboards that refetch this on
+                // every mount (TeacherDashboardPage etc.) would otherwise
+                // spin: refetch -> new object -> effects re-run -> some of
+                // those effects' own side effects trigger a re-render ->
+                // repeat. Comparing by value here is what actually breaks
+                // that loop, not just avoiding one extra render.
+                const unchanged =
+                    userData && state.user && JSON.stringify(userData) === JSON.stringify(state.user);
+                if (!unchanged) {
+                    state.user = userData || null;
+                }
                 state.isAuthenticated = !!userData;
                 state.error = null;
-                if (userData) {
+                if (userData && !unchanged) {
                     setStoredAuthUser(userData);
                 }
             })

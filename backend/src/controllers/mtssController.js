@@ -262,7 +262,11 @@ const resolveActorId = (value) =>
     value?.toString?.() ||
     '';
 
-const canViewerEditPlanForAssignment = ({ viewer = {}, assignment = {}, students = [] }) => {
+// Roster visibility only - whether a non-owner teacher sees this
+// assignment on their dashboard at all (Homeroom always, matching Subject
+// teacher otherwise). NOT an edit permission - see isAssignmentOwnerOrAdmin
+// for who's actually allowed to change it.
+const isAssignmentInViewerTeachingScope = ({ viewer = {}, assignment = {}, students = [] }) => {
     if (!students.length) return false;
     const classAssignments = Array.isArray(viewer.classes) ? viewer.classes : [];
     if (!classAssignments.length) return false;
@@ -293,17 +297,26 @@ const canViewerEditPlanForAssignment = ({ viewer = {}, assignment = {}, students
     });
 };
 
-const canViewerSubmitProgressForAssignment = ({ viewer = {}, assignment = {} }) => {
+// The only people who can actually change an intervention: whoever
+// created it, the mentor it's assigned to, or an MTSS admin role
+// (admin/superadmin/directorate/head_unit). No one else - not a
+// same-class homeroom teacher, not another subject teacher - regardless
+// of whether they can see it on their own dashboard.
+const isAssignmentOwnerOrAdmin = ({ viewer = {}, assignment = {} }) => {
     if (isMTSSAdminRole(viewer?.role)) return true;
     const viewerId = resolveActorId(viewer?.id || viewer?._id || viewer);
     if (!viewerId) return false;
 
-    const progressOwnerIds = [
+    const ownerIds = [
         resolveActorId(assignment?.createdBy),
         resolveActorId(assignment?.mentorId)
     ].filter(Boolean);
 
-    if (progressOwnerIds.includes(viewerId)) {
+    return ownerIds.includes(viewerId);
+};
+
+const canViewerSubmitProgressForAssignment = ({ viewer = {}, assignment = {} }) => {
+    if (isAssignmentOwnerOrAdmin({ viewer, assignment })) {
         return true;
     }
 
@@ -671,16 +684,9 @@ const buildWeeklyFocusOverview = (checkIns = []) => {
 };
 
 const enrichAssignmentForTeacherTools = (assignment = {}, viewer = {}) => {
-    const hydratedStudents = Array.isArray(assignment.studentIds) ? assignment.studentIds : [];
     const viewerPermissions = {
-        canEditPlan: isMTSSAdminRole(viewer?.role)
-            ? true
-            : canViewerEditPlanForAssignment({
-                viewer,
-                assignment,
-                students: hydratedStudents
-            }),
-        canSubmitProgress: canViewerSubmitProgressForAssignment({ viewer, assignment, students: hydratedStudents })
+        canEditPlan: isAssignmentOwnerOrAdmin({ viewer, assignment }),
+        canSubmitProgress: canViewerSubmitProgressForAssignment({ viewer, assignment })
     };
 
     return {
@@ -1355,7 +1361,7 @@ const getMentorAssignments = async (req, res) => {
                 if (viewerId && (mentorKey === viewerId || creatorKey === viewerId)) return true;
 
                 const assignmentStudents = Array.isArray(assignment?.studentIds) ? assignment.studentIds : [];
-                return canViewerEditPlanForAssignment({
+                return isAssignmentInViewerTeachingScope({
                     viewer: req.user,
                     assignment,
                     students: assignmentStudents
@@ -1535,23 +1541,13 @@ const updateMentorAssignment = async (req, res) => {
             }
         }
 
-	        let assignmentStudents = [];
-
-        if (includesPlanEdits || hasCheckInUpdates) {
-            const [hydratedScope] = await hydrateAssignmentStudents([{
-                studentIds: assignment.studentIds || []
-            }]);
-            assignmentStudents = Array.isArray(hydratedScope?.studentIds) ? hydratedScope.studentIds : [];
-        }
-
         if (includesPlanEdits) {
-            const canEditPlan = canViewerEditPlanForAssignment({
+            const canEditPlan = isAssignmentOwnerOrAdmin({
                 viewer: req.user,
-                assignment,
-                students: assignmentStudents
+                assignment
             });
             if (!canEditPlan) {
-                return sendError(res, 'Only the homeroom teacher or matching subject teacher can edit this intervention plan', 403);
+                return sendError(res, 'Only the intervention creator, assigned mentor, or MTSS admin can edit this intervention plan', 403);
             }
         }
 
@@ -2387,6 +2383,8 @@ const getKindergartenInterventionBank = async (_req, res) => {
 };
 
 module.exports = {
+    isAssignmentOwnerOrAdmin,
+    isAssignmentInViewerTeachingScope,
     getTierMetadata,
     upsertTier,
     getStrategies,
