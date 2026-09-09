@@ -453,7 +453,7 @@ const RoleSelection = memo(() => {
       {/* Back button — only shown for roles with Support Hub access */}
       {hasSupportHubAccess && (
         <div className="absolute top-4 left-4 sm:top-6 sm:left-6 md:top-4 md:left-[130px] z-30">
-          <button onClick={() => navigate('/support-hub')}
+          <button onClick={() => navigate('/mtss/support-hub')}
             className="rs-back-btn inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-primary bg-card/80 border border-border/40 shadow-md backdrop-blur-xl hover:shadow-lg hover:border-primary/30 active:scale-95 transition-all duration-200">
             <ArrowLeft className="w-3.5 h-3.5" /> Support Hub
           </button>
@@ -525,7 +525,7 @@ const RoleSelection = memo(() => {
               <MethodCard icon={BarChart3} title="User Management"
                 desc="Manage users, roles, and organizational structure"
                 features={["User account management", "Role and permission settings", "Organizational hierarchy", "Advanced user analytics"]}
-                isPremium={false} onClick={() => navigate('/user-management')} delay={0.65} />
+                isPremium={false} onClick={() => navigate('/mtss/user-management')} delay={0.65} />
             )}
 
             {loading && (

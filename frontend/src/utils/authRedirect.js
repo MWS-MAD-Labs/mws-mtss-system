@@ -1,5 +1,4 @@
 import { hasMtssAccess, getDefaultMtssRoute } from "@/utils/mtssAccess";
-import { getBasePath } from "@/lib/apiBase";
 
 const PENDING_AUTH_REDIRECT_KEY = "pending_auth_redirect";
 
@@ -11,15 +10,14 @@ export const sanitizeRedirectPath = (value) => {
         return null;
     }
 
-    if (trimmed.startsWith("/auth/callback")) {
+    if (trimmed.startsWith("/mtss/auth/callback")) {
         return null;
     }
 
-    const basePath = getBasePath();
-    if (basePath && (trimmed === basePath || trimmed.startsWith(`${basePath}/`))) {
-        return trimmed.slice(basePath.length) || "/";
-    }
-
+    // No basePath-stripping here anymore - there's no React Router basename
+    // (main.jsx), so paths captured from location.pathname or passed in
+    // already correctly include the literal /mtss prefix and should stay
+    // as-is.
     return trimmed;
 };
 
@@ -50,13 +48,13 @@ export const getDefaultPostLoginPath = (userOrRole) => {
     const normalizedRole = String(user?.role || userOrRole || "").trim().toLowerCase();
 
     if (normalizedRole === "student") {
-        return "/student/support-hub";
+        return "/mtss/student/support-hub";
     }
 
     if (hasMtssAccess(user || { role: normalizedRole })) {
-        return getDefaultMtssRoute(user || { role: normalizedRole }) || "/select-role";
+        return getDefaultMtssRoute(user || { role: normalizedRole }) || "/mtss/select-role";
     }
 
     // Unknown/non-support roles go directly to check-in method selection.
-    return "/select-role";
+    return "/mtss/select-role";
 };

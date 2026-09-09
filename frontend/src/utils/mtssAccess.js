@@ -101,7 +101,7 @@ export const canAccessMtssAdmin = (user = null) => getMtssAccessProfile(user).ca
 export const getDefaultMtssRoute = (user = null) => {
     const profile = getMtssAccessProfile(user);
     if (!profile.hasAccess) return null;
-    if (profile.accessLevel === "observer") return "/observer";
-    if (profile.canAccessAdmin) return "/admin";
-    return "/teacher";
+    if (profile.accessLevel === "observer") return "/mtss/observer";
+    if (profile.canAccessAdmin) return "/mtss/admin";
+    return "/mtss/teacher";
 };

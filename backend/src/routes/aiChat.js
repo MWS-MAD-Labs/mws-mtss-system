@@ -1,11 +1,38 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authenticateServiceRelay } = require('../middleware/auth');
 const aiChatController = require('../controllers/aiChatController');
 const devTopologyTelemetryService = require('../services/devTopologyTelemetryService');
 
-// All routes require authentication
-router.use(authenticate);
+// All routes require authentication - either a real MTSS user session, or
+// (for now) a forwarded request from daily-checkin's AI-chat proxy, which
+// carries its own separately-signed service token instead of an MTSS
+// session cookie/JWT. Tries the user session first since that's the
+// overwhelmingly common caller; falls back to the service-relay check only
+// when there's no ordinary Bearer JWT to verify in the first place, so a
+// genuinely invalid user token still fails as "invalid token", not a
+// confusing "service token required".
+router.use((req, res, next) => {
+    const authHeader = req.headers.authorization || '';
+    if (!authHeader.startsWith('Bearer ')) {
+        return authenticate(req, res, next);
+    }
+
+    const token = authHeader.substring(7);
+    let decoded;
+    try {
+        decoded = jwt.decode(token);
+    } catch (error) {
+        decoded = null;
+    }
+
+    if (decoded && decoded.source === 'daily-checkin') {
+        return authenticateServiceRelay(req, res, next);
+    }
+
+    return authenticate(req, res, next);
+});
 
 /**
  * @route   POST /api/v1/ai-chat/message

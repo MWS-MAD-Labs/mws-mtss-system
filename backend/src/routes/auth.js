@@ -10,6 +10,7 @@ const { buildRequestUser } = require("../middleware/auth");
 const { verifyHubRelayToken } = require("../utils/hubSsoRelay");
 const { resolveOrProvisionSsoUser } = require("../utils/ssoUserResolution");
 const { createUserAwareRateLimiter } = require("../middleware/rateLimiter");
+const { setAuthCookie, clearAuthCookie } = require("../utils/authCookie");
 
 const ssoLimiter = createUserAwareRateLimiter({
   windowMinutes: 1,
@@ -32,10 +33,10 @@ const isCentralLookupError = (error) => {
 
 const getDefaultMtssRedirectTarget = (user) => {
   const profile = user?.mtssAccess || {};
-  if (!profile.hasAccess) return "/select-role";
-  if (profile.accessLevel === "observer") return "/observer";
-  if (profile.canAccessAdmin) return "/admin";
-  return "/teacher";
+  if (!profile.hasAccess) return "/mtss/select-role";
+  if (profile.accessLevel === "observer") return "/mtss/observer";
+  if (profile.canAccessAdmin) return "/mtss/admin";
+  return "/mtss/teacher";
 };
 
 // Hub token-relay SSO handoff. Hub authenticates Google once, then sends a
@@ -104,6 +105,7 @@ router.get(
         process.env.JWT_SECRET,
         { expiresIn: "7d" },
       );
+      setAuthCookie(res, token7d);
 
       const userDataForFrontend = {
         ...buildRequestUser(dbUser),
@@ -115,7 +117,8 @@ router.get(
       };
 
       const redirectTarget = getDefaultMtssRedirectTarget(userDataForFrontend);
-      const redirectUrl = `${frontendUrl}/auth/callback#token=${encodeURIComponent(token7d)}&user=${encodeURIComponent(JSON.stringify(userDataForFrontend))}&redirect=${encodeURIComponent(redirectTarget)}`;
+      // No token in this URL - it's already set as an httpOnly cookie above.
+      const redirectUrl = `${frontendUrl}/auth/callback#user=${encodeURIComponent(JSON.stringify(userDataForFrontend))}&redirect=${encodeURIComponent(redirectTarget)}`;
 
       console.log("✅ MTSS Hub SSO login successful:", {
         email: dbUser.email,
@@ -188,11 +191,12 @@ router.post(
         process.env.JWT_SECRET,
         { expiresIn: "7d" },
       );
+      setAuthCookie(res, token);
 
-      // Return user data and token
+      // Token lives in the httpOnly cookie now, not the response body -
+      // the frontend never needs to see or store it directly.
       const userData = {
         user: buildRequestUser({ ...user.toObject(), lastLogin: new Date() }),
-        token,
       };
 
       sendSuccess(res, "Login successful", userData);
@@ -203,8 +207,11 @@ router.post(
   },
 );
 
-// Logout — JWT auth is stateless; client drops the token.
+// Logout — clears the httpOnly session cookie server-side (the client can't
+// do this itself the way it could with localStorage.removeItem).
 router.post("/logout", (req, res) => {
+  clearAuthCookie(res);
+
   // Signing out here should also end the Hub session, otherwise the user
   // lands back on the hub still logged in and one click re-enters this app.
   //
@@ -250,6 +257,10 @@ router.get("/logout-silent", (req, res) => {
     "Content-Security-Policy",
     `frame-ancestors 'self'${hubOrigin ? ` ${hubOrigin}` : ""}`,
   );
+  // This request is same-origin to MTSS (just framed by Hub's different
+  // origin), so clearing our own cookie here still works even though Hub
+  // can't touch it directly.
+  clearAuthCookie(res);
   res
     .type("html")
     .send(

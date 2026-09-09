@@ -188,7 +188,7 @@ const getTimeGreeting = () => {
 
 const normalizeRole = (role = "") => String(role || "").trim().toLowerCase();
 const isStudentRole = (role = "") => normalizeRole(role) === "student";
-const getAssistantChatPath = (role = "") => (isStudentRole(role) ? "/student/ai-chat" : "/ai-assistant");
+const getAssistantChatPath = (role = "") => (isStudentRole(role) ? "/mtss/student/ai-chat" : "/mtss/ai-assistant");
 const getCurrentTheme = () => {
     if (typeof document !== "undefined") {
         return document.documentElement.classList.contains("dark") ? "dark" : "light";
@@ -247,7 +247,7 @@ const pickAdaptiveNudge = ({
         };
     }
 
-    if (isStudentRole(role) && pathname.startsWith("/student/support-hub")) {
+    if (isStudentRole(role) && pathname.startsWith("/mtss/student/support-hub")) {
         return {
             title: `${assistantName} quick nudge`,
             text: primaryFocus
@@ -266,7 +266,7 @@ const pickAdaptiveNudge = ({
         };
     }
 
-    if (!isStudentRole(role) && pathname.startsWith("/support-hub")) {
+    if (!isStudentRole(role) && pathname.startsWith("/mtss/support-hub")) {
         return {
             title: `${assistantName} quick nudge`,
             text: primaryFocus
@@ -326,17 +326,17 @@ const getQuickActions = (role = "student") => {
             {
                 label: "Support Hub",
                 description: "Go to your student home hub",
-                navigateTo: "/student/support-hub"
+                navigateTo: "/mtss/student/support-hub"
             },
             {
                 label: "Open AI Chat",
                 description: "Continue your personal conversation",
-                navigateTo: "/student/ai-chat"
+                navigateTo: "/mtss/student/ai-chat"
             },
             {
                 label: "My Profile",
                 description: "Open profile, stats, and journey",
-                navigateTo: "/profile"
+                navigateTo: "/mtss/profile"
             },
             {
                 label: "Manual Check-in",
@@ -355,17 +355,17 @@ const getQuickActions = (role = "student") => {
         {
             label: "Support Hub",
             description: "Open your staff/teacher support workspace",
-            navigateTo: "/support-hub"
+            navigateTo: "/mtss/support-hub"
         },
         {
             label: "Open AI Assistant",
             description: "Continue your personal assistant conversation",
-            navigateTo: "/ai-assistant"
+            navigateTo: "/mtss/ai-assistant"
         },
         {
             label: "My Profile",
             description: "Open profile, stats, and journey",
-            navigateTo: "/profile"
+            navigateTo: "/mtss/profile"
         },
         {
             label: "Staff Check-in",
@@ -1078,7 +1078,7 @@ const UtilityDock = memo(() => {
 
     useEffect(() => {
         if (!isAuthenticated || isOpen) return;
-        if (location.pathname.startsWith(assistantChatPath) || location.pathname.startsWith("/ai-assistant")) return;
+        if (location.pathname.startsWith(assistantChatPath) || location.pathname.startsWith("/mtss/ai-assistant")) return;
         if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
 
         const state = normalizeNudgeState(readNudgeState());

@@ -5,6 +5,21 @@ import { loginSuccess } from '../store/slices/authSlice';
 import PageLoader from '../components/PageLoader';
 import { consumePendingRedirect, getDefaultPostLoginPath, sanitizeRedirectPath } from '@/utils/authRedirect';
 import { setStoredAuthSession } from '@/utils/authStorage';
+import { getBasePath } from '@/lib/apiBase';
+
+// Same specifiers RouteConfig.jsx's lazy() calls use for these routes, so
+// triggering the import here warms Vite's module cache under the exact key
+// React.lazy will look up next - by the time navigate() below causes
+// Suspense to render that route, the chunk is very likely already resolved,
+// instead of Suspense falling back to <PageLoader/> a second time right
+// after this component's own <PageLoader/> - the double mount is what reads
+// as a flicker, not just the actual load time.
+const DESTINATION_PRELOADERS = {
+    '/mtss/teacher': () => import('@/pages/mtss/TeacherDashboardPage'),
+    '/mtss/admin': () => import('@/pages/mtss/AdminDashboardPage'),
+    '/mtss/observer': () => import('@/pages/mtss/ObserverDashboardPage'),
+    '/mtss/select-role': () => import('@/pages/RoleSelectionPage'),
+};
 
 const AuthCallback = () => {
     const navigate = useNavigate();
@@ -24,12 +39,14 @@ const AuthCallback = () => {
 
         const handleCallback = async () => {
             try {
+                // No token here anymore - the backend already set it as an
+                // httpOnly cookie before this redirect (routes/auth.js).
+                // user/redirect are just UI convenience data.
                 const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-                const token = hashParams.get('token');
                 const userData = hashParams.get('user');
 
-                if (!token || !userData) {
-                    navigate('/?error=missing_data');
+                if (!userData) {
+                    navigate('/mtss?error=missing_data');
                     return;
                 }
 
@@ -41,12 +58,12 @@ const AuthCallback = () => {
 
                 // Ensure the user has required role field
                 if (!canonicalUser.role) {
-                    navigate('/?error=missing_role');
+                    navigate('/mtss?error=missing_role');
                     return;
                 }
 
-                setStoredAuthSession({ token, user: canonicalUser });
-                dispatch(loginSuccess({ user: canonicalUser, token }));
+                setStoredAuthSession({ user: canonicalUser });
+                dispatch(loginSuccess({ user: canonicalUser }));
 
                 const redirectParam = hashParams.get('redirect');
                 const safeRedirect = sanitizeRedirectPath(redirectParam);
@@ -61,13 +78,21 @@ const AuthCallback = () => {
                     target
                 });
 
-                // Remove sensitive token/user params from URL before leaving callback route
-                window.history.replaceState({}, document.title, '/auth/callback');
+                // Fire-and-forget: start fetching the destination's chunk now,
+                // in parallel with the history/navigate calls below, instead
+                // of waiting for Suspense to discover it needs the chunk.
+                DESTINATION_PRELOADERS[target]?.().catch(() => {});
+
+                // Remove the user/redirect params from the URL before leaving callback
+                // route. This bypasses React Router, so the gateway build's /mtss
+                // prefix (getBasePath()) has to be added explicitly rather than
+                // coming from a router basename.
+                window.history.replaceState({}, document.title, `${getBasePath()}/auth/callback`);
                 navigate(target, { replace: true });
 
             } catch (error) {
                 console.error('Auth callback error:', error);
-                navigate('/?error=callback_failed');
+                navigate('/mtss?error=callback_failed');
             }
         };
 

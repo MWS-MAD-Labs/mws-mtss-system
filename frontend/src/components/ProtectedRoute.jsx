@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { hasEmotionalDashboardAccess } from '@/utils/accessControl';
 import { storePendingRedirect } from '@/utils/authRedirect';
 import { getDefaultMtssRoute, hasMtssAccess } from '@/utils/mtssAccess';
+import PageLoader from '@/components/PageLoader';
 
 const ProtectedRoute = ({
     children,
@@ -17,24 +18,22 @@ const ProtectedRoute = ({
     // Role-aware fallback: students → student hub, MTSS roles → their own
     // dashboard directly, others (staff/support_staff) → check-in selection.
     const fallbackPath = user?.role === 'student'
-        ? '/student/support-hub'
+        ? '/mtss/student/support-hub'
         : hasMtssAccess(user)
-            ? (getDefaultMtssRoute(user) || '/select-role')
-            : '/select-role';
+            ? (getDefaultMtssRoute(user) || '/mtss/select-role')
+            : '/mtss/select-role';
 
-    // Show loading while checking authentication
+    // Show loading while checking authentication - same branded loader as
+    // AuthCallback, so there's no visual "flicker" switching between a
+    // bespoke spinner and the real one mid-login.
     if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500"></div>
-            </div>
-        );
+        return <PageLoader />;
     }
 
     // If not authenticated, redirect to login
     if (!isAuthenticated) {
         storePendingRedirect(`${location.pathname}${location.search}${location.hash}`);
-        return <Navigate to="/" replace />;
+        return <Navigate to="/mtss" replace />;
     }
 
     // Special check for dashboard access (directorate + academic department + head_unit)

@@ -221,7 +221,7 @@ const StudentResultView = memo(({ checkInData, analysis, recommendations = [], d
                     transition={{ duration: 0.45, delay: 0.35 }}
                     className="flex justify-center pt-2"
                 >
-                    <Link to="/profile" className="w-full sm:w-auto">
+                    <Link to="/mtss/profile" className="w-full sm:w-auto">
                         <Button className="w-full sm:w-auto rounded-2xl px-8 py-3 bg-gradient-to-r from-pink-500 to-violet-500 text-white hover:opacity-95">
                             <span className="inline-flex items-center gap-2">
                                 <Home className="w-4 h-4" />

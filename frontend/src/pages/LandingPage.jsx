@@ -206,7 +206,7 @@ const LandingPage = memo(function LandingPage() {
     if (!isAuthenticated) return;
     const pendingRedirect = consumePendingRedirect();
     const fallbackPath = (user?.role || "").toLowerCase() === "student"
-      ? "/profile"
+      ? "/mtss/profile"
       : getDefaultPostLoginPath(user);
     navigate(pendingRedirect || fallbackPath, { replace: true });
   }, [isAuthenticated, user, navigate]);

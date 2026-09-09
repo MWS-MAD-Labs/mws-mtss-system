@@ -6,9 +6,9 @@ const STUDENT_BOTTOM_NAV = [
     {
         key: "hub",
         label: "Hub",
-        path: "/student/support-hub",
+        path: "/mtss/student/support-hub",
         icon: Home,
-        activeWhen: (pathname) => pathname.startsWith("/student/support-hub"),
+        activeWhen: (pathname) => pathname.startsWith("/mtss/student/support-hub"),
     },
     {
         key: "mtss",
@@ -20,9 +20,9 @@ const STUDENT_BOTTOM_NAV = [
     {
         key: "profile",
         label: "Profile",
-        path: "/profile",
+        path: "/mtss/profile",
         icon: UserRound,
-        activeWhen: (pathname) => pathname.startsWith("/profile"),
+        activeWhen: (pathname) => pathname.startsWith("/mtss/profile"),
     },
 ];
 

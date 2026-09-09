@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const mongoose = require('mongoose');
 const winston = require('winston');
@@ -73,6 +74,10 @@ app.use('/api/', apiLimiter);
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Reads the httpOnly session cookie middleware/auth.js's authenticate()
+// checks - CORS above already sets credentials:true so the browser
+// actually sends it cross-subdomain.
+app.use(cookieParser());
 
 // Request logging middleware
 app.use((req, res, next) => {

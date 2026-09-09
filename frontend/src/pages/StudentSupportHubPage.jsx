@@ -27,7 +27,7 @@ const hubOptions = [
         title: "AI Study Buddy",
         description: "24/7 homework help & learning companion",
         icon: Sparkles,
-        path: "/student/ai-chat",
+        path: "/mtss/student/ai-chat",
         tag: "AI Helper",
         iconBg: "from-fuchsia-400 to-violet-500",
         cardAccent: "from-fuchsia-400/25 via-violet-300/15 to-transparent",

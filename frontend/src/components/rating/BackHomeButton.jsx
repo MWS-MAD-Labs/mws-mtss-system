@@ -12,7 +12,7 @@ const BackHomeButton = memo(() => {
     // Determine home route based on user role/delegated access
     const homeRoute = hasEmotionalDashboardAccess(user)
         ? '/emotional-checkin/dashboard'
-        : '/profile';
+        : '/mtss/profile';
 
     return (
         <motion.div

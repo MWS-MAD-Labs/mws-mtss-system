@@ -24,19 +24,23 @@ describe('deactivateMissingEmployees', () => {
 
         const result = await deactivateMissingEmployees();
 
-        expect(result).toEqual({ checked: 1, deactivated: 1, skipped: false });
+        expect(result).toEqual({ checked: 1, deactivated: 1, roleDriftDetected: 0, skipped: false });
         expect(candidate.isActive).toBe(false);
         expect(candidate.save).toHaveBeenCalledTimes(1);
     });
 
     test('leaves a candidate alone when still in the active roster', async () => {
+        // No job_level on this fixture, so the dry-run drift check derives
+        // 'staff' (the generic employee fallback) against the candidate's
+        // unset role - a real drift, correctly detected but never applied
+        // (see candidate.save assertion below).
         const candidate = makeCandidate({ email: 'still-here@millennia21.id' });
         User.find.mockResolvedValue([candidate]);
         listActiveEmployees.mockResolvedValue([{ email: 'still-here@millennia21.id' }]);
 
         const result = await deactivateMissingEmployees();
 
-        expect(result).toEqual({ checked: 1, deactivated: 0, skipped: false });
+        expect(result).toEqual({ checked: 1, deactivated: 0, roleDriftDetected: 1, skipped: false });
         expect(candidate.isActive).toBe(true);
         expect(candidate.save).not.toHaveBeenCalled();
     });

@@ -29,28 +29,30 @@ const ALLOWED_TYPES = new Set([
 ]);
 
 const ALLOWED_ROUTES = new Set([
-    '/student/support-hub',
+    '/mtss/student/support-hub',
     '/student/emotional-checkin',
     '/student/emotional-checkin/manual',
     '/student/emotional-checkin/ai',
     '/student/emotional-checkin/face-scan',
-    '/student/ai-chat',
-    '/support-hub',
+    '/mtss/student/ai-chat',
+    '/mtss/support-hub',
     '/emotional-checkin',
     '/emotional-checkin/staff',
     '/emotional-checkin/dashboard',
     '/emotional-checkin/teacher-dashboard',
-    '/profile',
-    '/profile/personal-stats',
-    '/profile/emotional-history',
-    '/profile/emotional-patterns',
+    '/mtss/profile',
+    '/mtss/profile/personal-stats',
+    '/mtss/profile/emotional-history',
+    '/mtss/profile/emotional-patterns',
     '/mtss',
     '/mtss/student-portal',
     '/mtss/teacher',
     '/mtss/admin',
-    '/select-role',
-    '/user-management',
-    '/ai-assistant'
+    '/mtss/observer',
+    '/mtss/pilot-testing',
+    '/mtss/select-role',
+    '/mtss/user-management',
+    '/mtss/ai-assistant'
 ]);
 
 const escapeHtml = (value) => String(value || '')

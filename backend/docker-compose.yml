@@ -12,7 +12,8 @@ services:
       CORS_ORIGINS: https://app.millenniaws.sch.id,http://localhost:5173
       MONGODB_URI: ${MONGODB_URI}
       JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: 7d
+      JWT_EXPIRES_IN: 1d
+      AI_CHAT_PROXY_SECRET: ${AI_CHAT_PROXY_SECRET}
       SESSION_SECRET: ${JWT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}

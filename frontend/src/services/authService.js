@@ -1,7 +1,7 @@
 import axios from "axios";
 import { startGlobalLoading, stopGlobalLoading } from "@/lib/loadingManager";
 import { getApiBaseUrl, getBasePath } from "@/lib/apiBase";
-import { clearStoredAuthSession, getStoredAuthToken } from "@/utils/authStorage";
+import { clearStoredAuthSession } from "@/utils/authStorage";
 
 // Base-aware: standalone uses /api/v1, gateway build under /mtss uses /mtss/api/v1.
 const API_BASE_URL = getApiBaseUrl();
@@ -10,20 +10,22 @@ const API_BASE_URL = getApiBaseUrl();
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 45000,
+  // The session lives in an httpOnly cookie now (see backend
+  // utils/authCookie.js) instead of a token this app attaches itself -
+  // withCredentials is what makes the browser actually send it.
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor - loading indicator only now. Auth is carried by the
+// httpOnly cookie automatically; there's no token for this app's own JS to
+// attach anymore.
 api.interceptors.request.use(
   (config) => {
     if (!config?.skipGlobalLoading) {
       startGlobalLoading();
-    }
-    const token = getStoredAuthToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -99,9 +101,12 @@ export const logout = async () => {
   const hubLogoutUrl = response?.data?.data?.hubLogoutUrl;
   if (hubLogoutUrl) {
     window.location.assign(hubLogoutUrl);
+    // Signal callers to NOT also navigate locally - that would race
+    // against this cross-origin navigation and can flash/override it.
+    return { redirectedToHub: true };
   }
 
-  return response;
+  return { redirectedToHub: false };
 };
 
 export const getCurrentUser = async () => {

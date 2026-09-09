@@ -468,9 +468,9 @@ SpParticle.displayName = "SpParticle";
 /* ── Quick adventure card config ── */
 const studentAdventures = [
     { id: 'checkin', title: 'Emotional Check-in', desc: 'Quick mood check or AI facial analysis', icon: Heart, path: null, tag: 'Wellness', iconBg: 'from-rose-400 to-orange-400', accent: 'from-rose-400/25 via-pink-300/15 to-transparent', tagCl: 'text-rose-600 bg-rose-500/10 dark:text-rose-400 dark:bg-rose-500/15', iconShadow: 'shadow-rose-400/30', featured: true },
-    { id: 'hub', title: 'Support Hub', desc: 'Choose your wellbeing activity', icon: Sparkles, path: '/student/support-hub', tag: 'Hub', iconBg: 'from-violet-400 to-blue-400', accent: 'from-violet-400/25 via-blue-300/15 to-transparent', tagCl: 'text-violet-600 bg-violet-500/10 dark:text-violet-400 dark:bg-violet-500/15', iconShadow: 'shadow-violet-400/30' },
-    { id: 'history', title: 'Emotional History', desc: 'Look at your reflection journey', icon: Calendar, path: '/profile/emotional-history', tag: 'Journey', iconBg: 'from-sky-400 to-cyan-400', accent: 'from-sky-400/25 via-cyan-300/15 to-transparent', tagCl: 'text-sky-600 bg-sky-500/10 dark:text-sky-400 dark:bg-sky-500/15', iconShadow: 'shadow-sky-400/30' },
-    { id: 'insights', title: 'Emotion Insights', desc: 'See your personal trends', icon: Activity, path: '/profile/emotional-patterns', tag: 'Trends', iconBg: 'from-emerald-400 to-teal-400', accent: 'from-emerald-400/25 via-teal-300/15 to-transparent', tagCl: 'text-emerald-600 bg-emerald-500/10 dark:text-emerald-400 dark:bg-emerald-500/15', iconShadow: 'shadow-emerald-400/30' },
+    { id: 'hub', title: 'Support Hub', desc: 'Choose your wellbeing activity', icon: Sparkles, path: '/mtss/student/support-hub', tag: 'Hub', iconBg: 'from-violet-400 to-blue-400', accent: 'from-violet-400/25 via-blue-300/15 to-transparent', tagCl: 'text-violet-600 bg-violet-500/10 dark:text-violet-400 dark:bg-violet-500/15', iconShadow: 'shadow-violet-400/30' },
+    { id: 'history', title: 'Emotional History', desc: 'Look at your reflection journey', icon: Calendar, path: '/mtss/profile/emotional-history', tag: 'Journey', iconBg: 'from-sky-400 to-cyan-400', accent: 'from-sky-400/25 via-cyan-300/15 to-transparent', tagCl: 'text-sky-600 bg-sky-500/10 dark:text-sky-400 dark:bg-sky-500/15', iconShadow: 'shadow-sky-400/30' },
+    { id: 'insights', title: 'Emotion Insights', desc: 'See your personal trends', icon: Activity, path: '/mtss/profile/emotional-patterns', tag: 'Trends', iconBg: 'from-emerald-400 to-teal-400', accent: 'from-emerald-400/25 via-teal-300/15 to-transparent', tagCl: 'text-emerald-600 bg-emerald-500/10 dark:text-emerald-400 dark:bg-emerald-500/15', iconShadow: 'shadow-emerald-400/30' },
 ];
 
 const StudentProfileView = memo(function StudentProfileView({
@@ -733,7 +733,7 @@ const StudentProfileView = memo(function StudentProfileView({
                                     <TrendingUp className="w-4 h-4 text-violet-500" />
                                     <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-wide">Recent Moments</h2>
                                 </div>
-                                <Link to="/profile/emotional-history" className="text-[11px] font-bold text-rose-500 hover:text-rose-600 transition-colors">View all</Link>
+                                <Link to="/mtss/profile/emotional-history" className="text-[11px] font-bold text-rose-500 hover:text-rose-600 transition-colors">View all</Link>
                             </div>
                             <div className="space-y-2">
                                 {recentSnapshots.slice(0, 3).map((entry, idx) => (
@@ -938,7 +938,7 @@ const ProfilePage = memo(function ProfilePage() {
         persistCheckinUsageSnapshot(updated);
         setCheckinUsage({ ...updated, ready: true });
         const isStudent = currentUser?.role === 'student';
-        navigate(isStudent ? "/student/support-hub" : "/support-hub");
+        navigate(isStudent ? "/mtss/student/support-hub" : "/mtss/support-hub");
     }, [navigate, toast, currentUser]);
 
     // Derived info for today's check-in
@@ -1016,15 +1016,15 @@ const ProfilePage = memo(function ProfilePage() {
                 key: "emotional-checkin",
                 icon: Sparkles,
                 title: "Emotional Check-in",
-                to: isStudent ? "/student/support-hub" : "/support-hub",
+                to: isStudent ? "/mtss/student/support-hub" : "/mtss/support-hub",
                 onClick: handleEmotionalCheckin,
                 disabled: checkinLimitReached,
                 description: checkinDescription,
                 featured: true,
                 badge: emotionalBadge,
             },
-            { key: "edit", icon: User, title: "Edit Profile", to: "/profile/edit" },
-            { key: "notif", icon: Bell, title: "Notification Settings", to: "/notifications/settings" },
+            { key: "edit", icon: User, title: "Edit Profile", to: "/mtss/profile/edit" },
+            { key: "notif", icon: Bell, title: "Notification Settings", to: "/mtss/notifications/settings" },
         ];
 
         const shouldShowPersonalMenu = currentUser && !['directorate', 'admin', 'superadmin'].includes(currentUser.role);
@@ -1040,7 +1040,7 @@ const ProfilePage = memo(function ProfilePage() {
         if (isAdminMenu) {
             baseItems.splice(1, 0,
                 dashboardMenuItem,
-                { key: "user-mgmt", icon: UserCog, title: "User Management", to: "/user-management" }
+                { key: "user-mgmt", icon: UserCog, title: "User Management", to: "/mtss/user-management" }
             );
         } else {
             if (canAccessDashboard) {
@@ -1050,9 +1050,9 @@ const ProfilePage = memo(function ProfilePage() {
             if (shouldShowPersonalMenu) {
                 const insertIndex = canAccessDashboard ? 2 : 1;
                 baseItems.splice(insertIndex, 0,
-                    { key: "stats", icon: TrendingUp, title: "Personal Stats", to: "/profile/personal-stats" },
-                    { key: "history", icon: Calendar, title: "Emotional History", to: "/profile/emotional-history" },
-                    { key: "insights", icon: Activity, title: "Emotional Insights", to: "/profile/emotional-patterns" }
+                    { key: "stats", icon: TrendingUp, title: "Personal Stats", to: "/mtss/profile/personal-stats" },
+                    { key: "history", icon: Calendar, title: "Emotional History", to: "/mtss/profile/emotional-history" },
+                    { key: "insights", icon: Activity, title: "Emotional Insights", to: "/mtss/profile/emotional-patterns" }
                 );
             }
         }
@@ -1074,46 +1074,48 @@ const ProfilePage = memo(function ProfilePage() {
         if (isAdminRole) {
             return [
                 { title: dashboardLabel, hint: dashboardHint, icon: BarChart3, to: "/emotional-checkin/dashboard" },
-                { title: "User Management", hint: "Manage users", icon: UserCog, to: "/user-management" },
+                { title: "User Management", hint: "Manage users", icon: UserCog, to: "/mtss/user-management" },
             ];
         }
 
         if (isHeadUnitRole) {
             return [
                 { title: "Unit Dashboard", hint: "Monitor team wellness", icon: BarChart3, to: "/emotional-checkin/dashboard" },
-                { title: "My Stats", hint: `${user.completed} check-ins`, icon: TrendingUp, to: "/profile/personal-stats" },
+                { title: "My Stats", hint: `${user.completed} check-ins`, icon: TrendingUp, to: "/mtss/profile/personal-stats" },
             ];
         }
 
         if (canAccessDashboard) {
             return [
                 { title: dashboardLabel, hint: dashboardHint, icon: BarChart3, to: "/emotional-checkin/dashboard" },
-                { title: "My Stats", hint: `${user.completed} check-ins`, icon: TrendingUp, to: "/profile/personal-stats" },
-                { title: "Emotional History", hint: "Reflection & thoughts", icon: Calendar, to: "/profile/emotional-history" },
+                { title: "My Stats", hint: `${user.completed} check-ins`, icon: TrendingUp, to: "/mtss/profile/personal-stats" },
+                { title: "Emotional History", hint: "Reflection & thoughts", icon: Calendar, to: "/mtss/profile/emotional-history" },
             ];
         }
 
         return [
-            { title: "My Stats", hint: `${user.completed} check-ins`, icon: TrendingUp, to: "/profile/personal-stats" },
-            { title: "Emotional History", hint: "Reflection & thoughts", icon: Calendar, to: "/profile/emotional-history" },
-            { title: "Emotional Patterns", hint: "Insights & patterns", icon: Activity, to: "/profile/emotional-patterns" },
+            { title: "My Stats", hint: `${user.completed} check-ins`, icon: TrendingUp, to: "/mtss/profile/personal-stats" },
+            { title: "Emotional History", hint: "Reflection & thoughts", icon: Calendar, to: "/mtss/profile/emotional-history" },
+            { title: "Emotional Patterns", hint: "Insights & patterns", icon: Activity, to: "/mtss/profile/emotional-patterns" },
         ];
     }, [user.completed, currentUser, dashboardRole, delegatedDashboardAccess, delegatedDashboardDetails, canAccessDashboard]);
 
     // Logout handler
     const handleLogout = async () => {
         try {
-            await dispatch(logoutUser()).unwrap();
-            navigate("/");
+            const result = await dispatch(logoutUser()).unwrap();
+            // If a Hub redirect is already navigating the tab away, don't
+            // also push a local route - that races the Hub nav.
+            if (!result?.redirectedToHub) navigate("/mtss");
         } catch (error) {
             console.error('Logout failed:', error);
             // Still navigate to landing page even if logout API fails
-            navigate("/");
+            navigate("/mtss");
         }
     };
 
     const handleStudentBack = useCallback(() => {
-        navigate("/student/support-hub");
+        navigate("/mtss/student/support-hub");
     }, [navigate]);
 
     if (isStudent) {
@@ -1269,7 +1271,7 @@ const ProfilePage = memo(function ProfilePage() {
                                             </Link>
                                         ) : null}
                                         {todayCard ? (
-                                            <Link to="/profile/emotional-history" className="inline-flex items-center gap-2 rounded-md border border-border/50 px-3 py-1.5 text-xs hover:border-primary/40 hover:bg-primary/5 transition-colors">
+                                            <Link to="/mtss/profile/emotional-history" className="inline-flex items-center gap-2 rounded-md border border-border/50 px-3 py-1.5 text-xs hover:border-primary/40 hover:bg-primary/5 transition-colors">
                                                 View History <ChevronRight className="h-3.5 w-3.5" />
                                             </Link>
                                         ) : (
@@ -1277,7 +1279,7 @@ const ProfilePage = memo(function ProfilePage() {
                                                 Start Check-in <ChevronRight className="h-3.5 w-3.5" />
                                             </Link>
                                         )}
-                                        <Link to="/profile/personal-stats" className="inline-flex items-center gap-2 rounded-md border border-border/50 px-3 py-1.5 text-xs hover:border-primary/40 hover:bg-primary/5 transition-colors">
+                                        <Link to="/mtss/profile/personal-stats" className="inline-flex items-center gap-2 rounded-md border border-border/50 px-3 py-1.5 text-xs hover:border-primary/40 hover:bg-primary/5 transition-colors">
                                             Overall Stats <ChevronRight className="h-3.5 w-3.5" />
                                         </Link>
                                     </div>
@@ -1488,7 +1490,7 @@ const ProfilePage = memo(function ProfilePage() {
                                             <h2 className="text-sm font-semibold text-foreground">Recent Check-ins</h2>
                                             <p className="text-xs text-muted-foreground">Ringkasan 5 aktivitas terakhir</p>
                                         </div>
-                                        <Link to="/profile/emotional-history" className="text-xs font-semibold text-primary hover:underline">
+                                        <Link to="/mtss/profile/emotional-history" className="text-xs font-semibold text-primary hover:underline">
                                             View all
                                         </Link>
                                     </div>

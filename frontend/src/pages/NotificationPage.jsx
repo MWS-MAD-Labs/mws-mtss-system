@@ -184,7 +184,7 @@ const getGroupLabel = (record, mode = "student") => {
 };
 
 const resolveDefaultRoute = (role = "") =>
-    toLowerText(role) === "student" ? "/student/support-hub" : "/support-hub";
+    toLowerText(role) === "student" ? "/mtss/student/support-hub" : "/mtss/support-hub";
 
 const resolveActionRoute = (record, role = "") => {
     const metadata = record.metadata || {};
@@ -206,7 +206,7 @@ const resolveActionRoute = (record, role = "") => {
         return toLowerText(role) === "student" ? "/student/emotional-checkin" : "/emotional-checkin/dashboard";
     }
     if (record.category === "alert" || record.category === "reminder") {
-        return toLowerText(role) === "student" ? "/student/support-hub" : "/mtss/teacher";
+        return toLowerText(role) === "student" ? "/mtss/student/support-hub" : "/mtss/teacher";
     }
     return resolveDefaultRoute(role);
 };

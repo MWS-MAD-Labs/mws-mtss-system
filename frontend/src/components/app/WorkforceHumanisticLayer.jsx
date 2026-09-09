@@ -141,12 +141,12 @@ const PAGE_VARIANT_OVERRIDES = [
     ["/emotional-checkin/teacher-dashboard", "playful-cascade"],
     ["/emotional-checkin/dashboard", "story-orbit"],
     ["/emotional-checkin/staff", "studio-zigzag"],
-    ["/user-management", "sunrise-bands"],
-    ["/profile/personal-stats", "sunrise-bands"],
-    ["/profile/emotional-history", "atlas-ribbon"],
-    ["/profile/emotional-patterns", "playful-cascade"],
-    ["/profile", "atlas-ribbon"],
-    ["/notifications", "story-orbit"],
+    ["/mtss/user-management", "sunrise-bands"],
+    ["/mtss/profile/personal-stats", "sunrise-bands"],
+    ["/mtss/profile/emotional-history", "atlas-ribbon"],
+    ["/mtss/profile/emotional-patterns", "playful-cascade"],
+    ["/mtss/profile", "atlas-ribbon"],
+    ["/mtss/notifications", "story-orbit"],
     ["/emotional-wellness", "studio-zigzag"],
     ["/mtss/admin", "sunrise-bands"],
     ["/mtss/student", "story-orbit"],
@@ -163,7 +163,7 @@ const resolveScenario = (pathname) => {
     if (
         routeMatches(pathname, "/emotional-checkin/dashboard")
         || routeMatches(pathname, "/emotional-checkin/teacher-dashboard")
-        || routeMatches(pathname, "/user-management")
+        || routeMatches(pathname, "/mtss/user-management")
         || routeMatches(pathname, "/mtss/admin")
     ) {
         return "dense";
@@ -171,8 +171,8 @@ const resolveScenario = (pathname) => {
 
     if (
         routeMatches(pathname, "/emotional-checkin/staff")
-        || routeMatches(pathname, "/profile")
-        || routeMatches(pathname, "/notifications")
+        || routeMatches(pathname, "/mtss/profile")
+        || routeMatches(pathname, "/mtss/notifications")
         || routeMatches(pathname, "/mtss/student")
     ) {
         return "medium";
@@ -452,12 +452,12 @@ const WorkforceHumanisticLayer = memo(() => {
 
     const shouldRender = useMemo(() => {
         if (!WORKFORCE_ROLES.has(normalizedRole)) return false;
-        if (routeMatches(pathname, "/student")) return false;
+        if (routeMatches(pathname, "/mtss/student")) return false;
         if (routeMatches(pathname, "/mtss/student-portal")) return false;
         if (routeMatches(pathname, "/emotional-checkin/staff")) return false;
-        if (pathname === "/support-hub" || pathname === "/mtss/teacher") return false;
+        if (pathname === "/mtss/support-hub" || pathname === "/mtss/teacher") return false;
         if (routeMatches(pathname, "/emotional-checkin/teacher-dashboard")) return false;
-        if (routeMatches(pathname, "/notifications/settings")) return false;
+        if (routeMatches(pathname, "/mtss/notifications/settings")) return false;
         return true;
     }, [normalizedRole, pathname]);
 

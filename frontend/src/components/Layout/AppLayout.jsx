@@ -118,7 +118,7 @@ const AppLayout = memo(() => {
 
                         {/* Right actions */}
                         <div className="flex items-center gap-3">
-<Link to="/profile" aria-label="Profile">
+<Link to="/mtss/profile" aria-label="Profile">
                                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-bold text-primary-foreground hover:opacity-90">
                                     U
                                 </div>

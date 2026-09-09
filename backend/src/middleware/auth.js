@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const UserStudent = require('../models/UserStudent');
 const { sendError } = require('../utils/response');
+const { COOKIE_NAME } = require('../utils/authCookie');
 const {
     buildDashboardAccessProfile,
     buildMtssAccessProfile,
@@ -61,13 +62,22 @@ const resolveUserByRoleAndId = async (role, userId) => {
 // JWT Authentication Middleware
 const authenticate = async (req, res, next) => {
     try {
+        // Cookie first - the browser's own session, now that the token
+        // lives in an httpOnly cookie instead of localStorage (see
+        // utils/authCookie.js). The Authorization header stays supported
+        // for non-browser callers, like the daily-checkin AI-chat proxy's
+        // own outbound service token.
         const authHeader = req.headers.authorization;
+        const cookieToken = req.cookies?.[COOKIE_NAME];
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        let token;
+        if (cookieToken) {
+            token = cookieToken;
+        } else if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.substring(7);
+        } else {
             return sendError(res, 'Access token required', 401);
         }
-
-        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
         // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -90,6 +100,54 @@ const authenticate = async (req, res, next) => {
         }
 
         console.error('Auth middleware error:', error);
+        return sendError(res, 'Authentication failed', 500);
+    }
+};
+
+// Service-to-service authentication for the daily-checkin AI-chat proxy.
+// daily-checkin and MTSS have separate MongoDBs (split 2026-09-08), so a
+// user's ObjectId in one is meaningless in the other - the regular
+// authenticate() above (User.findById(decoded.userId)) can't be reused for
+// a request forwarded from daily-checkin's backend. This verifies a
+// short-lived token signed with a dedicated shared secret (never the
+// user-facing JWT_SECRET) carrying only an email claim, and resolves the
+// real MTSS user by email instead - the one identifier that's guaranteed
+// to mean the same person in both databases.
+const authenticateServiceRelay = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return sendError(res, 'Service token required', 401);
+        }
+
+        const secret = process.env.AI_CHAT_PROXY_SECRET;
+        if (!secret) {
+            console.error('authenticateServiceRelay: AI_CHAT_PROXY_SECRET is not configured');
+            return sendError(res, 'Service relay is not configured', 500);
+        }
+
+        const token = authHeader.substring(7);
+        const decoded = jwt.verify(token, secret);
+
+        if (decoded.source !== 'daily-checkin' || !decoded.email) {
+            return sendError(res, 'Invalid service token', 401);
+        }
+
+        const user = await User.findOne({ email: decoded.email });
+        if (!user || !user.isActive) {
+            return sendError(res, 'User not found or inactive', 401);
+        }
+
+        req.user = buildRequestUser(user);
+        next();
+    } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+            return sendError(res, 'Service token expired', 401);
+        } else if (error.name === 'JsonWebTokenError') {
+            return sendError(res, 'Invalid service token', 401);
+        }
+
+        console.error('authenticateServiceRelay error:', error);
         return sendError(res, 'Authentication failed', 500);
     }
 };
@@ -159,6 +217,7 @@ const requireAuthenticated = (req, res, next) => {
 
 module.exports = {
     authenticate,
+    authenticateServiceRelay,
     authorize,
     requireAdmin,
     requireMTSSAdmin,

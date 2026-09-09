@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { loginSuccess, clearAuth, fetchCurrentUser } from '@/store/slices/authSlice';
+import { clearAuth, fetchCurrentUser } from '@/store/slices/authSlice';
 import { consumePendingRedirect, getDefaultPostLoginPath } from '@/utils/authRedirect';
-import { AUTH_USER_KEY, getStoredAuthToken, getStoredAuthUserRaw, isAuthStorageKey } from '@/utils/authStorage';
+import { getStoredAuthToken, isAuthStorageKey } from '@/utils/authStorage';
 
 // Hub can silently refresh this app's session from a hidden iframe instead
 // of navigating this visible tab through the whole SSO redirect chain (see
@@ -13,6 +13,11 @@ import { AUTH_USER_KEY, getStoredAuthToken, getStoredAuthUserRaw, isAuthStorageK
 // fires in OTHER same-origin contexts, never the one that made the
 // change) - this hook is what actually picks it up and brings this tab's
 // own Redux state in line, live, with no reload.
+//
+// The stored value is a non-sensitive marker now, not a real credential
+// (see utils/authStorage.js) - the real session lives in an httpOnly
+// cookie, so this fetches the actual current user from the backend rather
+// than trusting whatever this tab's own localStorage read says.
 export function useCrossTabAuthSync() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -22,33 +27,24 @@ export function useCrossTabAuthSync() {
         const handleStorage = (event) => {
             if (!isAuthStorageKey(event.key)) return;
 
-            const token = getStoredAuthToken();
-            const userRaw = getStoredAuthUserRaw();
-
-            if (!token || !userRaw) {
+            const hasSessionMarker = getStoredAuthToken();
+            if (!hasSessionMarker) {
                 dispatch(clearAuth());
                 return;
             }
 
-            let user;
-            try {
-                user = JSON.parse(userRaw);
-            } catch (error) {
-                console.error(`useCrossTabAuthSync: could not parse ${AUTH_USER_KEY}`, error);
-                return;
-            }
-
-            dispatch(loginSuccess({ user, token }));
-            dispatch(fetchCurrentUser());
-
-            // Was logged out (or never logged in) in this tab specifically -
-            // it's very likely sitting on the landing page, not a dashboard,
-            // since ProtectedRoute would have bounced it there already.
-            // Send it where a normal login would have.
-            if (!isAuthenticated) {
-                const pendingRedirect = consumePendingRedirect();
-                navigate(pendingRedirect || getDefaultPostLoginPath(user), { replace: true });
-            }
+            dispatch(fetchCurrentUser()).then((action) => {
+                if (fetchCurrentUser.fulfilled.match(action) && !isAuthenticated) {
+                    const userData = action.payload?.user || action.payload?.data?.user;
+                    // Was logged out (or never logged in) in this tab
+                    // specifically - it's very likely sitting on the
+                    // landing page, not a dashboard, since ProtectedRoute
+                    // would have bounced it there already. Send it where a
+                    // normal login would have.
+                    const pendingRedirect = consumePendingRedirect();
+                    navigate(pendingRedirect || getDefaultPostLoginPath(userData), { replace: true });
+                }
+            });
         };
 
         window.addEventListener('storage', handleStorage);

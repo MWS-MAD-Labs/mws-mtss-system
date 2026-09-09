@@ -49,14 +49,14 @@ const App = memo(() => {
         };
 
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-            const idleId = window.requestIdleCallback(initAOS, { timeout: 2000 });
+            const idleId = window.requestIdleCallback(initAOS, { timeout: 800 });
             return () => {
                 isDisposed = true;
                 window.cancelIdleCallback?.(idleId);
             };
         }
 
-        const timeoutId = window.setTimeout(initAOS, 600);
+        const timeoutId = window.setTimeout(initAOS, 400);
         return () => {
             isDisposed = true;
             window.clearTimeout(timeoutId);
@@ -75,14 +75,14 @@ const App = memo(() => {
         };
 
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-            const idleId = window.requestIdleCallback(enableEnhancements, { timeout: 1500 });
+            const idleId = window.requestIdleCallback(enableEnhancements, { timeout: 600 });
             return () => {
                 disposed = true;
                 window.cancelIdleCallback?.(idleId);
             };
         }
 
-        const timeoutId = window.setTimeout(enableEnhancements, 280);
+        const timeoutId = window.setTimeout(enableEnhancements, 150);
         return () => {
             disposed = true;
             window.clearTimeout(timeoutId);
