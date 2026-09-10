@@ -51,9 +51,11 @@ async function tryResolveAsStudent(email) {
         return userStudent;
     }
 
-    // A lookup error is treated as "couldn't check" rather than "not a
-    // student" - if we already have a local record, keep trusting it
-    // rather than kicking someone out over a network hiccup.
+    // Central doesn't currently say this email is a student. A lookup
+    // error is treated as "couldn't check" rather than "not a student" -
+    // if we already have a local record, keep trusting it rather than
+    // kicking someone out over a network hiccup; only fall through to the
+    // employee check when we're actually sure Central disagrees.
     if (studentLookupFailed) {
         if (userStudent) {
             userStudent.emailVerified = true;
