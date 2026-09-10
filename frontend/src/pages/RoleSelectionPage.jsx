@@ -1,14 +1,9 @@
 import { memo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Brain, Sparkles, ArrowRight, BarChart3, ArrowLeft, Shield } from "lucide-react";
+import { Heart, Sparkles, ArrowRight, BarChart3, ArrowLeft } from "lucide-react";
 import { useSelector } from "react-redux";
-import {
-  hasEmotionalDashboardAccess,
-  getEmotionalDashboardRole,
-  hasDelegatedDashboardAccess,
-  getDelegatedDashboardDetails
-} from "@/utils/accessControl";
-import { prefetchStaffFaceScanOnIntent } from "@/utils/faceScanPrefetch";
+import { getDefaultMtssRoute } from "@/utils/mtssAccess";
+import { env } from "@/config/env";
 import gsap from "gsap";
 import "@/pages/styles/role-selection-humanistic.css";
 
@@ -17,6 +12,16 @@ const CLD = "https://res.cloudinary.com/deldcwiji/image/upload";
 const cld = (id, w = 300) => `${CLD}/c_scale,w_${w},f_auto,q_auto/${id}.png`;
 const cldJpg = (id, w = 240) => `${CLD}/c_fill,w_${w},h_${Math.round(w * 1.25)},g_face,f_auto,q_auto/${id}.jpg`;
 const RS_ENABLE_FRAMED_CARDS = true;
+const HUB_SUPPORT_PATH = "/support-hub";
+
+// Mirrors daily-checkin's own RoleSelectionPage.jsx goToHubSupport - this
+// button means "go back to Hub's app launcher", not MTSS's own now-vestigial
+// /mtss/support-hub route (that just self-redirects back into the MTSS
+// dashboard, see SupportModeSelectionPage.jsx's own comment on why).
+const goToHubSupport = () => {
+  const hubBaseUrl = String(env.hubBaseUrl || "").trim().replace(/\/+$/, "");
+  window.location.assign(hubBaseUrl ? `${hubBaseUrl}${HUB_SUPPORT_PATH}` : HUB_SUPPORT_PATH);
+};
 
 const supportsFinePointer = () => {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
@@ -31,6 +36,25 @@ const prefersReducedMotion = () => {
 const resolveDepth = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 12;
+};
+
+// Keyed by the exact routes getDefaultMtssRoute() can return (mtssAccess.js).
+const MTSS_DASHBOARD_CARD_CONTENT = {
+  "/mtss/observer": {
+    title: "Observer Dashboard",
+    desc: "Read-only view across every MTSS tier and case.",
+    features: ["Org-wide case visibility", "Tier & intervention tracking", "No edit access", "Always up to date"],
+  },
+  "/mtss/admin": {
+    title: "Admin Dashboard",
+    desc: "Manage mentors, tiers, and MTSS configuration.",
+    features: ["Mentor assignment", "Tier & case management", "Org-wide analytics", "System configuration"],
+  },
+  "/mtss/teacher": {
+    title: "Teacher Dashboard",
+    desc: "Track your students' support tiers and interventions.",
+    features: ["Your assigned students", "Tier progress tracking", "Intervention logging", "Mentor notes"],
+  },
 };
 
 /* Structured, human-centered collage for Select Role page */
@@ -246,7 +270,7 @@ const MethodCard = memo(({ icon: Icon, title, desc, features, isPremium, onClick
       {/* Footer */}
       <div className="flex items-center justify-between pt-2 border-t border-border/20">
         <span className="text-[9px] sm:text-[10px] text-muted-foreground font-medium">
-          {isPremium ? 'Advanced analysis' : 'Traditional method'}
+          {isPremium ? 'Try it out' : 'Open'}
         </span>
         <ArrowRight className="w-3.5 h-3.5 text-primary/60 group-hover:text-primary group-hover:translate-x-1 transition-all duration-300" />
       </div>
@@ -260,10 +284,8 @@ const RoleSelection = memo(() => {
   const { user, loading } = useSelector((state) => state.auth);
   const pageRef = useRef(null);
 
-  const canAccessDashboard = user && hasEmotionalDashboardAccess(user);
-  const effectiveDashboardRole = getEmotionalDashboardRole(user);
-  const delegatedDashboardAccess = hasDelegatedDashboardAccess(user);
-  const delegatedDashboardDetails = getDelegatedDashboardDetails(user);
+  const mtssDashboardRoute = getDefaultMtssRoute(user);
+  const mtssDashboardCard = mtssDashboardRoute ? MTSS_DASHBOARD_CARD_CONTENT[mtssDashboardRoute] : null;
 
   /* GSAP entrance */
   useEffect(() => {
@@ -403,42 +425,10 @@ const RoleSelection = memo(() => {
     };
   }, []);
 
-  const headUnitFeatures = [
-    "Monitor unit staff wellness", "Handle support requests from your team",
-    "Unit-specific emotional analytics", "Real-time team support tracking"
-  ];
-  const directorateFeatures = [
-    "All employees emotional wellness overview", "Comprehensive staff analytics & insights",
-    "Organization-wide support tracking", "Cross-department mood & weather patterns",
-    "Individual employee deep-dive analysis", "Period-based reporting (daily/weekly/monthly/semesterly)"
-  ];
-  if (delegatedDashboardAccess && delegatedDashboardDetails) {
-    directorateFeatures.unshift(
-      `Mirrors ${delegatedDashboardDetails.delegatedFromName || delegatedDashboardDetails.delegatedFromEmail || 'directorate'} dashboard access`
-    );
-  }
-
-  const dashboardDescription = effectiveDashboardRole === 'head_unit'
-    ? "Monitor your team's emotional wellness and support requests"
-    : delegatedDashboardAccess && delegatedDashboardDetails
-      ? `Access the organization-wide dashboard entrusted to ${delegatedDashboardDetails.delegatedFromName || delegatedDashboardDetails.delegatedFromEmail}`
-      : "Access comprehensive emotional wellness data for all employees";
-
-  const dashboardFeatures = effectiveDashboardRole === 'head_unit' ? headUnitFeatures : directorateFeatures;
-
-  const isTeacherRole = user && ['teacher', 'se_teacher'].includes(user.role);
-  const isPrincipalRole = user && ['head_unit', 'directorate', 'admin', 'superadmin'].includes(user.role);
+  // Same role list RouteConfig.jsx gates /mtss/pilot-testing with - reused
+  // here for both the Support Hub button and the Pilot Testing card below.
   const hasSupportHubAccess = user && ['teacher', 'se_teacher', 'head_unit', 'directorate', 'admin', 'superadmin'].includes(user.role);
-  const studentDashboardFeatures = isPrincipalRole
-    ? ["Student emotional overview by grade and class", "Needs-support spotlight for faster follow up", "Unit-aligned scope for each principal", "Quick search and daily refresh monitoring"]
-    : ["Class-scoped student check-ins", "Daily submission tracking", "Needs support highlights", "Quick search by student"];
-
-  const selectMethod = (method) => {
-    if (method === 'manual') navigate('/emotional-checkin/staff');
-    else if (method === 'ai') navigate('/emotional-checkin/face-scan');
-    else if (method === 'dashboard') navigate('/emotional-checkin/dashboard');
-    else if (method === 'teacher-dashboard') navigate('/emotional-checkin/teacher-dashboard');
-  };
+  const hasNoMtssAccess = user && !mtssDashboardRoute && !hasSupportHubAccess;
 
   return (
     <div ref={pageRef} className="rs-humanistic-shell rs-white-collage relative min-h-screen text-foreground overflow-hidden">
@@ -453,7 +443,7 @@ const RoleSelection = memo(() => {
       {/* Back button — only shown for roles with Support Hub access */}
       {hasSupportHubAccess && (
         <div className="absolute top-4 left-4 sm:top-6 sm:left-6 md:top-4 md:left-[130px] z-30">
-          <button onClick={() => navigate('/mtss/support-hub')}
+          <button onClick={goToHubSupport}
             className="rs-back-btn inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-primary bg-card/80 border border-border/40 shadow-md backdrop-blur-xl hover:shadow-lg hover:border-primary/30 active:scale-95 transition-all duration-200">
             <ArrowLeft className="w-3.5 h-3.5" /> Support Hub
           </button>
@@ -470,62 +460,40 @@ const RoleSelection = memo(() => {
               <Heart className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
             <h1 className="rs-heading text-xl sm:text-2xl font-bold text-foreground mb-1.5">
-              Choose Check-in Method
+              MTSS Home
             </h1>
             <p className="rs-subtext text-[10px] sm:text-xs text-muted-foreground max-w-md mx-auto leading-relaxed px-2">
-              Select your preferred emotional check-in method. Both are confidential and support your wellbeing.
+              Jump straight into your dashboard, or explore other MTSS tools below.
             </p>
-
-            {/* Trust row */}
-            <div className="flex justify-center gap-4 mt-3">
-              {[{ icon: Shield, text: 'Confidential' }, { icon: Sparkles, text: 'AI-Powered' }].map(t => (
-                <div key={t.text} className="rs-trust flex items-center gap-1 text-muted-foreground/60 text-[10px]">
-                  <t.icon className="w-3 h-3" />
-                  <span className="font-medium">{t.text}</span>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Cards */}
           <div className="space-y-3">
-            <MethodCard icon={Heart} title="Manual Check-in"
-              desc="Traditional form-based assessment with weather metaphors and detailed reflection"
-              features={["Weather-based mood selection", "Detailed emotional reflection", "Presence & capacity ratings", "Support contact selection"]}
-              isPremium={false} onClick={() => selectMethod('manual')} delay={0.35} />
-
-            <MethodCard icon={Brain} title="AI Emotional Analysis"
-              desc="Face scan technology detects authentic micro-expressions beyond conscious control"
-              features={["Real-time facial expression analysis", "43 landmark micro-expression detection", "AI psychologist insights & recommendations", "Detects concealed emotions accurately"]}
-              isPremium={true} onIntent={prefetchStaffFaceScanOnIntent} onClick={() => selectMethod('ai')} delay={0.45} />
-
-            {(isTeacherRole || isPrincipalRole) && (
-              <MethodCard icon={BarChart3}
-                title={isPrincipalRole ? "Student Emotional Dashboard" : "Student Daily Check-in Dashboard"}
-                desc={isPrincipalRole ? "Monitor emotional wellbeing for students in your unit with grade-aware filtering." : "Review daily check-ins for your assigned class and track support needs."}
-                features={studentDashboardFeatures} isPremium={false}
-                onClick={() => selectMethod('teacher-dashboard')} delay={0.55} />
+            {mtssDashboardCard && (
+              <MethodCard icon={BarChart3} title={mtssDashboardCard.title}
+                desc={mtssDashboardCard.desc} features={mtssDashboardCard.features}
+                isPremium={false} onClick={() => navigate(mtssDashboardRoute)} delay={0.35} />
             )}
 
-            {canAccessDashboard && (
-              <MethodCard icon={BarChart3}
-                title={effectiveDashboardRole === 'head_unit' ? "Unit Dashboard" : "Emotional Checkin Dashboard"}
-                desc={dashboardDescription} features={dashboardFeatures}
-                isPremium={false} onClick={() => selectMethod('dashboard')} delay={0.6} />
-            )}
-
-            {user && user.role && !canAccessDashboard && (
-              <div className="rounded-xl border border-border/30 bg-card/40  p-3 text-center" style={{ animation: 'rs-card-in 0.5s ease-out 0.65s both' }}>
-                <p className="text-[10px] text-muted-foreground"></p>
-                <p className="text-[9px] text-muted-foreground/60 mt-0.5"></p>
-              </div>
+            {hasSupportHubAccess && (
+              <MethodCard icon={Sparkles} title="Pilot Testing Hub"
+                desc="Try upcoming MTSS features before they roll out org-wide."
+                features={["Early access to new tools", "Feedback shapes the rollout", "Opt-in, no commitment", "Same login, no extra setup"]}
+                isPremium={true} onClick={() => navigate('/mtss/pilot-testing')} delay={0.45} />
             )}
 
             {(user && ['directorate', 'admin', 'superadmin'].includes(user.role)) && (
               <MethodCard icon={BarChart3} title="User Management"
                 desc="Manage users, roles, and organizational structure"
                 features={["User account management", "Role and permission settings", "Organizational hierarchy", "Advanced user analytics"]}
-                isPremium={false} onClick={() => navigate('/mtss/user-management')} delay={0.65} />
+                isPremium={false} onClick={() => navigate('/mtss/user-management')} delay={0.55} />
+            )}
+
+            {hasNoMtssAccess && (
+              <div className="rounded-xl border border-border/30 bg-card/40 p-3 text-center" style={{ animation: 'rs-card-in 0.5s ease-out 0.65s both' }}>
+                <p className="text-[10px] text-muted-foreground">You don't have access to any MTSS dashboard yet.</p>
+                <p className="text-[9px] text-muted-foreground/60 mt-0.5">Use the Support Hub button above to go back to Hub, or contact your administrator.</p>
+              </div>
             )}
 
             {loading && (
@@ -545,11 +513,11 @@ const RoleSelection = memo(() => {
           {/* Footer */}
           <div className="mt-6 sm:mt-8 rounded-xl border border-border/20 bg-card/30 backdrop-blur-sm p-3" style={{ animation: 'rs-card-in 0.5s ease-out 0.8s both' }}>
             <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-relaxed text-center">
-              Your emotional wellbeing is our priority. All check-ins are confidential, processed securely, and designed to support your mental health journey.
+              What you see here reflects your current MTSS role and access level.
             </p>
           </div>
           <p className="mt-3 text-center text-[8px] text-muted-foreground/50" style={{ animation: 'rs-card-in 0.4s ease-out 0.9s both' }}>
-            Millennia World School • Emotional wellness platform
+            Millennia World School • MTSS Support Platform
           </p>
         </div>
       </div>

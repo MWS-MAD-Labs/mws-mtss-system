@@ -3295,7 +3295,7 @@ ${mentorLines}`;
             '/emotional-checkin/staff',
             '/emotional-checkin',
             '/mtss',
-            '/select-role'
+            '/mtss/home'
         ].forEach((entry) => routes.add(entry));
 
         if (['teacher', 'se_teacher', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin'].includes(normalizedRole)) {
@@ -3489,7 +3489,7 @@ ${mentorLines}`;
         }
 
         if (mentionsRoleSelection) {
-            return this.buildNavigateAction('open_role_selection', '/select-role', 'Role Selection', 0.93, role);
+            return this.buildNavigateAction('open_role_selection', '/mtss/home', 'Role Selection', 0.93, role);
         }
 
         if (mentionsUserManagement) {

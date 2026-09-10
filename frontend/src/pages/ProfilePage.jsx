@@ -1106,11 +1106,11 @@ const ProfilePage = memo(function ProfilePage() {
             const result = await dispatch(logoutUser()).unwrap();
             // If a Hub redirect is already navigating the tab away, don't
             // also push a local route - that races the Hub nav.
-            if (!result?.redirectedToHub) navigate("/mtss");
+            if (!result?.redirectedToHub) navigate("/mtss/");
         } catch (error) {
             console.error('Logout failed:', error);
             // Still navigate to landing page even if logout API fails
-            navigate("/mtss");
+            navigate("/mtss/");
         }
     };
 
@@ -1211,7 +1211,7 @@ const ProfilePage = memo(function ProfilePage() {
 
                     {isAdminPrincipal && (
                         <button
-                            onClick={() => navigate("/mtss")}
+                            onClick={() => navigate("/mtss/")}
                             className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-card/60 px-4 py-2 text-xs font-semibold text-foreground hover:border-primary/40 hover:bg-primary/5 transition"
                         >
                             Back to MTSS

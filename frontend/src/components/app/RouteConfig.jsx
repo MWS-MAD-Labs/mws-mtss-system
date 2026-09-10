@@ -88,7 +88,7 @@ const MtssPreviewGate = memo(({ children }) => {
     }
 
     if (!mtssAccess.hasAccess) {
-        return <Navigate to="/mtss/select-role" replace />;
+        return <Navigate to="/mtss/home" replace />;
     }
 
     return children;
@@ -98,7 +98,7 @@ MtssPreviewGate.displayName = "MtssPreviewGate";
 const publicRoutes = [
     <Route key="landing" path="/mtss" element={<MemoizedPageTransition><LandingPage /></MemoizedPageTransition>} />,
     <Route key="auth-callback" path="/mtss/auth/callback" element={<MemoizedPageTransition><AuthCallback /></MemoizedPageTransition>} />,
-    <Route key="select-role" path="/mtss/select-role" element={<ProtectedRoute allowedRoles={['staff', 'support_staff', 'nurse', 'counselor', 'teacher', 'se_teacher', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin']}><MemoizedPageTransition><RoleSelectionPage /></MemoizedPageTransition></ProtectedRoute>} />,
+    <Route key="home" path="/mtss/home" element={<ProtectedRoute allowedRoles={['staff', 'support_staff', 'nurse', 'counselor', 'teacher', 'se_teacher', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin']}><MemoizedPageTransition><RoleSelectionPage /></MemoizedPageTransition></ProtectedRoute>} />,
     <Route key="profile" path="/mtss/profile" element={<ProtectedRoute><MemoizedPageTransition><ProfilePage /></MemoizedPageTransition></ProtectedRoute>} />,
     <Route key="notifications" path="/mtss/notifications" element={<ProtectedRoute><MemoizedPageTransition><NotificationPage /></MemoizedPageTransition></ProtectedRoute>} />,
     <Route key="notifications-settings" path="/mtss/notifications/settings" element={<ProtectedRoute><MemoizedPageTransition><NotificationSettingsPage /></MemoizedPageTransition></ProtectedRoute>} />,

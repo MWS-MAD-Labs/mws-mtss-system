@@ -31,13 +31,12 @@ const isCentralLookupError = (error) => {
   );
 };
 
-const getDefaultMtssRedirectTarget = (user) => {
-  const profile = user?.mtssAccess || {};
-  if (!profile.hasAccess) return "/mtss/select-role";
-  if (profile.accessLevel === "observer") return "/mtss/observer";
-  if (profile.canAccessAdmin) return "/mtss/admin";
-  return "/mtss/teacher";
-};
+// Mirrors daily-checkin's own getDefaultPostLoginPath: every staff/teacher
+// role lands on /mtss/home first (its cards route on to the actual
+// role-specific dashboard - see mtssAccess.js's getDefaultMtssRoute, still
+// used there), rather than jumping straight past it into /mtss/teacher or
+// /mtss/admin from the Hub SSO handoff.
+const getDefaultMtssRedirectTarget = () => "/mtss/home";
 
 // Hub token-relay SSO handoff. Hub authenticates Google once, then sends a
 // short-lived audience-scoped token here. MTSS verifies only that email
@@ -219,16 +218,14 @@ router.post("/logout", (req, res) => {
   // clear it - no server-to-server call can. We hand the client a URL to
   // navigate to instead of trying to do it from here.
   const hubBaseUrl = process.env.HUB_BASE_URL;
-  // Trailing slash is load-bearing: this becomes a real top-level
-  // navigation, and the gateway/dev server serves this app at /mtss/,
-  // not /mtss (Vite's strict base-path match rejects the latter).
-  const frontendBase = (
-    process.env.FRONTEND_URL || "https://app.millenniaws.sch.id/mtss"
-  ).replace(/\/+$/, "");
+  // No redirect param: Hub's own /auth/logout falls back to Hub's own
+  // front page when none is given (mws-hub's resolveLogoutRedirect always
+  // allows Hub's own origin, and treats a missing/invalid redirect as
+  // "land on Hub itself"). Apps no longer have their own login screen as
+  // the real entry point - Hub is - so logging out here should land the
+  // user back at Hub, not bounce them into this app's own login form.
   const hubLogoutUrl = hubBaseUrl
-    ? `${hubBaseUrl.replace(/\/$/, "")}/auth/logout?redirect=${encodeURIComponent(
-        `${frontendBase}/`,
-      )}`
+    ? `${hubBaseUrl.replace(/\/$/, "")}/auth/logout`
     : null;
 
   sendSuccess(

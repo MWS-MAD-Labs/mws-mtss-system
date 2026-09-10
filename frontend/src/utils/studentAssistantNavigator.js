@@ -25,7 +25,7 @@ const WORKFORCE_BASE_ROUTES = new Set([
     '/emotional-checkin',
     '/emotional-checkin/staff',
     '/mtss',
-    '/mtss/select-role'
+    '/mtss/home'
 ]);
 
 const NAVIGATION_CUE_REGEX = /(bawa(kan)?|antar(kan)?|mau ke|ingin ke|ke halaman|pindah(kan)?|arahin|arahkan|redirect|go to|open|navigate|buka(\s+halaman)?|masuk ke|take me|bring me|visit|show me)/i;
@@ -155,7 +155,7 @@ const WORKFORCE_ROUTE_INTENTS = [
     {
         intent: 'open_role_selection',
         label: 'Role Selection',
-        navigateTo: '/mtss/select-role',
+        navigateTo: '/mtss/home',
         patterns: [/(role selection|select role|pilih role|pilih peran)/i]
     },
     {

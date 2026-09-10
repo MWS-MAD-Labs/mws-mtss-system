@@ -50,7 +50,7 @@ const ALLOWED_ROUTES = new Set([
     '/mtss/admin',
     '/mtss/observer',
     '/mtss/pilot-testing',
-    '/mtss/select-role',
+    '/mtss/home',
     '/mtss/user-management',
     '/mtss/ai-assistant'
 ]);

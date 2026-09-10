@@ -50,7 +50,7 @@ const ALLOWED_ASSISTANT_ROUTES = new Set([
     '/mtss/student-portal',
     '/mtss/teacher',
     '/mtss/admin',
-    '/select-role',
+    '/mtss/home',
     '/user-management',
     '/ai-assistant'
 ]);

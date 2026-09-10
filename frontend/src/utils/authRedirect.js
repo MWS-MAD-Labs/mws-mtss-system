@@ -52,9 +52,9 @@ export const getDefaultPostLoginPath = (userOrRole) => {
     }
 
     if (hasMtssAccess(user || { role: normalizedRole })) {
-        return getDefaultMtssRoute(user || { role: normalizedRole }) || "/mtss/select-role";
+        return getDefaultMtssRoute(user || { role: normalizedRole }) || "/mtss/home";
     }
 
     // Unknown/non-support roles go directly to check-in method selection.
-    return "/mtss/select-role";
+    return "/mtss/home";
 };

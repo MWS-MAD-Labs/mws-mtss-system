@@ -18,7 +18,7 @@ const DESTINATION_PRELOADERS = {
     '/mtss/teacher': () => import('@/pages/mtss/TeacherDashboardPage'),
     '/mtss/admin': () => import('@/pages/mtss/AdminDashboardPage'),
     '/mtss/observer': () => import('@/pages/mtss/ObserverDashboardPage'),
-    '/mtss/select-role': () => import('@/pages/RoleSelectionPage'),
+    '/mtss/home': () => import('@/pages/RoleSelectionPage'),
 };
 
 const AuthCallback = () => {

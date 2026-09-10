@@ -1,15 +1,7 @@
-import { memo, useCallback, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
-import { loginUser } from "../../store/slices/authSlice";
-import { useToast } from "../ui/use-toast";
+import { memo, useCallback } from "react";
 import HeroAuthCard from "@/components/ui/HeroAuthCard";
 import Logo from "./Millennia.webp";
 import { Sparkles, ShieldCheck, Smartphone } from "lucide-react";
-import {
-  consumePendingRedirect,
-  getDefaultPostLoginPath,
-} from "@/utils/authRedirect";
 import { env } from "@/config/env";
 
 const FEATURES = [
@@ -26,15 +18,6 @@ const TRUST = [
 ];
 
 const HeroSection = memo(() => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { loading } = useSelector((s) => s.auth);
-  const { toast } = useToast();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
   // Google sign-in goes through Hub, not a Google OAuth flow of our own: Hub
   // owns the identity/role source of truth (Central) and hands MTSS a
   // short-lived relay token via /auth/sso. This is the same "one door" every
@@ -43,50 +26,6 @@ const HeroSection = memo(() => {
   const handleGoogleSignIn = useCallback(() => {
     window.location.href = `${env.hubBaseUrl.replace(/\/$/, "")}/apps/mtss/launch`;
   }, []);
-
-  const handleEmailLogin = useCallback(
-    async (e) => {
-      e.preventDefault();
-      if (!email || !password) {
-        toast({
-          title: "Validation Error",
-          description: "Please fill in all fields",
-          variant: "destructive",
-        });
-        return;
-      }
-      try {
-        const resultAction = await dispatch(loginUser({ email, password }));
-        if (loginUser.fulfilled.match(resultAction)) {
-          const redirectPath =
-            consumePendingRedirect() ||
-            getDefaultPostLoginPath(resultAction.payload?.user);
-          toast({
-            title: "Login Successful! 🎉",
-            description: "Welcome back! Redirecting...",
-            duration: 3000,
-          });
-          setEmail("");
-          setPassword("");
-          setTimeout(() => navigate(redirectPath), 1000);
-          return;
-        }
-        toast({
-          title: "Login Failed",
-          description:
-            resultAction.payload || "Invalid credentials. Please try again.",
-          variant: "destructive",
-        });
-      } catch {
-        toast({
-          title: "Login Error",
-          description: "An unexpected error occurred. Please try again.",
-          variant: "destructive",
-        });
-      }
-    },
-    [dispatch, email, navigate, password, toast],
-  );
 
   return (
     <section className="landing-pointer-shell relative min-h-screen flex items-center justify-center px-4 py-10 md:py-16">
@@ -162,17 +101,7 @@ const HeroSection = memo(() => {
           data-landing-depth="10"
         >
           <div className="w-full max-w-md">
-            <HeroAuthCard
-              email={email}
-              password={password}
-              loading={loading}
-              onEmailChange={setEmail}
-              onPasswordChange={setPassword}
-              showPassword={showPassword}
-              onToggleShowPassword={() => setShowPassword((p) => !p)}
-              onSubmitEmail={handleEmailLogin}
-              onGoogleSignIn={handleGoogleSignIn}
-            />
+            <HeroAuthCard onGoogleSignIn={handleGoogleSignIn} />
           </div>
         </div>
       </div>

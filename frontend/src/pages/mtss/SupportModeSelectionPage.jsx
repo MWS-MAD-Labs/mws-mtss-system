@@ -11,7 +11,7 @@ import { getDefaultMtssRoute } from "@/utils/mtssAccess";
 // link here as "home" - only what it does on arrival changed.
 const SupportModeSelectionPage = memo(() => {
   const { user } = useSelector((state) => state.auth);
-  const target = getDefaultMtssRoute(user) || "/select-role";
+  const target = getDefaultMtssRoute(user) || "/mtss/home";
 
   return <Navigate to={target} replace />;
 });

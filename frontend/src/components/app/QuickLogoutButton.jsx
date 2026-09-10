@@ -199,9 +199,9 @@ const QuickMenu = memo(() => {
             .then((result) => {
                 // If a Hub redirect is already navigating the tab away,
                 // don't also push a local route - that races the Hub nav.
-                if (!result?.redirectedToHub) navigate("/mtss");
+                if (!result?.redirectedToHub) navigate("/mtss/");
             })
-            .catch(() => navigate("/mtss"))
+            .catch(() => navigate("/mtss/"))
             .finally(() => {
                 setLoading(false);
                 setConfirming(false);

@@ -20,8 +20,8 @@ const ProtectedRoute = ({
     const fallbackPath = user?.role === 'student'
         ? '/mtss/student/support-hub'
         : hasMtssAccess(user)
-            ? (getDefaultMtssRoute(user) || '/mtss/select-role')
-            : '/mtss/select-role';
+            ? (getDefaultMtssRoute(user) || '/mtss/home')
+            : '/mtss/home';
 
     // Show loading while checking authentication - same branded loader as
     // AuthCallback, so there's no visual "flicker" switching between a
@@ -33,7 +33,12 @@ const ProtectedRoute = ({
     // If not authenticated, redirect to login
     if (!isAuthenticated) {
         storePendingRedirect(`${location.pathname}${location.search}${location.hash}`);
-        return <Navigate to="/mtss" replace />;
+        // Trailing slash matters here: it's not just a route match (React
+        // Router is lenient about that) but the literal URL this puts in
+        // the address bar. Without it, a reload sends the browser to a
+        // bare /mtss request that Vite's dev server (and any static host
+        // matching on exact prefix) rejects before the SPA ever loads.
+        return <Navigate to="/mtss/" replace />;
     }
 
     // Special check for dashboard access (directorate + academic department + head_unit)
