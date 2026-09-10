@@ -51,6 +51,20 @@ if ('serviceWorker' in navigator) {
             window.location.reload();
         }
     });
+
+    // The browser only re-checks the SW script on a genuine network
+    // navigation - a tab or installed PWA left open/backgrounded for days
+    // (the common case on mobile, where people rarely force-quit) never
+    // triggers that check on its own, so controllerchange above never
+    // fires and the page keeps running whatever bundle it booted with.
+    // Force a check whenever the tab actually becomes visible again.
+    navigator.serviceWorker.ready.then((registration) => {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                registration.update().catch(() => {});
+            }
+        });
+    }).catch(() => {});
 }
 
 // No React Router basename here on purpose. MTSS's own route paths already
