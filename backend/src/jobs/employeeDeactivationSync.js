@@ -82,9 +82,19 @@ async function deactivateMissingEmployees() {
 
         if (!employee) {
             user.isActive = false;
-            await user.save();
-            deactivated += 1;
-            winston.info(`employeeDeactivationSync: deactivated ${user.email} (no longer active in Central)`);
+            try {
+                // validateModifiedOnly - some documents carry legacy values
+                // in fields this job never touches (e.g. an employmentStatus
+                // written before its enum was tightened); a full-document
+                // validate() on save would reject the isActive change too
+                // and, with no per-record guard, abort every remaining
+                // candidate in this run.
+                await user.save({ validateModifiedOnly: true });
+                deactivated += 1;
+                winston.info(`employeeDeactivationSync: deactivated ${user.email} (no longer active in Central)`);
+            } catch (error) {
+                winston.error(`employeeDeactivationSync: failed to deactivate ${user.email}: ${error.message}`);
+            }
             continue;
         }
 

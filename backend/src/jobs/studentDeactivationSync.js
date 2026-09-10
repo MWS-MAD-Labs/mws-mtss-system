@@ -47,9 +47,17 @@ async function deactivateMissingStudents() {
         if (enrolledEmails.has(normalizeEmail(student.email))) continue;
 
         student.isActive = false;
-        await student.save();
-        deactivated += 1;
-        winston.info(`studentDeactivationSync: deactivated ${student.email} (no longer enrolled in Central)`);
+        try {
+            // validateModifiedOnly - a legacy value in a field this job
+            // never touches shouldn't block the isActive change, or (with
+            // no per-record guard) abort every remaining candidate in
+            // this run. See employeeDeactivationSync.js for the same fix.
+            await student.save({ validateModifiedOnly: true });
+            deactivated += 1;
+            winston.info(`studentDeactivationSync: deactivated ${student.email} (no longer enrolled in Central)`);
+        } catch (error) {
+            winston.error(`studentDeactivationSync: failed to deactivate ${student.email}: ${error.message}`);
+        }
     }
 
     winston.info(`studentDeactivationSync: checked ${candidates.length}, deactivated ${deactivated}`);
