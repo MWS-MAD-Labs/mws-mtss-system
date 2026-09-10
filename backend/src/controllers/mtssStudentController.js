@@ -336,9 +336,17 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
 const buildFilter = (query = {}, skipGradeClassFilter = false) => {
     const filter = {};
 
+    // Default to active-only - there's no Status filter control in the UI
+    // yet, so with no explicit query param this silently showed every
+    // status including graduated/transferred/inactive students forever
+    // (mtssStudentRosterSync.js keeps their status field in sync with
+    // Central, but that's meaningless if nothing ever reads it here).
+    // Pass status=all explicitly to see everyone regardless of status.
     const statusList = normalizeList(query.status).map((status) => status.toLowerCase());
-    if (statusList.length) {
+    if (statusList.length && !statusList.includes('all')) {
         filter.status = { $in: statusList };
+    } else if (!statusList.length) {
+        filter.status = 'active';
     }
 
     // Only apply grade/className filters from query params for privileged users
