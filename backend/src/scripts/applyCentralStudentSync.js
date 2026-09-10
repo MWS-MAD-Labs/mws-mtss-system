@@ -3,12 +3,15 @@
 // doesn't have one yet, and updates identity fields (name, grade, class)
 // on records that already exist and have drifted from Central.
 //
-// Deliberately never touches:
-//   - a record Central no longer shows as enrolled (likely has real
-//     intervention history - that's studentDeactivationSync.js's job to
-//     flip isActive on the login side, not this script's to alter here)
-//   - a record with no Central match at all (manually added, or a data
-//     mismatch - needs a human, not a script)
+// Deliberately never touches identity fields (name/currentGrade/className)
+// for a record Central no longer shows as enrolled - those stay frozen as
+// the student's last real snapshot, since the record likely has real
+// intervention history attached. status IS still kept in sync either way
+// (see CENTRAL_TO_MTSS_STATUS below), so a graduated/withdrawn student
+// correctly drops out of "All Students" via the existing Status filter.
+//
+// Still never touches a record with no Central match at all (manually
+// added, or a data mismatch - needs a human, not a script).
 // Run the dry-run first if there's any doubt what this will do - same
 // matching logic, this just writes instead of printing.
 //
@@ -20,6 +23,18 @@ const { listStudentsByStatus } = require('../services/mwsDataCenterClient');
 
 const ENROLLED_STATUSES = new Set(['REGISTERED', 'ACTIVE']);
 const ALL_STATUSES = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED'];
+
+// MTSSStudent.status's enum is narrower than Central's - WITHDRAWN and
+// ARCHIVED both collapse to 'inactive' since there's no closer match.
+const CENTRAL_TO_MTSS_STATUS = {
+    REGISTERED: 'active',
+    ACTIVE: 'active',
+    GRADUATED: 'graduated',
+    TRANSFERRED: 'transferred',
+    WITHDRAWN: 'inactive',
+    ARCHIVED: 'inactive',
+    INACTIVE: 'inactive',
+};
 
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 
@@ -64,11 +79,13 @@ async function run() {
     const errors = [];
 
     for (const [email, central] of centralByEmail) {
-        if (!ENROLLED_STATUSES.has(central.status)) continue; // out of scope - see header
+        const isEnrolled = ENROLLED_STATUSES.has(central.status);
+        const targetStatus = CENTRAL_TO_MTSS_STATUS[central.status] || 'active';
 
         const existing = mtssByEmail.get(email);
 
         if (!existing) {
+            if (!isEnrolled) continue; // no MTSS record and not currently enrolled - nothing to create
             try {
                 const student = await MTSSStudent.create({
                     name: central.full_name,
@@ -86,18 +103,24 @@ async function run() {
         }
 
         const update = {};
-        if (existing.currentGrade !== central.current_grade) {
-            update.currentGrade = central.current_grade;
+        if (existing.status !== targetStatus) {
+            update.status = targetStatus;
         }
-        // Same rule the dry-run used: only apply a class when Central
-        // actually has one - most students aren't enrolled into a class
-        // there yet, and MTSS's own className stays authoritative until it
-        // does.
-        if (central.current_class && existing.className !== central.current_class) {
-            update.className = central.current_class;
-        }
-        if (existing.name !== central.full_name) {
-            update.name = central.full_name;
+
+        if (isEnrolled) {
+            if (existing.currentGrade !== central.current_grade) {
+                update.currentGrade = central.current_grade;
+            }
+            // Same rule the dry-run used: only apply a class when Central
+            // actually has one - most students aren't enrolled into a class
+            // there yet, and MTSS's own className stays authoritative until it
+            // does.
+            if (central.current_class && existing.className !== central.current_class) {
+                update.className = central.current_class;
+            }
+            if (existing.name !== central.full_name) {
+                update.name = central.full_name;
+            }
         }
 
         if (Object.keys(update).length) {

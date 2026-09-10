@@ -11,14 +11,32 @@ const { listStudentsByStatus } = require('../services/mwsDataCenterClient');
 // dryRunCentralStudentSync.js and applyCentralStudentSync.js already do
 // with each other).
 //
-// Deliberately never touches:
-//   - a record Central no longer shows as enrolled (likely has real
-//     intervention history - that's studentDeactivationSync.js's job to
-//     flip isActive on the login side, not this job's to alter here)
-//   - a record with no Central match at all (manually added, or a data
-//     mismatch - needs a human, not a job)
+// Deliberately never touches identity fields (name/currentGrade/className)
+// for a record Central no longer shows as enrolled - those stay frozen as
+// the student's last real snapshot, since the record likely has real
+// intervention history attached. status IS still kept in sync either way
+// (see CENTRAL_TO_MTSS_STATUS below), so a graduated/withdrawn student
+// correctly drops out of "All Students" via the existing Status filter
+// instead of sitting there indefinitely under a stale 'active' default -
+// studentDeactivationSync.js does the equivalent for the separate
+// UserStudent (login) model, not this one.
+//
+// Still never touches a record with no Central match at all (manually
+// added, or a data mismatch - needs a human, not a job).
 const ENROLLED_STATUSES = new Set(['REGISTERED', 'ACTIVE']);
 const ALL_STATUSES = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED'];
+
+// MTSSStudent.status's enum is narrower than Central's - WITHDRAWN and
+// ARCHIVED both collapse to 'inactive' since there's no closer match.
+const CENTRAL_TO_MTSS_STATUS = {
+    REGISTERED: 'active',
+    ACTIVE: 'active',
+    GRADUATED: 'graduated',
+    TRANSFERRED: 'transferred',
+    WITHDRAWN: 'inactive',
+    ARCHIVED: 'inactive',
+    INACTIVE: 'inactive',
+};
 
 // Longer than the 5-minute deactivation jobs - a new/updated roster row
 // showing up a bit late is lower-severity than a revoked account staying
@@ -67,11 +85,13 @@ async function syncStudentRoster() {
     let errors = 0;
 
     for (const [email, central] of centralByEmail) {
-        if (!ENROLLED_STATUSES.has(central.status)) continue; // out of scope - see header
+        const isEnrolled = ENROLLED_STATUSES.has(central.status);
+        const targetStatus = CENTRAL_TO_MTSS_STATUS[central.status] || 'active';
 
         const existing = mtssByEmail.get(email);
 
         if (!existing) {
+            if (!isEnrolled) continue; // no MTSS record and not currently enrolled - nothing to create
             try {
                 await MTSSStudent.create({
                     name: central.full_name,
@@ -89,25 +109,34 @@ async function syncStudentRoster() {
         }
 
         const update = {};
-        if (existing.currentGrade !== central.current_grade) {
-            update.currentGrade = central.current_grade;
+        if (existing.status !== targetStatus) {
+            update.status = targetStatus;
         }
-        // Central is authoritative either way, including when it now says
-        // "no class" - clearing className here, not just setting it, so a
-        // student who was un-enrolled or moved off this room in Central
-        // (a class reorganized, deleted, or re-rostered) stops showing up
-        // in that room's MTSS view instead of the stale name lingering
-        // forever. See exact-class-and-se-scope.test.js/
-        // no-verified-assignment-deny-all.test.js for the same "empty from
-        // Central means deny, not keep the old value" rule already applied
-        // to classes[]/supportedStudentIds.
-        const centralClassName = central.current_class || null;
-        const existingClassName = existing.className || null;
-        if (existingClassName !== centralClassName) {
-            update.className = centralClassName;
-        }
-        if (existing.name !== central.full_name) {
-            update.name = central.full_name;
+
+        // Identity fields only ever move for someone Central currently
+        // shows as enrolled - see the header comment for why a graduated/
+        // withdrawn record's className/currentGrade/name stay frozen.
+        if (isEnrolled) {
+            if (existing.currentGrade !== central.current_grade) {
+                update.currentGrade = central.current_grade;
+            }
+            // Central is authoritative either way, including when it now says
+            // "no class" - clearing className here, not just setting it, so a
+            // student who was un-enrolled or moved off this room in Central
+            // (a class reorganized, deleted, or re-rostered) stops showing up
+            // in that room's MTSS view instead of the stale name lingering
+            // forever. See exact-class-and-se-scope.test.js/
+            // no-verified-assignment-deny-all.test.js for the same "empty from
+            // Central means deny, not keep the old value" rule already applied
+            // to classes[]/supportedStudentIds.
+            const centralClassName = central.current_class || null;
+            const existingClassName = existing.className || null;
+            if (existingClassName !== centralClassName) {
+                update.className = centralClassName;
+            }
+            if (existing.name !== central.full_name) {
+                update.name = central.full_name;
+            }
         }
 
         if (Object.keys(update).length) {
