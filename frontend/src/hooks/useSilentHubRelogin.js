@@ -30,15 +30,6 @@ const ATTEMPT_TIMEOUT_MS = 5000;
 export function useSilentHubRelogin() {
     const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
     const attemptedRef = useRef(false);
-    // The setTimeout below closes over whatever isAuthenticated was at
-    // effect-run time - this ref is how it reads the up-to-date value 5s
-    // later instead of a stale one, without re-running the effect (and
-    // firing a second iframe) every time auth state changes.
-    const isAuthenticatedRef = useRef(isAuthenticated);
-
-    useEffect(() => {
-        isAuthenticatedRef.current = isAuthenticated;
-    }, [isAuthenticated]);
 
     useEffect(() => {
         if (isAuthenticated || attemptedRef.current) return;
@@ -65,18 +56,16 @@ export function useSilentHubRelogin() {
         // StrictMode remount from double-attempting, not this. This is a
         // fire-and-forget background check; the component unmounting early
         // doesn't need to cancel it, so its lifetime is just the timeout.
-        setTimeout(() => {
-            iframe.remove();
-            // Silent recovery didn't restore a session - either Hub itself
-            // is also signed out, or its cookie wasn't reachable at all.
-            // There's no login screen of this app's own to fall back to
-            // anymore (see HeroSection/HeroAuthCard) - Hub is the only
-            // place sign-in happens now, so send the browser there for
-            // real instead of leaving the visitor stranded on a landing
-            // page with nothing to do but click through manually.
-            if (!isAuthenticatedRef.current) {
-                window.location.href = env.hubBaseUrl.replace(/\/$/, '');
-            }
-        }, ATTEMPT_TIMEOUT_MS);
+        //
+        // No forced redirect to Hub on failure (there used to be one
+        // here) - that fired just as often for someone opening a shared
+        // MTSS link cold as it did for a genuinely expired session,
+        // bouncing a first-time visitor away from the very link they
+        // clicked a few seconds after landing. Silent recovery failing
+        // just means this app's own landing page (HeroSection/
+        // HeroAuthCard) shows its "Sign in with Hub" button instead - a
+        // real logout still reaches Hub for real, that's authService.js's
+        // logout(), unrelated to this hook.
+        setTimeout(() => iframe.remove(), ATTEMPT_TIMEOUT_MS);
     }, [isAuthenticated]);
 }
