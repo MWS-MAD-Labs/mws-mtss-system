@@ -28,8 +28,11 @@ const ALL_STATUSES = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFER
 
 // MTSSStudent.status's enum is narrower than Central's - WITHDRAWN and
 // ARCHIVED both collapse to 'inactive' since there's no closer match.
+// REGISTERED means Central hasn't put them in a class yet, so they don't
+// belong in the "active" caseload view either - 'pending' fits until they
+// actually get enrolled into a class and Central promotes them to ACTIVE.
 const CENTRAL_TO_MTSS_STATUS = {
-    REGISTERED: 'active',
+    REGISTERED: 'pending',
     ACTIVE: 'active',
     GRADUATED: 'graduated',
     TRANSFERRED: 'transferred',
