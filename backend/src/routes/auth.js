@@ -218,14 +218,18 @@ router.post("/logout", (req, res) => {
   // clear it - no server-to-server call can. We hand the client a URL to
   // navigate to instead of trying to do it from here.
   const hubBaseUrl = process.env.HUB_BASE_URL;
-  // No redirect param: Hub's own /auth/logout falls back to Hub's own
-  // front page when none is given (mws-hub's resolveLogoutRedirect always
-  // allows Hub's own origin, and treats a missing/invalid redirect as
-  // "land on Hub itself"). Apps no longer have their own login screen as
-  // the real entry point - Hub is - so logging out here should land the
-  // user back at Hub, not bounce them into this app's own login form.
+  // redirect points back at this app's own landing page instead of leaving
+  // the user on Hub's front page - mws-hub's resolveLogoutRedirect only
+  // allows an origin already registered in its catalog, so this only works
+  // because MTSS's own origin is already there.
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5176/mtss";
+  // Trailing slash matters here specifically - Vite's dev server serves
+  // this app under a strict base path and errors on the bare (no trailing
+  // slash) form, unlike the /auth/sso handler above which needs frontendUrl
+  // WITHOUT one to avoid a double slash before /auth/callback.
+  const logoutRedirectUrl = `${frontendUrl.replace(/\/$/, "")}/`;
   const hubLogoutUrl = hubBaseUrl
-    ? `${hubBaseUrl.replace(/\/$/, "")}/auth/logout`
+    ? `${hubBaseUrl.replace(/\/$/, "")}/auth/logout?redirect=${encodeURIComponent(logoutRedirectUrl)}`
     : null;
 
   sendSuccess(

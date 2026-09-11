@@ -65,6 +65,16 @@ const AuthCallback = () => {
                 setStoredAuthSession({ user: canonicalUser });
                 dispatch(loginSuccess({ user: canonicalUser }));
 
+                // Running inside a hidden iframe (a silent Hub relogin
+                // attempt - see utils/hubSilentLogin.js) means the parent
+                // tab is waiting to hear whether this landed. Its own
+                // navigate() below only affects this iframe's own history,
+                // invisible to the parent, so tell it directly instead of
+                // making it guess via a timeout.
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'MWS_HUB_SILENT_LOGIN_SUCCESS' }, window.location.origin);
+                }
+
                 const redirectParam = hashParams.get('redirect');
                 const safeRedirect = sanitizeRedirectPath(redirectParam);
                 const pendingRedirect = consumePendingRedirect();

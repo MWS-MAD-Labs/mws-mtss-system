@@ -1,5 +1,3 @@
-import { hasMtssAccess, getDefaultMtssRoute } from "@/utils/mtssAccess";
-
 const PENDING_AUTH_REDIRECT_KEY = "pending_auth_redirect";
 
 export const sanitizeRedirectPath = (value) => {
@@ -51,10 +49,9 @@ export const getDefaultPostLoginPath = (userOrRole) => {
         return "/mtss/student/support-hub";
     }
 
-    if (hasMtssAccess(user || { role: normalizedRole })) {
-        return getDefaultMtssRoute(user || { role: normalizedRole }) || "/mtss/home";
-    }
-
-    // Unknown/non-support roles go directly to check-in method selection.
+    // Every staff/teacher role lands on /mtss/home first, same as
+    // daily-checkin's own getDefaultPostLoginPath - not a per-role
+    // dashboard route (getDefaultMtssRoute), which is only for the
+    // dashboard card RoleSelectionPage itself renders once there.
     return "/mtss/home";
 };

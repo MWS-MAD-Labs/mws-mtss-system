@@ -13,6 +13,10 @@ const cld = (id, w = 300) => `${CLD}/c_scale,w_${w},f_auto,q_auto/${id}.png`;
 const cldJpg = (id, w = 240) => `${CLD}/c_fill,w_${w},h_${Math.round(w * 1.25)},g_face,f_auto,q_auto/${id}.jpg`;
 const RS_ENABLE_FRAMED_CARDS = true;
 const HUB_SUPPORT_PATH = "/support-hub";
+// Shared literally with daily-checkin's own RoleSelectionPage.jsx - naming
+// the target the same in both apps means a Hub tab either one opens gets
+// reused/focused by the other too, not just by repeated clicks in one app.
+const HUB_SUPPORT_WINDOW_NAME = "mws-hub-support";
 
 // Mirrors daily-checkin's own RoleSelectionPage.jsx goToHubSupport - this
 // button means "go back to Hub's app launcher", not MTSS's own now-vestigial
@@ -20,7 +24,7 @@ const HUB_SUPPORT_PATH = "/support-hub";
 // dashboard, see SupportModeSelectionPage.jsx's own comment on why).
 const goToHubSupport = () => {
   const hubBaseUrl = String(env.hubBaseUrl || "").trim().replace(/\/+$/, "");
-  window.location.assign(hubBaseUrl ? `${hubBaseUrl}${HUB_SUPPORT_PATH}` : HUB_SUPPORT_PATH);
+  window.open(hubBaseUrl ? `${hubBaseUrl}${HUB_SUPPORT_PATH}` : HUB_SUPPORT_PATH, HUB_SUPPORT_WINDOW_NAME);
 };
 
 const supportsFinePointer = () => {
