@@ -88,6 +88,15 @@ const authenticate = async (req, res, next) => {
             return sendError(res, 'User not found or inactive', 401);
         }
 
+        // A token minted before this field existed has no sessionVersion
+        // claim at all - treat that as 0 rather than rejecting every
+        // already-issued session the moment this deploys. Mismatch means
+        // Hub's back-channel logout (routes/auth.js's /auth/revoke-session)
+        // bumped the stored value since this token was signed.
+        if ((decoded.sessionVersion || 0) !== (user.sessionVersion || 0)) {
+            return sendError(res, 'Session has been revoked', 401);
+        }
+
         // Attach user to request object
         req.user = buildRequestUser(user);
 

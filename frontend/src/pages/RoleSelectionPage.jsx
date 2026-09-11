@@ -24,7 +24,34 @@ const HUB_SUPPORT_WINDOW_NAME = "mws-hub-support";
 // dashboard, see SupportModeSelectionPage.jsx's own comment on why).
 const goToHubSupport = () => {
   const hubBaseUrl = String(env.hubBaseUrl || "").trim().replace(/\/+$/, "");
-  window.open(hubBaseUrl ? `${hubBaseUrl}${HUB_SUPPORT_PATH}` : HUB_SUPPORT_PATH, HUB_SUPPORT_WINDOW_NAME);
+  const url = hubBaseUrl ? `${hubBaseUrl}${HUB_SUPPORT_PATH}` : HUB_SUPPORT_PATH;
+
+  // Opened with an empty URL first (mirrors Hub's own AppCard.tsx reuse
+  // trick) so an already-open tab just gets focused instead of reloaded -
+  // window.open(url, name) navigates the reused tab immediately even if
+  // it's already showing that exact page, which reads as a jarring reload.
+  const target = window.open("", HUB_SUPPORT_WINDOW_NAME);
+  if (!target) {
+    // Popup blocked despite the synchronous open - fall back rather than
+    // silently doing nothing.
+    window.location.assign(url);
+    return;
+  }
+
+  let isFreshWindow = true;
+  try {
+    isFreshWindow = target.location.href === "about:blank" || target.location.href === "";
+  } catch {
+    // Cross-origin already (it navigated to Hub in an earlier click) -
+    // not fresh, and not readable from here either way.
+    isFreshWindow = false;
+  }
+
+  if (isFreshWindow) {
+    target.location.href = url;
+  } else {
+    target.focus();
+  }
 };
 
 const supportsFinePointer = () => {

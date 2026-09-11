@@ -51,6 +51,14 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    // Incremented to force every previously-issued JWT for this user
+    // invalid at once (see middleware/auth.js's authenticate) - the
+    // back-channel session revocation Hub calls on logout bumps this
+    // instead of trying to invalidate one specific token.
+    sessionVersion: {
+        type: Number,
+        default: 0
+    },
     emailVerified: {
         type: Boolean,
         default: false
