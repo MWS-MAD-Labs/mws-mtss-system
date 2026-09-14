@@ -11,6 +11,7 @@ import {
     SCORE_UNITS,
     GOAL_NOTES_MAX_LENGTH,
     MAX_CAPPED_SCORE,
+    MAX_CUSTOM_DURATION_DAYS,
     getInterventionFormErrors,
 } from "../config/interventionFormConfig";
 
@@ -180,17 +181,24 @@ const InterventionFormFields = memo(({
                             <input
                                 type="number"
                                 min="1"
+                                max={MAX_CUSTOM_DURATION_DAYS}
                                 className={`${fieldClass} flex-1`}
                                 placeholder="e.g. 100"
                                 value={customDurationDays}
                                 onChange={(e) => {
+                                    // Clamp on keystroke, same reasoning as
+                                    // baseline/target above - `max` alone
+                                    // doesn't stop someone typing "1000".
                                     const digits = e.target.value.replace(/\D/g, "");
-                                    onChange("duration", digits ? `${digits} days` : "Custom");
+                                    if (!digits) { onChange("duration", "Custom"); return; }
+                                    const clamped = Math.min(Number(digits), MAX_CUSTOM_DURATION_DAYS);
+                                    onChange("duration", `${clamped} days`);
                                 }}
                             />
                             <span className="text-sm font-semibold text-slate-500 dark:text-slate-300">days</span>
                         </div>
                     )}
+                    {errors.duration && <p className={errorTextClass}>{errors.duration}</p>}
                 </div>
             </div>
 

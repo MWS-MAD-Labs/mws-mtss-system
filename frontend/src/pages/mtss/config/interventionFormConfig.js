@@ -80,6 +80,10 @@ export const filterStrategiesByType = (strategies, type) => {
 };
 
 export const GOAL_NOTES_MAX_LENGTH = 100;
+// A generous ceiling for a custom intervention duration - the longest
+// preset (8 weeks = 56 days) is nowhere near this; it exists purely to
+// reject nonsense like "1000 days", not to constrain real plans.
+export const MAX_CUSTOM_DURATION_DAYS = 365;
 // % / pts / score are genuinely bounded 0-100. wpm (reading fluency) is
 // not - a fluent upper-grade reader can clear 100+ words per minute, so
 // capping it would reject real data, not catch a typo.
@@ -101,6 +105,13 @@ export const getInterventionFormErrors = (formState = {}) => {
     }
     if ((formState.notes || "").length > GOAL_NOTES_MAX_LENGTH) {
         errors.notes = `Notes must be ${GOAL_NOTES_MAX_LENGTH} characters or fewer`;
+    }
+
+    // Only the custom "NNN days" format is bounded here - the weekly
+    // presets ("2 weeks" ... "8 weeks") never approach this ceiling anyway.
+    const customDurationMatch = (formState.duration || "").match(/^(\d+)\s*days$/);
+    if (customDurationMatch && Number(customDurationMatch[1]) > MAX_CUSTOM_DURATION_DAYS) {
+        errors.duration = `Duration can't be above ${MAX_CUSTOM_DURATION_DAYS} days`;
     }
 
     const scoreCapped = CAPPED_SCORE_UNITS.has(formState.baselineUnit);
