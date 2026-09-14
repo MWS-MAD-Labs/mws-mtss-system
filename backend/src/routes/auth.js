@@ -11,7 +11,7 @@ const { buildRequestUser } = require("../middleware/auth");
 const { verifyHubRelayToken } = require("../utils/hubSsoRelay");
 const { resolveOrProvisionSsoUser } = require("../utils/ssoUserResolution");
 const { createUserAwareRateLimiter } = require("../middleware/rateLimiter");
-const { setAuthCookie, clearAuthCookie } = require("../utils/authCookie");
+const { setAuthCookie, clearAuthCookie, COOKIE_NAME } = require("../utils/authCookie");
 
 const ssoLimiter = createUserAwareRateLimiter({
   windowMinutes: 1,
@@ -211,6 +211,19 @@ router.post(
 // Logout — clears the httpOnly session cookie server-side (the client can't
 // do this itself the way it could with localStorage.removeItem).
 router.post("/logout", (req, res) => {
+  // Read who this actually was BEFORE clearing the cookie - Hub's own
+  // logout cascade (see mws-hub's logoutFromApp) needs to know this so it
+  // doesn't blindly clear whatever DIFFERENT account Hub's own session
+  // currently holds (e.g. a stale MTSS session for one person sitting
+  // alongside a genuinely different, currently-active Hub login).
+  let loggedOutEmail = null;
+  try {
+    const token = req.cookies?.[COOKIE_NAME];
+    if (token) loggedOutEmail = jwt.verify(token, process.env.JWT_SECRET).email;
+  } catch {
+    // expired/invalid token - nothing to attribute, fall through as before
+  }
+
   clearAuthCookie(res);
 
   // Signing out here should also end the Hub session, otherwise the user
@@ -231,7 +244,7 @@ router.post("/logout", (req, res) => {
   // WITHOUT one to avoid a double slash before /auth/callback.
   const logoutRedirectUrl = `${frontendUrl.replace(/\/$/, "")}/`;
   const hubLogoutUrl = hubBaseUrl
-    ? `${hubBaseUrl.replace(/\/$/, "")}/auth/logout?redirect=${encodeURIComponent(logoutRedirectUrl)}`
+    ? `${hubBaseUrl.replace(/\/$/, "")}/auth/logout?redirect=${encodeURIComponent(logoutRedirectUrl)}${loggedOutEmail ? `&email=${encodeURIComponent(loggedOutEmail)}` : ""}`
     : null;
 
   sendSuccess(
