@@ -9,6 +9,7 @@ async function syncStudentFromCentral(email) {
         email: centralStudent.email,
         name: centralStudent.full_name,
         nickname: centralStudent.nick_name,
+        gender: centralStudent.gender,
         status: centralStudent.status,
         currentGrade: centralStudent.current_grade,
         className: centralStudent.current_class,

@@ -24,15 +24,16 @@ const ALL_STATUSES = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFER
 
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 
+// A fetch that actually fails is re-thrown as-is rather than silently
+// treated as "Central says nobody for this status" - a partial/wrong
+// picture here would print a misleading diff report (e.g. real students
+// looking orphaned because one status's request timed out), which is
+// exactly the kind of mistake this dry-run exists to let a human catch
+// before applyCentralStudentSync.js ever runs for real.
 async function fetchCentralStudentsByStatus() {
     const byStatus = {};
     for (const status of ALL_STATUSES) {
-        try {
-            byStatus[status] = await listStudentsByStatus(status);
-        } catch (error) {
-            console.error(`⚠️  Failed to fetch Central students with status=${status}:`, error.message);
-            byStatus[status] = [];
-        }
+        byStatus[status] = await listStudentsByStatus(status);
     }
     return byStatus;
 }

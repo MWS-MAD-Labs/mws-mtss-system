@@ -506,6 +506,12 @@ const formatRosterStudent = (studentDoc, summary) => {
 
         status: source.status,
 
+        // Set by mtssStudentRosterSync.js when a full sync run finds no
+        // Central match for this student's email at all - surfaced so an
+        // admin can spot and review a stale/manually-added record instead
+        // of it silently sitting on a teacher's live roster forever.
+        orphanedAt: source.orphanedAt || null,
+
         grade: gradeLabel,
 
         mentor: mentorLabel,

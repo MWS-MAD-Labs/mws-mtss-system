@@ -863,7 +863,7 @@ const ensureStudentsValid = async (studentIds) => {
         throw new Error('One or more students were not found in the MTSS roster');
     }
 
-    const inactive = students.filter(student => student.status !== 'active');
+    const inactive = students.filter(student => student.status !== 'ACTIVE');
     if (inactive.length) {
         const names = inactive.map(student => student.name).join(', ');
         throw new Error(`The following students are not active: ${names}`);
@@ -2202,7 +2202,7 @@ const generateKindergartenAiDraft = async (req, res) => {
             if (!studentRecord) {
                 return sendError(res, 'Student not found in MTSS roster.', 404);
             }
-            if (studentRecord.status !== 'active') {
+            if (studentRecord.status !== 'ACTIVE') {
                 return sendError(res, 'Student is not active for MTSS planning.', 400);
             }
             if (!isKindergartenStudent(studentRecord)) {

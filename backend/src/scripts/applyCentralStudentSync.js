@@ -7,11 +7,14 @@
 // for a record Central no longer shows as enrolled - those stay frozen as
 // the student's last real snapshot, since the record likely has real
 // intervention history attached. status IS still kept in sync either way
-// (see CENTRAL_TO_MTSS_STATUS below), so a graduated/withdrawn student
-// correctly drops out of "All Students" via the existing Status filter.
+// (MTSSStudent.status stores Central's StudentStatus value as-is), so a
+// graduated/withdrawn student correctly drops out of "All Students" via the
+// existing Status filter.
 //
-// Still never touches a record with no Central match at all (manually
-// added, or a data mismatch - needs a human, not a script).
+// Still never touches identity/status fields, and never deletes, a record
+// with no Central match at all (manually added, or a data mismatch) - but
+// it IS flagged via orphanedAt (models/MTSSStudent.js) so an admin can find
+// and decide what to do with it.
 // Run the dry-run first if there's any doubt what this will do - same
 // matching logic, this just writes instead of printing.
 //
@@ -24,32 +27,18 @@ const { listStudentsByStatus } = require('../services/mwsDataCenterClient');
 const ENROLLED_STATUSES = new Set(['REGISTERED', 'ACTIVE']);
 const ALL_STATUSES = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED'];
 
-// MTSSStudent.status's enum is narrower than Central's - WITHDRAWN and
-// ARCHIVED both collapse to 'inactive' since there's no closer match.
-// REGISTERED means Central hasn't put them in a class yet, so they don't
-// belong in the "active" caseload view either - 'pending' fits until they
-// actually get enrolled into a class and Central promotes them to ACTIVE.
-const CENTRAL_TO_MTSS_STATUS = {
-    REGISTERED: 'pending',
-    ACTIVE: 'active',
-    GRADUATED: 'graduated',
-    TRANSFERRED: 'transferred',
-    WITHDRAWN: 'inactive',
-    ARCHIVED: 'inactive',
-    INACTIVE: 'inactive',
-};
-
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 
+// Central is the source of truth - a genuinely empty response (every
+// status fetch succeeds, none of them have anyone) is real data that must
+// propagate here exactly like any other answer from Central would. A
+// fetch that actually fails is a different thing entirely and must not be
+// silently treated as "Central says nobody" - re-thrown as-is so run()
+// aborts instead of diffing against a partial/unknown picture.
 async function fetchCentralStudentsByStatus() {
     const byStatus = {};
     for (const status of ALL_STATUSES) {
-        try {
-            byStatus[status] = await listStudentsByStatus(status);
-        } catch (error) {
-            console.error(`⚠️  Failed to fetch Central students with status=${status}:`, error.message);
-            byStatus[status] = [];
-        }
+        byStatus[status] = await listStudentsByStatus(status);
     }
     return byStatus;
 }
@@ -62,6 +51,9 @@ async function run() {
     console.log(`✓ Central API: ${process.env.MWS_DATA_CENTER_API_URL}\n`);
 
     const byStatus = await fetchCentralStudentsByStatus();
+    // No try/catch here (unlike the scheduled job) - a failure should abort
+    // this manual script loudly (non-zero exit, see the bottom of the
+    // file) rather than silently no-op, since a human is watching it run.
     const centralByEmail = new Map();
     for (const status of ALL_STATUSES) {
         for (const student of byStatus[status]) {
@@ -70,7 +62,7 @@ async function run() {
         }
     }
 
-    const mtssStudents = await MTSSStudent.find({}).select('name email currentGrade className status');
+    const mtssStudents = await MTSSStudent.find({}).select('name email gender currentGrade className status orphanedAt');
     const mtssByEmail = new Map();
     mtssStudents.forEach((doc) => {
         const email = normalizeEmail(doc.email);
@@ -79,11 +71,15 @@ async function run() {
 
     const createdIds = [];
     const updatedIds = [];
+    const orphanedIds = [];
+    const unorphanedIds = [];
     const errors = [];
 
     for (const [email, central] of centralByEmail) {
         const isEnrolled = ENROLLED_STATUSES.has(central.status);
-        const targetStatus = CENTRAL_TO_MTSS_STATUS[central.status] || 'active';
+        // Direct pass-through - MTSSStudent.status stores Central's exact
+        // StudentStatus value, no local narrowing table needed.
+        const targetStatus = central.status;
 
         const existing = mtssByEmail.get(email);
 
@@ -93,6 +89,8 @@ async function run() {
                 const student = await MTSSStudent.create({
                     name: central.full_name,
                     email,
+                    gender: central.gender,
+                    status: targetStatus,
                     currentGrade: central.current_grade || undefined,
                     className: central.current_class || undefined,
                 });
@@ -108,6 +106,12 @@ async function run() {
         const update = {};
         if (existing.status !== targetStatus) {
             update.status = targetStatus;
+        }
+        if (central.gender && existing.gender !== central.gender) {
+            update.gender = central.gender;
+        }
+        if (existing.orphanedAt) {
+            update.orphanedAt = null;
         }
 
         if (isEnrolled) {
@@ -130,6 +134,7 @@ async function run() {
             try {
                 await MTSSStudent.findByIdAndUpdate(existing._id, update, { runValidators: true });
                 updatedIds.push(existing._id);
+                if (update.orphanedAt === null) unorphanedIds.push(existing._id);
                 console.log(`  ~ updated ${email}: ${Object.keys(update).join(', ')}`);
             } catch (error) {
                 errors.push({ email, action: 'update', error: error.message });
@@ -138,7 +143,22 @@ async function run() {
         }
     }
 
-    console.log(`\n✅ Done. Created ${createdIds.length}, updated ${updatedIds.length}, ${errors.length} error(s).`);
+    // Anything never visited above has no Central match at all under any
+    // status - flag it (if not already flagged) rather than touching its data.
+    for (const [email, doc] of mtssByEmail) {
+        if (centralByEmail.has(email)) continue;
+        if (doc.orphanedAt) continue;
+        try {
+            await MTSSStudent.findByIdAndUpdate(doc._id, { orphanedAt: new Date() });
+            orphanedIds.push(doc._id);
+            console.log(`  ! flagged ${email} as orphaned (no Central match)`);
+        } catch (error) {
+            errors.push({ email, action: 'flag-orphan', error: error.message });
+            console.error(`  ✗ failed to flag ${email} as orphaned: ${error.message}`);
+        }
+    }
+
+    console.log(`\n✅ Done. Created ${createdIds.length}, updated ${updatedIds.length}, ${orphanedIds.length} newly orphaned, ${unorphanedIds.length} un-orphaned, ${errors.length} error(s).`);
     if (errors.length) {
         console.log('\nErrors:');
         errors.forEach((e) => console.log(`  ${e.action} ${e.email}: ${e.error}`));

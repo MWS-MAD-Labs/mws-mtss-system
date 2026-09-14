@@ -86,6 +86,7 @@ describe('mtssStudentRosterSync - className follows Central, including clearing 
         await MTSSStudent.create({
             name: 'Roster Sync Test Student 3',
             email: 'unchanged@roster-sync-test.millennia21.id',
+            status: 'ACTIVE',
             currentGrade: 'Grade 5',
             className: 'Grade 5 - Orion',
         });
@@ -120,5 +121,66 @@ describe('mtssStudentRosterSync - className follows Central, including clearing 
 
         const created = await MTSSStudent.findOne({ email: 'brand-new@roster-sync-test.millennia21.id' });
         expect(created.className).toBeUndefined();
+    });
+});
+
+describe('mtssStudentRosterSync - genuinely empty vs. a failed fetch', () => {
+    beforeAll(async () => {
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/integra-learn-test');
+    });
+
+    afterAll(async () => {
+        await mongoose.connection.close();
+    });
+
+    beforeEach(async () => {
+        jest.clearAllMocks();
+        await MTSSStudent.deleteMany({ email: TEST_EMAIL_RE });
+    });
+
+    test('flags an existing record as orphaned when Central genuinely reports zero students across every status', async () => {
+        await MTSSStudent.create({
+            name: 'Roster Sync Test Student 5',
+            email: 'genuinely-empty@roster-sync-test.millennia21.id',
+            status: 'ACTIVE',
+            currentGrade: 'Kindergarten K1',
+            className: 'Kindergarten K1',
+        });
+
+        // Every status fetch succeeds and returns [] - a real, honest
+        // answer from Central, not an error.
+        mockCentralStatuses({});
+
+        const result = await syncStudentRoster();
+        expect(result.skipped).toBe(false);
+        expect(result.orphaned).toBe(1);
+
+        const doc = await MTSSStudent.findOne({ email: 'genuinely-empty@roster-sync-test.millennia21.id' });
+        expect(doc.orphanedAt).not.toBeNull();
+    });
+
+    test('skips the run entirely, touching nothing, when a status fetch actually fails', async () => {
+        const existing = await MTSSStudent.create({
+            name: 'Roster Sync Test Student 6',
+            email: 'fetch-failure@roster-sync-test.millennia21.id',
+            status: 'ACTIVE',
+            currentGrade: 'Kindergarten K1',
+            className: 'Kindergarten K1',
+        });
+
+        listStudentsByStatus.mockImplementation(async (status) => {
+            if (status === 'ACTIVE') throw new Error('simulated network failure');
+            return [];
+        });
+
+        const result = await syncStudentRoster();
+        expect(result.skipped).toBe(true);
+
+        // Nothing touched - not created, not updated, and critically not
+        // orphaned just because the (incomplete) fetch happened to come
+        // back without this email in it.
+        const doc = await MTSSStudent.findById(existing._id);
+        expect(doc.orphanedAt).toBeNull();
+        expect(doc.status).toBe('ACTIVE');
     });
 });

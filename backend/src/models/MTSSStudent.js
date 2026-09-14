@@ -194,15 +194,32 @@ const studentSchema = new mongoose.Schema(
             type: String,
             trim: true
         },
+        // Central's exact Gender enum (mws-data-center/server/prisma/schema.prisma)
+        // - no local "other"/nonbinary/prefer_not_to_say sentinel, Central
+        // itself only has MALE/FEMALE.
         gender: {
             type: String,
-            enum: ['male', 'female', 'nonbinary', 'prefer_not_to_say', 'other'],
-            default: 'prefer_not_to_say'
+            enum: ['MALE', 'FEMALE']
         },
+        // Central's exact StudentStatus enum - stored as-is, no local
+        // narrowing. mtssStudentRosterSync.js always sets this explicitly
+        // (on both create and update), so no default is needed here.
         status: {
             type: String,
-            enum: ['active', 'inactive', 'graduated', 'transferred', 'pending'],
-            default: 'active'
+            enum: ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED']
+        },
+        // Not synced from Central - a local bookkeeping flag.
+        // mtssStudentRosterSync.js sets this the first time a full sync
+        // run finds no Central match at all for this student's email (a
+        // seed/manually-added record, or a genuine data mismatch), and
+        // clears it back to null if a later run finds a match again. This
+        // record's status/identity fields otherwise stay frozen forever -
+        // the sync job never deletes or auto-corrects an orphan, "needs a
+        // human, not a job". Surfaced to admins via the students list so
+        // someone can decide whether to fix or remove it.
+        orphanedAt: {
+            type: Date,
+            default: null
         },
         email: {
             type: String,

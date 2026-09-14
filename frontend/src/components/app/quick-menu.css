@@ -12,13 +12,6 @@
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 }
 
-/* Hide entirely on mobile — AI Dock is sufficient for mobile users */
-@media (max-width: 767px) {
-    .qm-root {
-        display: none;
-    }
-}
-
 /* ── Trigger pill ────────────────────────────────────────── */
 .qm-trigger {
     display: inline-flex;

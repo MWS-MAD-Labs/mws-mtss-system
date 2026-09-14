@@ -6,14 +6,50 @@
  * - Navigation shortcuts + dark mode toggle + logout
  */
 import { memo, useState, useCallback, useRef, useEffect } from "react";
-import { LogOut, Moon, Sun, User } from "lucide-react";
+import { ExternalLink, LogOut, Moon, RefreshCw, Sun, User } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { logoutUser } from "@/store/slices/authSlice";
 import { applyThemePreference, emitThemeSpell, persistTheme } from "@/lib/theme";
+import { goToHubSupport, hasSupportHubAccess } from "@/utils/hubConfig";
+import { useToast } from "@/components/ui/use-toast";
+import { getSyncStatus, triggerSync } from "@/services/syncService";
 import gsap from "gsap";
 import { animate, stagger } from "animejs";
 import "./quick-menu.css";
+
+/* Merges every roster/assignment/deactivation job's own return shape into
+   one short, human sentence - reads the same regardless of which job(s)
+   actually had something to report this run. */
+const summarizeSyncResult = (result) => {
+    if (!result) return "";
+    const jobs = Object.values(result);
+    const anySkipped = jobs.some((job) => job?.skipped);
+    const sum = (field) => jobs.reduce((total, job) => total + (job?.[field] || 0), 0);
+    const created = sum("created");
+    const updated = sum("updated");
+    const deactivated = sum("deactivated");
+    const orphaned = sum("orphaned");
+
+    if (anySkipped && !created && !updated && !deactivated && !orphaned) {
+        return "Could not reach Central just now - nothing was changed.";
+    }
+    if (!created && !updated && !deactivated && !orphaned) {
+        return "Everything is already up to date.";
+    }
+    const parts = [];
+    if (created) parts.push(`${created} created`);
+    if (updated) parts.push(`${updated} updated`);
+    if (deactivated) parts.push(`${deactivated} deactivated`);
+    if (orphaned) parts.push(`${orphaned} orphaned`);
+    return `Sync complete: ${parts.join(", ")}.`;
+};
+
+const formatCountdown = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+};
 
 /* ── Helpers ───────────────────────────────────────────── */
 const getIsDark = () => {
@@ -32,11 +68,14 @@ const QuickMenu = memo(() => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const location = useLocation();
+    const { toast } = useToast();
 
     const [isOpen, setIsOpen] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isDark, setIsDark] = useState(getIsDark);
+    const [syncing, setSyncing] = useState(false);
+    const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
     /* refs */
     const triggerRef = useRef(null);
@@ -140,6 +179,36 @@ const QuickMenu = memo(() => {
 
     useEffect(() => () => clearTimeout(confirmTimer.current), []);
 
+    /* Prime the cooldown state when the menu is actually opened, not on
+       mount - firing this the instant isAuthenticated flips true can race
+       a fresh SSO login (auth cookie not always readable on that very
+       first tick yet), and a stray 401 from it is enough to trip the
+       shared axios client's "session invalid" handler and hard-redirect
+       right back out to login. Gating on user interaction removes that
+       race entirely. */
+    useEffect(() => {
+        if (!isOpen || !isAuthenticated) return;
+        getSyncStatus()
+            .then((response) => {
+                const data = response?.data?.data;
+                setCooldownSeconds(data?.cooldownRemainingSeconds || 0);
+            })
+            .catch(() => {});
+    }, [isOpen, isAuthenticated]);
+
+    /* Tick the countdown down locally once primed - avoids polling the
+       server every second just to redraw a number. */
+    useEffect(() => {
+        if (cooldownSeconds <= 0) return;
+        const timer = setInterval(() => {
+            setCooldownSeconds((s) => Math.max(0, s - 1));
+        }, 1000);
+        return () => clearInterval(timer);
+        // Only re-arm the interval when the cooldown starts/ends, not on
+        // every single tick of its own setCooldownSeconds update.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cooldownSeconds > 0]);
+
     /* Reset logout state whenever the logged-in user changes (e.g. re-login
        after logout) — prevents stale "Signing out…" from a previous session */
     useEffect(() => {
@@ -160,6 +229,57 @@ const QuickMenu = memo(() => {
             navigate(path);
         }, 120);
     }, [close, navigate]);
+
+    /* Support Hub - opens/focuses Hub's app launcher in a separate tab,
+       not an in-app route, so this can't reuse handleNav's navigate(path). */
+    const handleSupportHub = useCallback((e) => {
+        animate(e.currentTarget, {
+            scale: [1, 0.93, 1],
+            duration: 220,
+            ease: "outElastic(1, .7)",
+        });
+        setTimeout(() => {
+            close();
+            goToHubSupport();
+        }, 120);
+    }, [close]);
+
+    /* Sync Now - forces every sync/deactivation job to run immediately
+       instead of waiting out its interval. Cooldown is global/shared
+       server-side, so a 429 here just means someone else's run is still
+       the current one. */
+    const handleSyncNow = useCallback((e) => {
+        if (syncing || cooldownSeconds > 0) return;
+        animate(e.currentTarget, {
+            scale: [1, 0.93, 1],
+            duration: 220,
+            ease: "outElastic(1, .7)",
+        });
+        setSyncing(true);
+        triggerSync()
+            .then((response) => {
+                const data = response?.data?.data;
+                toast({ title: "Sync Now", description: summarizeSyncResult(data?.lastResult) });
+                setCooldownSeconds(data?.cooldownRemainingSeconds || 0);
+            })
+            .catch((error) => {
+                if (error?.response?.status === 429) {
+                    const data = error.response.data?.errors;
+                    toast({
+                        title: "Sync already running",
+                        description: data?.lastResult ? summarizeSyncResult(data.lastResult) : "Please wait for the current cooldown to finish.",
+                    });
+                    setCooldownSeconds(data?.cooldownRemainingSeconds || 0);
+                } else {
+                    toast({
+                        title: "Sync failed",
+                        description: error?.response?.data?.message || "Could not reach the server.",
+                        variant: "destructive",
+                    });
+                }
+            })
+            .finally(() => setSyncing(false));
+    }, [syncing, cooldownSeconds, toast]);
 
     /* Dark mode toggle */
     const handleDarkMode = useCallback((e) => {
@@ -270,6 +390,37 @@ const QuickMenu = memo(() => {
                                 </button>
                             );
                         })}
+
+                        {hasSupportHubAccess(user?.role) && (
+                            <button
+                                ref={(el) => (itemsRef.current[idx++] = el)}
+                                type="button"
+                                className="qm-item qm-item--btn"
+                                onClick={handleSupportHub}
+                                role="menuitem"
+                            >
+                                <div className="qm-item-icon">
+                                    <ExternalLink size={14} />
+                                </div>
+                                <span className="qm-item-label">Support Hub</span>
+                            </button>
+                        )}
+
+                        <button
+                            ref={(el) => (itemsRef.current[idx++] = el)}
+                            type="button"
+                            className="qm-item qm-item--btn"
+                            onClick={handleSyncNow}
+                            role="menuitem"
+                            disabled={syncing || cooldownSeconds > 0}
+                        >
+                            <div className="qm-item-icon">
+                                <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+                            </div>
+                            <span className="qm-item-label">
+                                {syncing ? "Syncing…" : cooldownSeconds > 0 ? `Sync Now (${formatCountdown(cooldownSeconds)})` : "Sync Now"}
+                            </span>
+                        </button>
 
                         <div className="qm-divider" role="separator" />
 

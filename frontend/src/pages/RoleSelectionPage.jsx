@@ -1,9 +1,9 @@
 import { memo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Sparkles, ArrowRight, BarChart3, ArrowLeft } from "lucide-react";
+import { Heart, Sparkles, ArrowRight, BarChart3 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { getDefaultMtssRoute } from "@/utils/mtssAccess";
-import { env } from "@/config/env";
+import { hasSupportHubAccess as computeHasSupportHubAccess } from "@/utils/hubConfig";
 import gsap from "gsap";
 import "@/pages/styles/role-selection-humanistic.css";
 
@@ -12,47 +12,6 @@ const CLD = "https://res.cloudinary.com/deldcwiji/image/upload";
 const cld = (id, w = 300) => `${CLD}/c_scale,w_${w},f_auto,q_auto/${id}.png`;
 const cldJpg = (id, w = 240) => `${CLD}/c_fill,w_${w},h_${Math.round(w * 1.25)},g_face,f_auto,q_auto/${id}.jpg`;
 const RS_ENABLE_FRAMED_CARDS = true;
-const HUB_SUPPORT_PATH = "/support-hub";
-// Shared literally with daily-checkin's own RoleSelectionPage.jsx - naming
-// the target the same in both apps means a Hub tab either one opens gets
-// reused/focused by the other too, not just by repeated clicks in one app.
-const HUB_SUPPORT_WINDOW_NAME = "mws-hub-support";
-
-// Mirrors daily-checkin's own RoleSelectionPage.jsx goToHubSupport - this
-// button means "go back to Hub's app launcher", not MTSS's own now-vestigial
-// /mtss/support-hub route (that just self-redirects back into the MTSS
-// dashboard, see SupportModeSelectionPage.jsx's own comment on why).
-const goToHubSupport = () => {
-  const hubBaseUrl = String(env.hubBaseUrl || "").trim().replace(/\/+$/, "");
-  const url = hubBaseUrl ? `${hubBaseUrl}${HUB_SUPPORT_PATH}` : HUB_SUPPORT_PATH;
-
-  // Opened with an empty URL first (mirrors Hub's own AppCard.tsx reuse
-  // trick) so an already-open tab just gets focused instead of reloaded -
-  // window.open(url, name) navigates the reused tab immediately even if
-  // it's already showing that exact page, which reads as a jarring reload.
-  const target = window.open("", HUB_SUPPORT_WINDOW_NAME);
-  if (!target) {
-    // Popup blocked despite the synchronous open - fall back rather than
-    // silently doing nothing.
-    window.location.assign(url);
-    return;
-  }
-
-  let isFreshWindow = true;
-  try {
-    isFreshWindow = target.location.href === "about:blank" || target.location.href === "";
-  } catch {
-    // Cross-origin already (it navigated to Hub in an earlier click) -
-    // not fresh, and not readable from here either way.
-    isFreshWindow = false;
-  }
-
-  if (isFreshWindow) {
-    target.location.href = url;
-  } else {
-    target.focus();
-  }
-};
 
 const supportsFinePointer = () => {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
@@ -457,8 +416,10 @@ const RoleSelection = memo(() => {
   }, []);
 
   // Same role list RouteConfig.jsx gates /mtss/pilot-testing with - reused
-  // here for both the Support Hub button and the Pilot Testing card below.
-  const hasSupportHubAccess = user && ['teacher', 'se_teacher', 'head_unit', 'directorate', 'admin', 'superadmin'].includes(user.role);
+  // here for both the Pilot Testing card below and hasNoMtssAccess. The
+  // Support Hub button itself now lives in QuickLogoutButton.jsx's floating
+  // menu (top-left corner), not on this page.
+  const hasSupportHubAccess = computeHasSupportHubAccess(user?.role);
   const hasNoMtssAccess = user && !mtssDashboardRoute && !hasSupportHubAccess;
 
   return (
@@ -470,16 +431,6 @@ const RoleSelection = memo(() => {
         <div className="absolute bottom-0 right-0 w-72 h-72 bg-primary/[0.04] rounded-full blur-3xl" style={{ animation: 'rs-blob 10s ease-in-out 1s infinite' }} />
         <div className="rs-grid-overlay" />
       </div>
-
-      {/* Back button — only shown for roles with Support Hub access */}
-      {hasSupportHubAccess && (
-        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 md:top-4 md:left-[130px] z-30">
-          <button onClick={goToHubSupport}
-            className="rs-back-btn inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-primary bg-card/80 border border-border/40 shadow-md backdrop-blur-xl hover:shadow-lg hover:border-primary/30 active:scale-95 transition-all duration-200">
-            <ArrowLeft className="w-3.5 h-3.5" /> Support Hub
-          </button>
-        </div>
-      )}
 
       {/* Content */}
       <div className="rs-pointer-shell relative z-10 min-h-screen flex items-center justify-center p-4 sm:p-6">
@@ -523,7 +474,7 @@ const RoleSelection = memo(() => {
             {hasNoMtssAccess && (
               <div className="rounded-xl border border-border/30 bg-card/40 p-3 text-center" style={{ animation: 'rs-card-in 0.5s ease-out 0.65s both' }}>
                 <p className="text-[10px] text-muted-foreground">You don't have access to any MTSS dashboard yet.</p>
-                <p className="text-[9px] text-muted-foreground/60 mt-0.5">Use the Support Hub button above to go back to Hub, or contact your administrator.</p>
+                <p className="text-[9px] text-muted-foreground/60 mt-0.5">Please contact your administrator for access.</p>
               </div>
             )}
 

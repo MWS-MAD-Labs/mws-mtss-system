@@ -110,6 +110,26 @@ export const deriveTeacherSegments = (user = {}) => {
         source,
         shouldFilterServer,
         unit: user?.unit || "",
-        label: allowedGrades.length ? allowedGrades.join(", ") : user?.unit || "All Grades",
+        // Prefer Central's real class name(s) (e.g. "K1") over the grade
+        // list when this teacher is actually scoped to specific class(es) -
+        // a mixed-age room produces one classes[] entry per grade it
+        // teaches (see collectClassNames' comment above), so joining grades
+        // here used to show a name like "Kindergarten Pre-K, Kindergarten
+        // K1, Kindergarten K2" for a teacher who's really just assigned to
+        // one room. Grade-wide roles (e.g. a JH subject specialist with no
+        // single class) still fall back to the grade list, then unit.
+        //
+        // shouldUseClassScopedRoster with zero synced classes is the exact
+        // condition applyViewerScope (mtssStudentController.js) treats as
+        // deny-all - this teacher's roster is genuinely empty right now, so
+        // showing the grade list here would look like they still have a
+        // grade-wide student list when they don't.
+        label: normalizedClasses.length
+            ? normalizedClasses.join(", ")
+            : shouldUseClassScopedRoster
+                ? "No Class Assigned"
+                : allowedGrades.length
+                    ? allowedGrades.join(", ")
+                    : user?.unit || "All Grades",
     };
 };

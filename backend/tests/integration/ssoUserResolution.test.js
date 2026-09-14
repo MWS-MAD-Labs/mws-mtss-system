@@ -19,7 +19,7 @@ const EMPLOYEE_FIELDS = {
     jobPosition: 'Teacher',
     jobLevel: 'Teacher',
     isTeachingRole: true,
-    employmentStatus: 'Permanent',
+    employmentStatus: 'PERMANENT',
     department: 'Junior High',
     unit: 'Junior High',
 };

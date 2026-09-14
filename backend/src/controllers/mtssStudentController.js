@@ -38,18 +38,24 @@ const normalizeList = (value) =>
             ? value.map((item) => item.trim()).filter(Boolean)
             : [];
 
+// Central's exact StudentStatus enum - validate-and-pass-through, not
+// lowercase-and-reinterpret. Used by the manual admin create/update path
+// (sanitizeStudentPayload below) - mtssStudentRosterSync.js's own status
+// mapping is separate and already passes Central's value straight through.
 const normalizeStatus = (status) => {
-    const normalized = normalizeValue(status)?.toLowerCase();
+    const normalized = normalizeValue(status)?.toUpperCase();
     if (!normalized) return undefined;
-    const allowed = ['active', 'inactive', 'graduated', 'transferred', 'pending'];
+    const allowed = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED'];
     return allowed.includes(normalized) ? normalized : undefined;
 };
 
+// Central's exact Gender enum - no local "other"/nonbinary/prefer_not_to_say
+// sentinel, and no silent fallback for an unrecognized value.
 const normalizeGender = (gender) => {
-    const normalized = normalizeValue(gender)?.toLowerCase();
+    const normalized = normalizeValue(gender)?.toUpperCase();
     if (!normalized) return undefined;
-    const allowed = ['male', 'female', 'nonbinary', 'other', 'prefer_not_to_say'];
-    return allowed.includes(normalized) ? normalized : 'other';
+    const allowed = ['MALE', 'FEMALE'];
+    return allowed.includes(normalized) ? normalized : undefined;
 };
 
 const TIER_CODES = ['tier1', 'tier2', 'tier3'];
@@ -342,11 +348,31 @@ const buildFilter = (query = {}, skipGradeClassFilter = false) => {
     // (mtssStudentRosterSync.js keeps their status field in sync with
     // Central, but that's meaningless if nothing ever reads it here).
     // Pass status=all explicitly to see everyone regardless of status.
-    const statusList = normalizeList(query.status).map((status) => status.toLowerCase());
-    if (statusList.length && !statusList.includes('all')) {
+    // 'all' is a local-only sentinel, not a Central value - checked
+    // case-insensitively on its own, separate from the real status values
+    // below which are upper-cased to match Central's exact casing.
+    const rawStatusList = normalizeList(query.status);
+    const isAllSentinel = rawStatusList.some((status) => status.toLowerCase() === 'all');
+    const statusList = rawStatusList.map((status) => status.toUpperCase());
+    if (statusList.length && !isAllSentinel) {
         filter.status = { $in: statusList };
     } else if (!statusList.length) {
-        filter.status = 'active';
+        filter.status = 'ACTIVE';
+    }
+
+    // Orphaned (no Central match at all - see orphanedAt on the schema and
+    // mtssStudentRosterSync.js) records are excluded from the normal roster
+    // by default - a stale/manually-added record showing up on a teacher's
+    // live "My Students" as if it's a real, currently-enrolled student is
+    // exactly the confusion this flag exists to prevent. Pass
+    // orphaned=true to see ONLY orphaned records (a review queue for an
+    // admin to clean up), or orphaned=all to see everyone regardless.
+    const orphanedParam = normalizeValue(query.orphaned)?.toLowerCase();
+    if (orphanedParam === 'true') {
+        filter.orphanedAt = { $ne: null };
+        delete filter.status; // an orphan's status is frozen/stale - not a useful filter here
+    } else if (orphanedParam !== 'all') {
+        filter.orphanedAt = null;
     }
 
     // Only apply grade/className filters from query params for privileged users

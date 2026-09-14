@@ -34,9 +34,13 @@ const userSchema = new mongoose.Schema({
         enum: ['student', 'staff', 'teacher', 'admin', 'superadmin', 'directorate', 'support_staff', 'head_unit', 'se_teacher', 'counselor'],
         default: 'staff'
     },
+    // No enum - mws-data-center's MasterUnit table is admin-editable master
+    // data, not a fixed vocabulary; synced as-is. A hardcoded list here
+    // already caused a real incident (BRIDGE/RISE/SHIELD/SAFE/COMPASS were
+    // once missing and silently blocked login for every employee in those
+    // units - see central-field-consistency.test.js).
     department: {
         type: String,
-        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE', 'BRIDGE', 'RISE', 'SHIELD', 'SAFE', 'COMPASS'],
         trim: true
     },
     employeeId: {
@@ -75,14 +79,18 @@ const userSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    // No enum - mws-data-center's job_level master data is free-text and
+    // admin-editable, not a fixed vocabulary (real example seen in
+    // production: "Junior Full-Stack Web Developer"). role/access-control
+    // derives separately (see jobLevelRoleMapping.js) - this field is
+    // display-only.
     jobLevel: {
         type: String,
-        enum: ['Director', 'Head Unit', 'Staff', 'Teacher', 'SE Teacher', 'Support Staff'],
         trim: true
     },
+    // No enum - same reasoning as department above.
     unit: {
         type: String,
-        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE', 'BRIDGE', 'RISE', 'SHIELD', 'SAFE', 'COMPASS'],
         trim: true
     },
     jobPosition: {
@@ -98,10 +106,10 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    // Central's exact EmploymentType enum - stored as-is, no local mapping.
     employmentStatus: {
         type: String,
-        enum: ['Permanent', 'Contract', 'Probation', 'Freelance', 'Part Time', 'WFH'],
-        default: 'Permanent'
+        enum: ['PERMANENT', 'CONTRACT', 'PART_TIME', 'PROBATION', 'FREELANCE', 'WFH']
     },
     joinDate: {
         type: Date
@@ -141,9 +149,10 @@ const userSchema = new mongoose.Schema({
     lastLogin: {
         type: Date
     },
+    // Central's exact Gender enum - no local "other" sentinel.
     gender: {
         type: String,
-        enum: ['male', 'female', 'other'],
+        enum: ['MALE', 'FEMALE'],
         trim: true
     },
     mtssAccess: {

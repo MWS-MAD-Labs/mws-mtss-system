@@ -9,23 +9,30 @@ const normalizeEmail = (email) => {
     return cleaned ? cleaned.toLowerCase() : undefined;
 };
 
+// Central's exact Gender enum - validate-and-pass-through, not lowercase-
+// and-reinterpret. An unrecognized value is left unset rather than silently
+// coerced to a guessed default, so a schema drift in Central surfaces as a
+// warning here instead of quietly mislabeling someone.
+const VALID_GENDERS = new Set(['MALE', 'FEMALE']);
 const normalizeGender = (gender) => {
     const value = normalizeString(gender);
     if (!value) return undefined;
-    const lowered = value.toLowerCase();
-    if (lowered === 'male' || lowered === 'm') return 'male';
-    if (lowered === 'female' || lowered === 'f') return 'female';
-    return 'other';
+    const upper = value.toUpperCase();
+    if (VALID_GENDERS.has(upper)) return upper;
+    console.warn(`normalizeGender: unrecognized Central gender value "${gender}" - leaving unset`);
+    return undefined;
 };
 
+// Central's exact StudentStatus enum - same validate-and-pass-through
+// posture as normalizeGender above.
+const VALID_STATUSES = new Set(['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED']);
 const normalizeStatus = (status) => {
     const value = normalizeString(status);
     if (!value) return undefined;
-    const lowered = value.toLowerCase();
-    if (['active', 'inactive', 'graduated', 'transferred', 'pending'].includes(lowered)) {
-        return lowered;
-    }
-    return 'active';
+    const upper = value.toUpperCase();
+    if (VALID_STATUSES.has(upper)) return upper;
+    console.warn(`normalizeStatus: unrecognized Central status value "${status}" - leaving unset`);
+    return undefined;
 };
 
 const deriveUnitFromGrade = (currentGrade, className) => {

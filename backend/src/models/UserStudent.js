@@ -63,16 +63,16 @@ const studentUserSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    // Central's exact Gender enum - no local "other" sentinel.
     gender: {
         type: String,
-        enum: ['male', 'female', 'other'],
-        default: 'other',
+        enum: ['MALE', 'FEMALE'],
         trim: true
     },
+    // Central's exact StudentStatus enum - stored as-is, no local narrowing.
     status: {
         type: String,
-        enum: ['active', 'inactive', 'graduated', 'transferred', 'pending'],
-        default: 'active',
+        enum: ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED'],
         trim: true
     },
     currentGrade: {
@@ -87,14 +87,15 @@ const studentUserSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    // No enum - mws-data-center's MasterUnit table is admin-editable master
+    // data, not a fixed vocabulary; synced as-is (see central-field-
+    // consistency.test.js for the incident this used to cause).
     department: {
         type: String,
-        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE', 'BRIDGE', 'RISE', 'SHIELD', 'SAFE', 'COMPASS'],
         trim: true
     },
     unit: {
         type: String,
-        enum: ['Directorate', 'Elementary', 'Junior High', 'Kindergarten', 'Operational', 'MAD Lab', 'Finance', 'Pelangi', 'CARE', 'BRIDGE', 'RISE', 'SHIELD', 'SAFE', 'COMPASS'],
         trim: true
     },
     lastLogin: {

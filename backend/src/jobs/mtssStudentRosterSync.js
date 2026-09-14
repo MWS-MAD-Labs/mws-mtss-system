@@ -15,31 +15,19 @@ const { listStudentsByStatus } = require('../services/mwsDataCenterClient');
 // for a record Central no longer shows as enrolled - those stay frozen as
 // the student's last real snapshot, since the record likely has real
 // intervention history attached. status IS still kept in sync either way
-// (see CENTRAL_TO_MTSS_STATUS below), so a graduated/withdrawn student
-// correctly drops out of "All Students" via the existing Status filter
-// instead of sitting there indefinitely under a stale 'active' default -
-// studentDeactivationSync.js does the equivalent for the separate
-// UserStudent (login) model, not this one.
+// (MTSSStudent.status stores Central's StudentStatus value as-is - see
+// models/MTSSStudent.js), so a graduated/withdrawn student correctly drops
+// out of "All Students" via the existing Status filter instead of sitting
+// there indefinitely under a stale ACTIVE default - studentDeactivationSync.js
+// does the equivalent for the separate UserStudent (login) model, not this one.
 //
-// Still never touches a record with no Central match at all (manually
-// added, or a data mismatch - needs a human, not a job).
+// Still never touches identity/status fields, and never deletes, a record
+// with no Central match at all (manually added, or a data mismatch) - but
+// it IS flagged via orphanedAt (models/MTSSStudent.js) so an admin can find
+// and decide what to do with it, instead of it silently lingering forever
+// on a teacher's live roster with no trace of why.
 const ENROLLED_STATUSES = new Set(['REGISTERED', 'ACTIVE']);
 const ALL_STATUSES = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED'];
-
-// MTSSStudent.status's enum is narrower than Central's - WITHDRAWN and
-// ARCHIVED both collapse to 'inactive' since there's no closer match.
-// REGISTERED means Central hasn't put them in a class yet, so they don't
-// belong in the "active" caseload view either - 'pending' fits until they
-// actually get enrolled into a class and Central promotes them to ACTIVE.
-const CENTRAL_TO_MTSS_STATUS = {
-    REGISTERED: 'pending',
-    ACTIVE: 'active',
-    GRADUATED: 'graduated',
-    TRANSFERRED: 'transferred',
-    WITHDRAWN: 'inactive',
-    ARCHIVED: 'inactive',
-    INACTIVE: 'inactive',
-};
 
 // Longer than the 5-minute deactivation jobs - a new/updated roster row
 // showing up a bit late is lower-severity than a revoked account staying
@@ -48,21 +36,33 @@ const DEFAULT_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 
+// Central is the single source of truth here - a genuinely empty response
+// (every status fetch succeeds, none of them have anyone) is real data and
+// must propagate everywhere else exactly like any other answer from
+// Central would. What must NOT propagate is a guess: if any status fetch
+// actually fails (network error, non-2xx, timeout), that failure is
+// re-thrown as-is instead of being swallowed into an empty array - an
+// empty array on error was indistinguishable from Central honestly saying
+// "nobody", which meant a mid-fetch outage could get diffed as if Central
+// had emptied out for real. The caller (syncStudentRoster) catches this
+// and skips the whole run rather than act on a partial/unknown picture.
 async function fetchCentralStudentsByStatus() {
     const byStatus = {};
     for (const status of ALL_STATUSES) {
-        try {
-            byStatus[status] = await listStudentsByStatus(status);
-        } catch (error) {
-            winston.warn(`mtssStudentRosterSync: failed to fetch Central students with status=${status}: ${error.message}`);
-            byStatus[status] = [];
-        }
+        byStatus[status] = await listStudentsByStatus(status);
     }
     return byStatus;
 }
 
 async function syncStudentRoster() {
-    const byStatus = await fetchCentralStudentsByStatus();
+    let byStatus;
+    try {
+        byStatus = await fetchCentralStudentsByStatus();
+    } catch (error) {
+        winston.warn(`mtssStudentRosterSync: failed to fetch Central roster, skipping this run: ${error.message}`);
+        return { created: 0, updated: 0, errors: 0, orphaned: 0, unorphaned: 0, skipped: true };
+    }
+
     const centralByEmail = new Map();
     for (const status of ALL_STATUSES) {
         for (const student of byStatus[status]) {
@@ -71,12 +71,15 @@ async function syncStudentRoster() {
         }
     }
 
-    if (centralByEmail.size === 0) {
-        winston.warn('mtssStudentRosterSync: Central returned no students at all, skipping this run');
-        return { created: 0, updated: 0, errors: 0, skipped: true };
-    }
+    // No "if centralByEmail.size === 0, skip" guard here on purpose - every
+    // status fetch above already succeeded (a real failure would have
+    // thrown and been caught above), so an empty result at this point is
+    // Central genuinely reporting zero students, not a sign of an outage.
+    // The loop below (and the orphan sweep after it) already does the
+    // right thing with that: every existing MTSSStudent gets flagged as
+    // orphaned, matching "not in Central means not here either."
 
-    const mtssStudents = await MTSSStudent.find({}).select('name email currentGrade className status');
+    const mtssStudents = await MTSSStudent.find({}).select('name email gender currentGrade className status orphanedAt');
     const mtssByEmail = new Map();
     mtssStudents.forEach((doc) => {
         const email = normalizeEmail(doc.email);
@@ -86,10 +89,14 @@ async function syncStudentRoster() {
     let created = 0;
     let updated = 0;
     let errors = 0;
+    let orphaned = 0;
+    let unorphaned = 0;
 
     for (const [email, central] of centralByEmail) {
         const isEnrolled = ENROLLED_STATUSES.has(central.status);
-        const targetStatus = CENTRAL_TO_MTSS_STATUS[central.status] || 'active';
+        // Direct pass-through - MTSSStudent.status stores Central's exact
+        // StudentStatus value, no local narrowing table needed.
+        const targetStatus = central.status;
 
         const existing = mtssByEmail.get(email);
 
@@ -99,6 +106,8 @@ async function syncStudentRoster() {
                 await MTSSStudent.create({
                     name: central.full_name,
                     email,
+                    gender: central.gender,
+                    status: targetStatus,
                     currentGrade: central.current_grade || undefined,
                     className: central.current_class || undefined,
                 });
@@ -114,6 +123,13 @@ async function syncStudentRoster() {
         const update = {};
         if (existing.status !== targetStatus) {
             update.status = targetStatus;
+        }
+        if (central.gender && existing.gender !== central.gender) {
+            update.gender = central.gender;
+        }
+        // Found a match this run - clear a stale orphan flag, if any.
+        if (existing.orphanedAt) {
+            update.orphanedAt = null;
         }
 
         // Identity fields only ever move for someone Central currently
@@ -146,6 +162,7 @@ async function syncStudentRoster() {
             try {
                 await MTSSStudent.findByIdAndUpdate(existing._id, update, { runValidators: true });
                 updated += 1;
+                if (update.orphanedAt === null) unorphaned += 1;
                 winston.info(`mtssStudentRosterSync: updated ${email}: ${Object.keys(update).join(', ')}`);
             } catch (error) {
                 errors += 1;
@@ -154,8 +171,26 @@ async function syncStudentRoster() {
         }
     }
 
-    winston.info(`mtssStudentRosterSync: checked ${centralByEmail.size}, created ${created}, updated ${updated}, ${errors} error(s)`);
-    return { created, updated, errors, skipped: false };
+    // Anything in mtssByEmail never visited above has no Central match at
+    // all under any status - flag it (if not already flagged) rather than
+    // touching its data. Central being fully unreachable this run already
+    // returned early above, so reaching here means Central genuinely
+    // answered and genuinely doesn't know this email.
+    for (const [email, doc] of mtssByEmail) {
+        if (centralByEmail.has(email)) continue;
+        if (doc.orphanedAt) continue;
+        try {
+            await MTSSStudent.findByIdAndUpdate(doc._id, { orphanedAt: new Date() });
+            orphaned += 1;
+            winston.info(`mtssStudentRosterSync: flagged ${email} as orphaned (no Central match)`);
+        } catch (error) {
+            errors += 1;
+            winston.error(`mtssStudentRosterSync: failed to flag ${email} as orphaned: ${error.message}`);
+        }
+    }
+
+    winston.info(`mtssStudentRosterSync: checked ${centralByEmail.size}, created ${created}, updated ${updated}, ${orphaned} newly orphaned, ${unorphaned} un-orphaned, ${errors} error(s)`);
+    return { created, updated, errors, orphaned, unorphaned, skipped: false };
 }
 
 let intervalHandle = null;

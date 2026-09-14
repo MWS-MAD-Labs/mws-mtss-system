@@ -4043,7 +4043,7 @@ ${teacherLines}`;
                 if (user.email) {
                     mtssProfile = await MTSSStudent.findOne({
                         email: user.email,
-                        status: 'active'
+                        status: 'ACTIVE'
                     })
                         .select('name email currentGrade className interventions status tier type')
                         .lean();
@@ -4053,7 +4053,7 @@ ${teacherLines}`;
                     const escapedName = String(fullName || preferredName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     mtssProfile = await MTSSStudent.findOne({
                         name: { $regex: new RegExp(escapedName, 'i') },
-                        status: 'active'
+                        status: 'ACTIVE'
                     })
                         .select('name email currentGrade className interventions status tier type')
                         .lean();
