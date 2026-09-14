@@ -56,18 +56,20 @@ const DashboardOverviewSpotlightChart = ({ chartSeries = [], progressUnit = "sco
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50/80 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-200 border border-emerald-200/50">
-                        Latest {fmt(latest)}
+                    {/* Fixed-height grid + translate-y-px nudge - same Nunito
+                        vertical-centering fix as the other MTSS Studio badges. */}
+                    <span className="inline-grid h-6 place-items-center px-2.5 rounded-full bg-emerald-50/80 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-200 border border-emerald-200/50">
+                        <span className="leading-none translate-y-px">Latest {fmt(latest)}</span>
                     </span>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100/80 text-slate-600 dark:bg-slate-800/50 dark:text-slate-200 border border-white/40">
-                        Avg {fmt(average)}
+                    <span className="inline-grid h-6 place-items-center px-2.5 rounded-full bg-slate-100/80 text-slate-600 dark:bg-slate-800/50 dark:text-slate-200 border border-white/40">
+                        <span className="leading-none translate-y-px">Avg {fmt(average)}</span>
                     </span>
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/80 dark:bg-white/10 border border-white/40 ${deltaTone}`}>
-                        {deltaSign}{fmt(Math.abs(delta))}
+                    <span className={`inline-grid h-6 place-items-center px-2.5 rounded-full bg-white/80 dark:bg-white/10 border border-white/40 ${deltaTone}`}>
+                        <span className="leading-none translate-y-px">{deltaSign}{fmt(Math.abs(delta))}</span>
                     </span>
                     {goal != null && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50/80 text-amber-600 dark:bg-amber-900/40 dark:text-amber-200 border border-amber-200/50">
-                            Goal {fmt(goal)}
+                        <span className="inline-grid h-6 place-items-center px-2.5 rounded-full bg-amber-50/80 text-amber-600 dark:bg-amber-900/40 dark:text-amber-200 border border-amber-200/50">
+                            <span className="leading-none translate-y-px">Goal {fmt(goal)}</span>
                         </span>
                     )}
                 </div>

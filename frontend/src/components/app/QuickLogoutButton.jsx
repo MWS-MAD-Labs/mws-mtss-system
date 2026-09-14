@@ -86,6 +86,7 @@ const QuickMenu = memo(() => {
     const itemsRef = useRef([]);
     const burgerTl = useRef(null);
     const confirmTimer = useRef(null);
+    const lastSyncStatusFetchAt = useRef(0);
 
     /* sync dark state when theme changes externally */
     useEffect(() => {
@@ -147,6 +148,15 @@ const QuickMenu = memo(() => {
     /* Panel entrance after mount — direction-aware for mobile (opens upward) */
     useEffect(() => {
         if (!isOpen || !panelRef.current) return;
+        // Hide items before the panel's own fade-in starts, not just at its
+        // completion. Item opacity is relative to the panel's (a parent's
+        // opacity multiplies through its subtree), so without this the
+        // items were already visible for the whole 0.32s panel fade, then
+        // instantly snapped invisible (gsap.set, no tween) right as
+        // animateIn kicked off its stagger - a visible "pop"/flicker every
+        // single open, not the sync-status fetch this was first mistaken for.
+        const items = itemsRef.current.filter(Boolean);
+        if (items.length) gsap.set(items, { opacity: 0, y: -6 });
         const isMobile = window.innerWidth < 768;
         const origin = isMobile ? "bottom left" : "top left";
         const yFrom = isMobile ? 10 : -10;
@@ -188,6 +198,14 @@ const QuickMenu = memo(() => {
        race entirely. */
     useEffect(() => {
         if (!isOpen || !isAuthenticated) return;
+        // Skip re-fetching on a rapid reopen (e.g. closing and immediately
+        // reopening while testing) - the state update once the response
+        // lands, after the panel has already animated in, was visible as a
+        // repaint "flash" on the blurred glass panel. A short staleness
+        // window keeps this correct (still catches a cooldown started from
+        // another tab) without refetching on every single open.
+        if (Date.now() - lastSyncStatusFetchAt.current < 10000) return;
+        lastSyncStatusFetchAt.current = Date.now();
         getSyncStatus()
             .then((response) => {
                 const data = response?.data?.data;

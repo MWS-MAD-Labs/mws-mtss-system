@@ -6,11 +6,19 @@ import { resolveProgressAssignmentForStudent } from "../utils/editPlanAccess";
 const MAX_RENDER = 50;
 
 const HEADER_COLS = [
+    // Student keeps its original width - it also carries the "Universal
+    // Supports" support-unit badge under the name, which crowded the Class
+    // / Mentor column when this was narrowed to fund Progress/Last Update.
     { label: "Student", align: "text-left", width: "w-[16%]" },
     { label: "Class / Mentor", align: "text-left", width: "w-[13%]" },
-    { label: "Interventions", align: "text-left", width: "w-[22%]" },
-    { label: "Progress", align: "text-left", width: "w-[9%]" },
-    { label: "Last Update", align: "text-left", width: "w-[13%]" },
+    // Interventions is the one column with real slack (1-2 small chips
+    // usually) - it funds the extra width Progress/Last Update need below.
+    { label: "Interventions", align: "text-left", width: "w-[18%]" },
+    // Progress/Last Update carry the longest realistic values ("Not
+    // Assigned", "No updates yet") - narrower than this and the pill/text
+    // crowds right up against the next column.
+    { label: "Progress", align: "text-left", width: "w-[11%]" },
+    { label: "Last Update", align: "text-left", width: "w-[15%]" },
     { label: "Next Update", align: "text-left", width: "w-[12%]" },
 ];
 

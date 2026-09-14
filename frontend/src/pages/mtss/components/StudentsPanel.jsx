@@ -4,16 +4,17 @@ import { useLocation, useNavigate } from "react-router-dom";
 import PilotTaskHintBanner from "./PilotTaskHintBanner";
 import StudentsTable from "./StudentsTable";
 import QuickUpdateModal from "./QuickUpdateModal";
+import RosterPagination from "./RosterPagination";
 import { updateMentorAssignment, uploadEvidenceAttachments } from "@/services/mtssService";
 import { canUserSubmitProgressForAssignment } from "../utils/editPlanAccess";
 import { ensureStudentInterventions, getMostCriticalForDisplay } from "../utils/interventionUtils";
-import { FilterBar, RosterHeader, LoadMore, STUDENTS_PANEL_BATCH } from "./StudentsPanelParts";
+import { FilterBar, RosterHeader, STUDENTS_PANEL_PAGE_SIZE } from "./StudentsPanelParts";
 import useMtssPersistentState from "../hooks/useMtssPersistentState";
 
 const DEFAULT_VIEW_STATE = {
     activeTier: "All",
     query: "",
-    visibleCount: STUDENTS_PANEL_BATCH,
+    page: 1,
 };
 
 const getStudentRowId = (student = {}) =>
@@ -83,7 +84,7 @@ const StudentsPanel = memo(({ students, TierPill, ProgressBadge, onRefresh, onEd
     const [viewState, setViewState] = useMtssPersistentState(storageKey, DEFAULT_VIEW_STATE);
     const activeTier = typeof viewState?.activeTier === "string" ? viewState.activeTier : "All";
     const query = typeof viewState?.query === "string" ? viewState.query : "";
-    const visibleCount = Math.max(Number(viewState?.visibleCount) || STUDENTS_PANEL_BATCH, STUDENTS_PANEL_BATCH);
+    const page = Math.max(Number(viewState?.page) || 1, 1);
 
     const deferredQuery = useDeferredValue(query.trim().toLowerCase());
     const rosterStudents = useMemo(() => groupStudentsForRoster(students), [students]);
@@ -115,16 +116,22 @@ const StudentsPanel = memo(({ students, TierPill, ProgressBadge, onRefresh, onEd
         }),
     [rosterStudents, activeTier, deferredQuery]);
 
-    const visibleStudents = useMemo(
-        () => filteredStudents.slice(0, Math.min(visibleCount, filteredStudents.length)),
-        [filteredStudents, visibleCount],
-    );
+    const totalPages = Math.max(1, Math.ceil(filteredStudents.length / STUDENTS_PANEL_PAGE_SIZE));
+    const clampedPage = Math.min(page, totalPages);
+
+    const visibleStudents = useMemo(() => {
+        const start = (clampedPage - 1) * STUDENTS_PANEL_PAGE_SIZE;
+        return filteredStudents.slice(start, start + STUDENTS_PANEL_PAGE_SIZE);
+    }, [filteredStudents, clampedPage]);
+
+    const rangeStart = filteredStudents.length ? (clampedPage - 1) * STUDENTS_PANEL_PAGE_SIZE + 1 : 0;
+    const rangeEnd = Math.min(clampedPage * STUDENTS_PANEL_PAGE_SIZE, filteredStudents.length);
 
     const setActiveTier = useCallback((value) => {
         setViewState((prev) => ({
             ...(prev || {}),
             activeTier: value,
-            visibleCount: STUDENTS_PANEL_BATCH,
+            page: 1,
         }));
     }, [setViewState]);
 
@@ -132,17 +139,17 @@ const StudentsPanel = memo(({ students, TierPill, ProgressBadge, onRefresh, onEd
         setViewState((prev) => ({
             ...(prev || {}),
             query: value,
-            visibleCount: STUDENTS_PANEL_BATCH,
+            page: 1,
         }));
     }, [setViewState]);
 
-    const setVisibleCount = useCallback((updater) => {
+    const setPage = useCallback((updater) => {
         setViewState((prev) => {
-            const currentValue = Math.max(Number(prev?.visibleCount) || STUDENTS_PANEL_BATCH, STUDENTS_PANEL_BATCH);
+            const currentValue = Math.max(Number(prev?.page) || 1, 1);
             const nextValue = typeof updater === "function" ? updater(currentValue) : updater;
             return {
                 ...(prev || {}),
-                visibleCount: Math.max(Number(nextValue) || STUDENTS_PANEL_BATCH, STUDENTS_PANEL_BATCH),
+                page: Math.max(Number(nextValue) || 1, 1),
             };
         });
     }, [setViewState]);
@@ -266,11 +273,16 @@ const StudentsPanel = memo(({ students, TierPill, ProgressBadge, onRefresh, onEd
                     />
                 </div>
 
-                <LoadMore
-                    visible={visibleStudents.length}
-                    total={filteredStudents.length}
-                    onLoadMore={() => setVisibleCount((prev) => Math.min(filteredStudents.length, prev + STUDENTS_PANEL_BATCH))}
-                />
+                {filteredStudents.length > 0 && (
+                    <RosterPagination
+                        page={clampedPage}
+                        totalPages={totalPages}
+                        setPage={setPage}
+                        rangeStart={rangeStart}
+                        rangeEnd={rangeEnd}
+                        totalCount={filteredStudents.length}
+                    />
+                )}
             </section>
 
             {modalState.type === "update" && (

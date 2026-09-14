@@ -20,6 +20,22 @@ const FEMALE_GENDER_KEYS = new Set([
     'perempuan'
 ]);
 
+// A raw username fallback ("dummystaff") is always plain lower/upper case
+// with no internal caps to preserve, so this only reshapes tokens that
+// currently look that way - an already-correct mixed-case name (McDonald,
+// O'Brien) passes through untouched.
+const toDisplayCase = (value = '') =>
+    String(value || '')
+        .split(/(\s+)/)
+        .map((part) => {
+            if (!part.trim()) return part;
+            const isAllLower = part === part.toLowerCase();
+            const isAllUpper = part === part.toUpperCase();
+            if (!isAllLower && !isAllUpper) return part;
+            return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+        })
+        .join('');
+
 const stripTitlePrefix = (rawName = '') =>
     String(rawName || '')
         .replace(/^(mr\.?\s*\/\s*ms\.?|ms\.?\s*\/\s*mr\.?|mr\.?\s*or\s*ms\.?)\s*/i, '')
@@ -64,7 +80,7 @@ export const formatStaffDisplayName = ({ name, username, nickname, gender, fallb
         String(name || '').trim() ||
         fallback;
 
-    const cleanName = stripTitlePrefix(rawName) || fallback;
+    const cleanName = toDisplayCase(stripTitlePrefix(rawName) || fallback);
     const salutation = resolveStaffSalutation(gender, rawName);
     return `${salutation} ${cleanName}`.trim();
 };

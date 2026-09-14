@@ -48,19 +48,19 @@ const DashboardOverviewSpotlightDetails = ({
                 <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span>Grade</span>
-                        <span className="font-semibold text-foreground dark:text-white">{spotlightStudent?.grade ?? "-"}</span>
+                        <span className="font-semibold text-foreground dark:text-white">{spotlightStudent?.grade ?? "Not set"}</span>
                     </div>
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span>Class</span>
-                        <span className="font-semibold text-foreground dark:text-white">{classLabel}</span>
+                        <span className="font-semibold text-foreground dark:text-white">{classLabel === "-" ? "Not set" : classLabel}</span>
                     </div>
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span>Teacher</span>
-                        <span className="font-semibold text-foreground dark:text-white">{spotlightProfile.teacher ?? "-"}</span>
+                        <span className="font-semibold text-foreground dark:text-white">{spotlightProfile.teacher ?? "Not set"}</span>
                     </div>
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span>Mentor</span>
-                        <span className="font-semibold text-foreground dark:text-white">{spotlightProfile.mentor ?? "-"}</span>
+                        <span className="font-semibold text-foreground dark:text-white">{spotlightProfile.mentor ?? "Not assigned"}</span>
                     </div>
                     {pairingLabel && (
                         <div className="rounded-xl bg-sky-50 px-3 py-2 text-sky-700 dark:bg-sky-500/10 dark:text-sky-100">
@@ -72,7 +72,7 @@ const DashboardOverviewSpotlightDetails = ({
                         {spotlightStudent?.tier ? (
                             <TierPill tier={spotlightStudent.tier} />
                         ) : (
-                            <span className="font-semibold text-foreground dark:text-white">-</span>
+                            <span className="font-semibold text-foreground dark:text-white">Not set</span>
                         )}
                     </div>
                 </div>

@@ -32,7 +32,7 @@ const TIER_STYLES = [
 ];
 
 export const tierFilters = TIER_STYLES.map((t) => t.key);
-export const STUDENTS_PANEL_BATCH = 10;
+export const STUDENTS_PANEL_PAGE_SIZE = 10;
 
 export const FilterBar = ({ activeTier, setActiveTier, query, setQuery }) => (
     <div
@@ -99,20 +99,3 @@ export const RosterHeader = ({ visible, total }) => (
     </div>
 );
 
-export const LoadMore = ({ visible, total, onLoadMore }) => (
-    <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground py-3" data-aos="fade-up" data-aos-delay="160">
-        {visible < total ? (
-            <button
-                type="button"
-                onClick={onLoadMore}
-                className="px-4 py-2 rounded-full bg-white/80 dark:bg-white/10 border border-primary/30 text-sm font-semibold text-primary shadow-sm hover:-translate-y-0.5 transition"
-            >
-                Load 10 more students ({visible}/{total})
-            </button>
-        ) : (
-            <span className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-200 border border-emerald-200/70 dark:border-emerald-500/30">
-                All students loaded
-            </span>
-        )}
-    </div>
-);

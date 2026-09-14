@@ -1,29 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, CheckCircle2 } from "lucide-react";
 import StudentsTable from "./StudentsTable";
+import RosterPagination from "./RosterPagination";
 
-const BATCH = 10;
+const PAGE_SIZE = 10;
 
 const DashboardOverviewRoster = ({ students, TierPill, ProgressBadge, onView, onUpdate, onEditPlan, canEditPlanForStudent }) => {
-    const [visibleCount, setVisibleCount] = useState(BATCH);
-
-    useEffect(() => {
-        setVisibleCount(BATCH);
-    }, [students.length]);
+    const [page, setPage] = useState(1);
 
     const rosterStudents = useMemo(() => (Array.isArray(students) ? students : []), [students]);
+    const totalPages = Math.max(1, Math.ceil(rosterStudents.length / PAGE_SIZE));
 
     useEffect(() => {
-        setVisibleCount(BATCH);
+        setPage(1);
     }, [rosterStudents.length]);
 
-    const visibleStudents = useMemo(
-        () => rosterStudents.slice(0, Math.min(visibleCount, rosterStudents.length)),
-        [rosterStudents, visibleCount],
-    );
+    // Clamp instead of reset when the list shrinks out from under a page
+    // the person is already sitting on (e.g. a filter removes rows) -
+    // jumping straight back to page 1 would be more disorienting.
+    useEffect(() => {
+        setPage((current) => Math.min(current, totalPages));
+    }, [totalPages]);
 
-    const hasMore = visibleStudents.length < rosterStudents.length;
-    const progressPercent = rosterStudents.length ? Math.round((visibleStudents.length / rosterStudents.length) * 100) : 0;
+    const visibleStudents = useMemo(() => {
+        const start = (page - 1) * PAGE_SIZE;
+        return rosterStudents.slice(start, start + PAGE_SIZE);
+    }, [rosterStudents, page]);
+
+    const rangeStart = rosterStudents.length ? (page - 1) * PAGE_SIZE + 1 : 0;
+    const rangeEnd = Math.min(page * PAGE_SIZE, rosterStudents.length);
 
     return (
         <section className="relative rounded-[28px] sm:rounded-[32px] overflow-hidden border border-white/40 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl shadow-[0_20px_60px_rgba(15,23,42,0.12)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.4)]">
@@ -67,39 +71,19 @@ const DashboardOverviewRoster = ({ students, TierPill, ProgressBadge, onView, on
                 />
             </div>
 
-            {/* Footer with load more */}
-            <div className="px-5 pb-5 sm:px-7 sm:pb-6">
-                <div className="flex flex-col items-center gap-3">
-                    {/* Progress bar */}
-                    <div className="w-full max-w-xs">
-                        <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                            <div
-                                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500 ease-out"
-                                style={{ width: `${progressPercent}%` }}
-                            />
-                        </div>
-                        <p className="text-[10px] sm:text-xs text-center text-slate-400 dark:text-slate-500 mt-1.5">
-                            {visibleStudents.length} of {rosterStudents.length} students shown
-                        </p>
-                    </div>
-
-                    {hasMore ? (
-                        <button
-                            type="button"
-                                    onClick={() => setVisibleCount((prev) => Math.min(rosterStudents.length, prev + BATCH))}
-                            className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-semibold shadow-[0_8px_25px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_35px_rgba(99,102,241,0.4)] hover:-translate-y-0.5 transition-all duration-200"
-                        >
-                            <span>Show more</span>
-                            <ChevronDown className="w-4 h-4 transition-transform group-hover:translate-y-0.5" />
-                        </button>
-                    ) : rosterStudents.length > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-500/20 text-sm font-medium">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            All students loaded
-                        </span>
-                    ) : null}
+            {/* Footer with pagination */}
+            {rosterStudents.length > 0 && (
+                <div className="px-5 pb-5 sm:px-7 sm:pb-6">
+                    <RosterPagination
+                        page={page}
+                        totalPages={totalPages}
+                        setPage={setPage}
+                        rangeStart={rangeStart}
+                        rangeEnd={rangeEnd}
+                        totalCount={rosterStudents.length}
+                    />
                 </div>
-            </div>
+            )}
         </section>
     );
 };

@@ -36,7 +36,11 @@ const InterventionFormPanel = memo(({
     useEffect(() => {
         let mounted = true;
         setLoadingStrategies(true);
-        fetchStrategies()
+        // skipGlobalLoading: this panel unmounts/remounts on every tab
+        // switch (see the comment on the section below), so without this
+        // every switch into "Create Intervention" flashed the global
+        // loading overlay - same root cause as the burger-menu flicker.
+        fetchStrategies({}, { skipGlobalLoading: true })
             .then((response) => {
                 if (!mounted) return;
                 setStrategies(response?.strategies || []);

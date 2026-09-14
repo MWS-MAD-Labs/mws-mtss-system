@@ -8,7 +8,9 @@ const { deactivateMissingStudents } = require('../jobs/studentDeactivationSync')
 const { sendSuccess, sendError } = require('../utils/response');
 
 const DOC_ID = 'manual-sync';
-const COOLDOWN_MS = 5 * 60 * 1000;
+// Short cooldown outside production so the button is actually testable
+// without a 5-minute wait between clicks.
+const COOLDOWN_MS = process.env.NODE_ENV === 'production' ? 5 * 60 * 1000 : 30 * 1000;
 
 const cooldownRemainingSeconds = (doc) => {
     if (!doc || !doc.lastTriggeredAt) return 0;

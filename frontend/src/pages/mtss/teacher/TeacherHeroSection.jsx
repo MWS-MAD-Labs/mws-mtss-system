@@ -15,15 +15,23 @@ const TeacherHeroSection = ({ heroBadge, tabs, activeTab, onTabChange, pilotGuid
             <div className="relative px-3 py-4 sm:px-7 sm:py-8 lg:px-9 text-slate-900 dark:text-white">
                 {/* Top badges row — compact on mobile */}
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2.5 sm:mb-5">
-                    <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.3em] sm:tracking-[0.35em] text-white bg-gradient-to-r from-[#f472b6] via-[#a78bfa] to-[#818cf8] px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-[0_4px_20px_rgba(168,85,247,0.35)]">
-                        <Sparkles className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
-                        MTSS Studio
+                    {/* Fixed height + grid centering gets the BOX right, but
+                        Nunito (.mtss-theme, index.css) sits visually high
+                        within its own line box at these weights - a small
+                        manual downward nudge on the glyphs themselves is the
+                        standard fix for that, independent of box centering. */}
+                    <span className="inline-grid h-6 sm:h-7 grid-flow-col auto-cols-max items-center gap-1.5 text-[9px] sm:text-[11px] font-bold uppercase tracking-[0.3em] sm:tracking-[0.35em] text-white bg-gradient-to-r from-[#f472b6] via-[#a78bfa] to-[#818cf8] px-2.5 sm:px-3 rounded-full shadow-[0_4px_20px_rgba(168,85,247,0.35)]">
+                        <Sparkles className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 translate-y-px" />
+                        <span className="leading-none translate-y-px">MTSS Studio</span>
                     </span>
-                    <span className="inline-flex items-center px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white/90 dark:bg-white/10 border border-white/60 dark:border-white/15 text-[9px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] sm:tracking-[0.25em] text-slate-600 dark:text-slate-200 shadow-sm">
-                        {heroBadge.school}
+                    <span className="inline-grid h-6 sm:h-7 place-items-center px-2.5 sm:px-3 rounded-full bg-white/90 dark:bg-white/10 border border-white/60 dark:border-white/15 text-[9px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] sm:tracking-[0.25em] text-slate-600 dark:text-slate-200 shadow-sm">
+                        <span className="leading-none translate-y-px">{heroBadge.school}</span>
                     </span>
-                    <span className="inline-flex items-center px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-gradient-to-r from-emerald-400/20 to-cyan-400/20 dark:from-emerald-500/20 dark:to-cyan-500/20 border border-emerald-300/40 dark:border-emerald-500/20 text-[9px] sm:text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                        {heroBadge.gradeLabel}
+                    {/* min-w so a short class label like "K1" doesn't collapse
+                        into a barely-visible dot - matches the pill's own
+                        horizontal padding at rest. */}
+                    <span className="inline-grid h-6 sm:h-7 place-items-center min-w-[3.25rem] sm:min-w-[3.75rem] px-2.5 sm:px-3 rounded-full bg-gradient-to-r from-emerald-400/20 to-cyan-400/20 dark:from-emerald-500/20 dark:to-cyan-500/20 border border-emerald-300/40 dark:border-emerald-500/20 text-[9px] sm:text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                        <span className="leading-none">{heroBadge.gradeLabel}</span>
                     </span>
                 </div>
 

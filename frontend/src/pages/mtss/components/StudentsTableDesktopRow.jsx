@@ -176,10 +176,10 @@ const StudentsTableDesktopRow = memo(
                         <span className="block text-[10px] text-slate-500 dark:text-slate-300 mt-0.5">{student.grade}</span>
                         {supportSubjectLabel && (
                             <span
-                                className="mt-1 inline-flex max-w-[200px] items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-sky-700 dark:border-sky-400/25 dark:bg-sky-500/10 dark:text-sky-200"
+                                className="mt-1 inline-flex max-w-full items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-sky-700 dark:border-sky-400/25 dark:bg-sky-500/10 dark:text-sky-200"
                                 title={`Support unit: ${supportSubjectLabel}`}
                             >
-                                {supportSubjectLabel}
+                                <span className="truncate">{supportSubjectLabel}</span>
                             </span>
                         )}
                     </div>
@@ -201,7 +201,7 @@ const StudentsTableDesktopRow = memo(
                 </td>
 
                 {/* Interventions — top 2 inline, rest collapsed */}
-                <td className="py-3.5 pr-2 align-top w-[22%]">
+                <td className="py-3.5 pr-2 align-top w-[18%]">
                     {isGrouped ? (
                         <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-white/10 dark:bg-white/5">
                             <div className="flex items-center justify-between gap-3">
@@ -231,7 +231,7 @@ const StudentsTableDesktopRow = memo(
                 </td>
 
                 {/* Progress */}
-                <td className="py-3.5 pr-2 align-top w-[9%]">
+                <td className="py-3.5 pl-1 pr-2 align-top w-[11%]">
                     {isGrouped ? (
                         <ProgressBadge status={groupedProgressLabel} />
                     ) : (
@@ -240,7 +240,7 @@ const StudentsTableDesktopRow = memo(
                 </td>
 
                 {/* Last Update */}
-                <td className="py-3.5 pr-2 align-top w-[13%]">
+                <td className="py-3.5 pl-1 pr-2 align-top w-[15%]">
                     {isGrouped ? (
                         <StudentUpdateValue
                             dateLabel={groupedLastUpdate.dateLabel}

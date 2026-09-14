@@ -79,13 +79,51 @@ export const filterStrategiesByType = (strategies, type) => {
     });
 };
 
-export const validateInterventionForm = (formState) => {
-    return Boolean(
-        formState.studentId &&
-        formState.type &&
-        formState.tier &&
-        formState.startDate &&
-        formState.monitorFrequency &&
-        formState.monitorMethod
-    );
+export const GOAL_NOTES_MAX_LENGTH = 100;
+// % / pts / score are genuinely bounded 0-100. wpm (reading fluency) is
+// not - a fluent upper-grade reader can clear 100+ words per minute, so
+// capping it would reject real data, not catch a typo.
+const CAPPED_SCORE_UNITS = new Set(["%", "pts", "score"]);
+export const MAX_CAPPED_SCORE = 100;
+
+export const getInterventionFormErrors = (formState = {}) => {
+    const errors = {};
+
+    if (!formState.studentId) errors.studentId = "Select a student";
+    if (!formState.type) errors.type = "Select a subject or focus area";
+    if (!formState.tier) errors.tier = "Select a tier";
+    if (!formState.startDate) errors.startDate = "Select a start date";
+    if (!formState.monitorFrequency) errors.monitorFrequency = "Select a monitoring frequency";
+    if (!formState.monitorMethod) errors.monitorMethod = "Select a monitoring method";
+
+    if ((formState.goal || "").length > GOAL_NOTES_MAX_LENGTH) {
+        errors.goal = `Goal must be ${GOAL_NOTES_MAX_LENGTH} characters or fewer`;
+    }
+    if ((formState.notes || "").length > GOAL_NOTES_MAX_LENGTH) {
+        errors.notes = `Notes must be ${GOAL_NOTES_MAX_LENGTH} characters or fewer`;
+    }
+
+    const scoreCapped = CAPPED_SCORE_UNITS.has(formState.baselineUnit);
+    const baseline = formState.baselineValue === "" || formState.baselineValue == null ? null : Number(formState.baselineValue);
+    const target = formState.targetValue === "" || formState.targetValue == null ? null : Number(formState.targetValue);
+
+    if (baseline != null) {
+        if (baseline < 0) errors.baselineValue = "Baseline can't be negative";
+        else if (scoreCapped && baseline > MAX_CAPPED_SCORE) errors.baselineValue = `Baseline can't be above ${MAX_CAPPED_SCORE} for this unit`;
+    }
+    if (target != null) {
+        if (target < 0) errors.targetValue = "Target can't be negative";
+        else if (scoreCapped && target > MAX_CAPPED_SCORE) errors.targetValue = `Target can't be above ${MAX_CAPPED_SCORE} for this unit`;
+    }
+    // Not "baseline must be below target" - a reduction-style goal (fewer
+    // behavior incidents, fewer absences) legitimately has target < baseline.
+    // The progress-percentage formula (DashboardOverviewSpotlightDetails)
+    // only breaks when they're exactly equal (divide by zero).
+    if (baseline != null && target != null && baseline === target) {
+        errors.targetValue = "Target can't be the same as baseline";
+    }
+
+    return errors;
 };
+
+export const validateInterventionForm = (formState) => Object.keys(getInterventionFormErrors(formState)).length === 0;
