@@ -23,6 +23,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const MTSSStudent = require('../models/MTSSStudent');
 const { listStudentsByStatus } = require('../services/mwsDataCenterClient');
+const { normalizeGender } = require('../utils/studentUserHelpers');
 
 const ENROLLED_STATUSES = new Set(['REGISTERED', 'ACTIVE']);
 const ALL_STATUSES = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED'];
@@ -89,7 +90,7 @@ async function run() {
                 const student = await MTSSStudent.create({
                     name: central.full_name,
                     email,
-                    gender: central.gender,
+                    gender: normalizeGender(central.gender),
                     status: targetStatus,
                     currentGrade: central.current_grade || undefined,
                     className: central.current_class || undefined,
@@ -107,8 +108,9 @@ async function run() {
         if (existing.status !== targetStatus) {
             update.status = targetStatus;
         }
-        if (central.gender && existing.gender !== central.gender) {
-            update.gender = central.gender;
+        const normalizedGender = normalizeGender(central.gender);
+        if (normalizedGender && existing.gender !== normalizedGender) {
+            update.gender = normalizedGender;
         }
         if (existing.orphanedAt) {
             update.orphanedAt = null;

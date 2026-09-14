@@ -1,6 +1,7 @@
 const winston = require('winston');
 const MTSSStudent = require('../models/MTSSStudent');
 const { listStudentsByStatus } = require('../services/mwsDataCenterClient');
+const { normalizeGender } = require('../utils/studentUserHelpers');
 
 // Scheduled version of scripts/applyCentralStudentSync.js - creates/updates
 // MTSSStudent records from Central's roster on an interval, so "Crew
@@ -106,7 +107,7 @@ async function syncStudentRoster() {
                 await MTSSStudent.create({
                     name: central.full_name,
                     email,
-                    gender: central.gender,
+                    gender: normalizeGender(central.gender),
                     status: targetStatus,
                     currentGrade: central.current_grade || undefined,
                     className: central.current_class || undefined,
@@ -124,8 +125,9 @@ async function syncStudentRoster() {
         if (existing.status !== targetStatus) {
             update.status = targetStatus;
         }
-        if (central.gender && existing.gender !== central.gender) {
-            update.gender = central.gender;
+        const normalizedGender = normalizeGender(central.gender);
+        if (normalizedGender && existing.gender !== normalizedGender) {
+            update.gender = normalizedGender;
         }
         // Found a match this run - clear a stale orphan flag, if any.
         if (existing.orphanedAt) {
