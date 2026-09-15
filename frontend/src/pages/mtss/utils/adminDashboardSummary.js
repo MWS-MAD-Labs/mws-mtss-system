@@ -2,6 +2,7 @@ import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { INTERVENTION_TYPES, TIER_LABELS, TIER_PRIORITY, TYPE_LOOKUP } from "./interventionConstants";
 import { resolveTypeKey, normalizeTierCode } from "./interventionNormalize";
 import { ensureStudentInterventions, pickPrimaryIntervention } from "./interventionSelection";
+import { getDirectionalProgress } from "./directionalProgress";
 import { isAssignmentTargetMet } from "./adminDashboardStats";
 import {
     getAssignmentFocusLabels,
@@ -71,8 +72,8 @@ const getAssignmentProgressRatio = (assignment = {}, checkIn = getAssignmentLate
         return latestValue > 0 ? 1 : 0;
     }
 
-    const rawRatio = (latestValue - baselineValue) / (targetValue - baselineValue);
-    return Math.max(0, Math.min(rawRatio, 1.25));
+    const percent = getDirectionalProgress({ baseline: baselineValue, current: latestValue, target: targetValue }).percent;
+    return percent == null ? null : percent / 100;
 };
 
 const getAssignmentProgressSignal = (assignment = {}) => {

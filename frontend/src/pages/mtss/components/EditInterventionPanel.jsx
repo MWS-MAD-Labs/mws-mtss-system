@@ -58,7 +58,6 @@ const EditInterventionPanel = memo(({
         onChange("studentName", student?.name || "");
         onChange("grade", student?.grade || student?.currentGrade || "");
         onChange("className", student?.className || "");
-        onChange("mode", "quantitative");
     };
 
     const handleStrategyChange = (event) => {

@@ -57,6 +57,7 @@ const resolveTierValue = (value = "tier2") => {
 const resolveDurationValue = (value = "") => {
     const normalized = normalizeText(value);
     if (normalized === "custom") return "Custom";
+    if (/^\d+\s+days?$/.test(normalized)) return normalized.replace(/days?$/, "days");
     return /^\d+\s+weeks?$/.test(normalized) ? normalized.replace(/weeks?$/, "weeks") : "";
 };
 
@@ -144,12 +145,16 @@ const buildInterventionFormFromAssignment = (student, option = {}) => {
         studentName: student?.name || "",
         grade: student?.grade || student?.currentGrade || "",
         className: student?.className || "",
-        mode: "quantitative",
+        mode: option?.mode || "quantitative",
+        status: option?.statusKey || option?.status || "active",
         type: resolveTypeValue(option),
         strategyId: option?.strategyId || "",
         strategyName: option?.strategyName || "",
         tier: resolveTierValue(option?.tierValue || option?.tierCode || option?.tier),
         goal: resolveGoalValue(option),
+        goals: Array.isArray(option?.goals) ? option.goals : [],
+        goalSuccessCriteria: option?.goals?.[0]?.successCriteria || "",
+        goalCompleted: Boolean(option?.goals?.[0]?.completed),
         notes: option?.notes || "",
         startDate: toDateInputValue(option?.startDate),
         duration: resolveDurationValue(option?.duration),
@@ -258,6 +263,7 @@ export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {
             target: formatScoreLabel(selectedOption.targetScore, metricUnit),
             lastProgressUpdate: formatDateTimeLabel(resolveLastProgressUpdate(selectedOption)),
             status: resolveStatusLabel(selectedOption),
+            goals: Array.isArray(selectedOption.goals) ? selectedOption.goals : [],
         });
         setInterventionForm(buildInterventionFormFromAssignment(student, selectedOption));
         setActiveTab("edit");
@@ -290,28 +296,54 @@ export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {
                 setSubmittingPlan(true);
 
                 const isEditing = Boolean(editingPlan?.assignmentId);
+                const isQualitative = currentForm.mode === "qualitative";
                 const goalText = currentForm.goal?.trim() || "";
                 const metricUnit = currentForm.baselineUnit || currentForm.targetUnit || "score";
-                const baselineScore = buildScorePayload(currentForm.baselineValue, metricUnit, isEditing);
-                const targetScore = buildScorePayload(currentForm.targetValue, metricUnit, isEditing);
+                const baselineScore = isQualitative ? undefined : buildScorePayload(currentForm.baselineValue, metricUnit, isEditing);
+                const targetScore = isQualitative ? undefined : buildScorePayload(currentForm.targetValue, metricUnit, isEditing);
+                const existingGoals = Array.isArray(currentForm.goals) ? currentForm.goals : [];
+                const primaryGoal = typeof existingGoals[0] === "object" && existingGoals[0] !== null
+                    ? existingGoals[0]
+                    : {};
+                const goals = goalText
+                    ? [{
+                        ...primaryGoal,
+                        description: goalText,
+                        successCriteria: currentForm.goalSuccessCriteria || "",
+                        completed: Boolean(currentForm.goalCompleted),
+                    }, ...existingGoals.slice(1)]
+                    : existingGoals.slice(1);
 
                 const payload = {
                     tier: currentForm.tier,
                     focusAreas: currentForm.type ? [currentForm.type] : ["Universal Supports"],
                     startDate: currentForm.startDate || undefined,
                     duration: currentForm.duration || undefined,
+                    mode: currentForm.mode || "quantitative",
+                    ...(isEditing ? { status: currentForm.status || "active" } : {}),
                     strategyId: currentForm.strategyId || undefined,
                     strategyName: currentForm.strategyName || undefined,
                     monitoringMethod: currentForm.monitorMethod || undefined,
                     monitoringFrequency: currentForm.monitorFrequency || undefined,
-                    metricLabel: metricUnit,
+                    ...(isQualitative ? {} : { metricLabel: metricUnit }),
                     ...(baselineScore !== undefined ? { baselineScore } : {}),
                     ...(targetScore !== undefined ? { targetScore } : {}),
                     notes: isEditing ? (currentForm.notes || "") : (currentForm.notes || undefined),
-                    goals: goalText
-                        ? [{ description: goalText }]
-                        : (isEditing ? [] : undefined),
+                    goals: goals.length ? goals : (isEditing ? [] : undefined),
                 };
+
+                if (!isEditing && isQualitative && currentForm.initialObservation?.trim()) {
+                    payload.initialCheckIn = {
+                        summary: currentForm.initialObservation.trim(),
+                        signal: currentForm.initialSignal || undefined,
+                        tags: currentForm.initialTags?.length ? currentForm.initialTags : undefined,
+                        context: currentForm.initialContext?.trim() || undefined,
+                        observation: currentForm.initialObservation.trim(),
+                        response: currentForm.initialResponse?.trim() || undefined,
+                        nextStep: currentForm.initialNextStep?.trim() || undefined,
+                        weeklyFocus: currentForm.initialWeeklyFocus || undefined,
+                    };
+                }
 
                 if (currentForm.monitorFrequency === "Custom") {
                     payload.customFrequencyDays = currentForm.customFrequencyDays?.length ? currentForm.customFrequencyDays : [];
@@ -362,10 +394,15 @@ export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {
             event.preventDefault();
             if (submittingProgress) return;
 
-            if (!progressForm.assignmentId || !progressForm.notes) {
+            const progressNarrative = progressForm.mode === "qualitative"
+                ? progressForm.observation?.trim()
+                : progressForm.notes?.trim();
+            if (!progressForm.assignmentId || !progressNarrative) {
                 toast({
                     title: "Complete the required fields",
-                    description: "Please select a student and provide progress notes.",
+                    description: progressForm.mode === "qualitative"
+                        ? "Please select a student and provide an observation."
+                        : "Please select a student and provide progress notes.",
                     variant: "destructive",
                 });
                 return;
@@ -377,9 +414,16 @@ export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {
                 const payload = {
                     checkIns: [{
                         date: progressForm.date || new Date().toISOString(),
-                        summary: progressForm.notes || "Progress update",
+                        summary: progressForm.notes || progressForm.observation || "Progress update",
                         value: progressForm.scoreValue ? Number(progressForm.scoreValue) : undefined,
                         unit: progressForm.scoreUnit || "score",
+                            signal: progressForm.signal || undefined,
+                            tags: progressForm.tags?.length ? progressForm.tags : undefined,
+                            context: progressForm.context?.trim() || undefined,
+                            observation: progressForm.observation?.trim() || undefined,
+                            response: progressForm.response?.trim() || undefined,
+                            nextStep: progressForm.nextStep?.trim() || undefined,
+                            weeklyFocus: progressForm.weeklyFocus || undefined,
                             performed: progressForm.performed === "yes" || progressForm.performed === true,
                             skipReason: progressForm.performed === "no" ? (progressForm.skipReason || undefined) : undefined,
                             skipReasonNote: progressForm.performed === "no" && progressForm.skipReason === "other" ? (progressForm.skipReasonNote || undefined) : undefined,

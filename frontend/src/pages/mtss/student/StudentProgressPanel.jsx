@@ -104,7 +104,7 @@ const StudentProgressPanel = ({ student, isLoading = false }) => {
     const baseline = activeIntervention?.baseline ?? profile?.baseline;
     const current = activeIntervention?.current ?? profile?.current;
     const target = activeIntervention?.target ?? profile?.target;
-    const progressPercent = activeIntervention?.progress ?? toProgressPercent(current, target);
+    const progressPercent = toProgressPercent(current, target, baseline) ?? activeIntervention?.progress ?? null;
     const nextReviewLabel = formatReviewDate(activeIntervention?.endDate, student?.nextUpdate || "Awaiting schedule");
 
     const chart = Array.isArray(activeIntervention?.chart) && activeIntervention.chart.length

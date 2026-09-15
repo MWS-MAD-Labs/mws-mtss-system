@@ -86,7 +86,7 @@ const emitStudentsChanged = async (studentIds = []) => {
                 'studentIds tier status focusAreas startDate endDate duration strategyId strategyName ' +
                 'monitoringMethod monitoringFrequency customFrequencyDays customFrequencyNote ' +
                 'goals checkIns mentorId notes metricLabel baselineScore targetScore ' +
-                'lastPlanUpdatedAt lastPlanUpdatedBy'
+                'lastPlanUpdatedAt lastPlanUpdatedBy mode'
             )
             .lean();
 

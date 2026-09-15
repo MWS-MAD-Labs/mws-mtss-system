@@ -113,10 +113,15 @@ export const useMtssIntervention = () => {
         event?.preventDefault?.();
         if (progressSubmitting) return;
 
-        if (!progressForm.assignmentId || !progressForm.summary) {
+        const hasNarrative = progressForm.mode === "qualitative"
+            ? Boolean(progressForm.observation?.trim())
+            : Boolean(progressForm.summary?.trim());
+        if (!progressForm.assignmentId || !hasNarrative) {
             toast({
                 title: "Complete the required fields",
-                description: "Please select a student and provide a progress summary.",
+                description: progressForm.mode === "qualitative"
+                    ? "Please select a student and provide an observation."
+                    : "Please select a student and provide a progress summary.",
                 variant: "destructive",
             });
             return;

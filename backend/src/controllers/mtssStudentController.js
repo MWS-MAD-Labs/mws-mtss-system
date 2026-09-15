@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const MTSSStudent = require('../models/MTSSStudent');
 const MentorAssignment = require('../models/MentorAssignment');
+const { calculateDirectionalProgress } = require('../utils/mtssIntervention');
 const User = require('../models/User');
 const { sendSuccess, sendError } = require('../utils/response');
 const {
@@ -954,7 +955,7 @@ const getStudent = async (req, res) => {
             const checkIns = assignment.checkIns || [];
             const lastCheckIn = checkIns[checkIns.length - 1];
             const firstCheckIn = checkIns[0];
-            const isQualitative = false;
+            const isQualitative = assignment.mode === 'qualitative';
             const reversedCheckIns = [...checkIns].reverse();
             const latestQualitativeCheckIn = reversedCheckIns.find((checkIn = {}) => (
                 Boolean(checkIn.signal) ||
@@ -981,6 +982,18 @@ const getStudent = async (req, res) => {
             const latestObservation = latestQualitativeCheckIn?.observation || null;
             const latestResponse = latestQualitativeCheckIn?.response || null;
             const latestNextStep = latestQualitativeCheckIn?.nextStep || null;
+            const numericCheckIns = checkIns.filter((checkIn) => (
+                checkIn.value !== null
+                && checkIn.value !== undefined
+                && checkIn.value !== ''
+                && Number.isFinite(Number(checkIn.value))
+            ));
+            const progressResult = calculateDirectionalProgress({
+                baseline: assignment.baselineScore?.value ?? numericCheckIns[0]?.value,
+                target: assignment.targetScore?.value,
+                current: numericCheckIns[numericCheckIns.length - 1]?.value,
+                previous: numericCheckIns[numericCheckIns.length - 2]?.value
+            });
             const chart = checkIns.map((checkIn) => ({
                 label: new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(checkIn.date)),
                 date: checkIn.date,
@@ -1057,17 +1070,14 @@ const getStudent = async (req, res) => {
                     current: lastCheckIn?.value ?? null,
                     target: assignment.targetScore?.value ?? null,
                     progressUnit: assignment.metricLabel || 'score',
-                    progress: (
-                        assignment.targetScore?.value && lastCheckIn?.value
-                            ? Math.min(100, Math.round((lastCheckIn.value / assignment.targetScore.value) * 100))
-                            : 0
-                    ),
+                    progress: isQualitative ? 0 : progressResult.percentage,
+                    trend: isQualitative ? 'qualitative' : progressResult.trend,
                     checkInsCount: checkIns.length,
                     chart,
                     history,
                     goals: assignment.goals || [],
                     notes: assignment.notes,
-                    mode: 'quantitative',
+                    mode: assignment.mode || 'quantitative',
                     planChangeLog: (assignment.planChangeLog || []).map((entry = {}) => ({
                         ...entry,
                         changedByName: entry.changedBy?.name || entry.changedBy?.username || null,

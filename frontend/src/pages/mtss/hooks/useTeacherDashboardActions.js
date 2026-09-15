@@ -19,10 +19,19 @@ const useTeacherDashboardActions = ({
     const handleProgressSubmitForm = useCallback(
         async (event, evidenceFiles = [], resetEvidenceFiles) => {
             event?.preventDefault?.();
-            if (!progressForm.studentId || !progressForm.date || progressForm.scoreValue === "") {
+            const selectedStudent = students.find((student) => student.id === progressForm.studentId);
+            const selectedOption = Array.isArray(selectedStudent?.assignmentOptions)
+                ? selectedStudent.assignmentOptions.find((option) => option?.assignmentId === progressForm.assignmentId)
+                : null;
+            const isQualitative = selectedOption?.mode === "qualitative" || progressForm.mode === "qualitative";
+            const progressValueMissing = progressForm.performed !== "no"
+                && (isQualitative ? !progressForm.observation?.trim() : progressForm.scoreValue === "");
+            if (!progressForm.studentId || !progressForm.date || progressValueMissing) {
                 toast({
                     title: "Complete the required fields",
-                    description: "Student, date, and score are required to submit progress.",
+                    description: isQualitative
+                        ? "Student, date, and an observation are required to submit progress."
+                        : "Student, date, and score are required to submit progress.",
                     variant: "destructive",
                 });
                 return;
@@ -46,7 +55,6 @@ const useTeacherDashboardActions = ({
                 });
                 return;
             }
-            const selectedStudent = students.find((student) => student.id === progressForm.studentId);
             if (!selectedStudent) {
                 toast({
                     title: "Select a student",
@@ -64,10 +72,10 @@ const useTeacherDashboardActions = ({
                 });
                 return;
             }
-            const selectedOption = Array.isArray(selectedStudent.assignmentOptions)
+            const progressOption = Array.isArray(selectedStudent.assignmentOptions)
                 ? selectedStudent.assignmentOptions.find((option) => option?.assignmentId === assignmentId)
                 : null;
-            if (!canUserSubmitProgressForAssignment(selectedOption)) {
+            if (!canUserSubmitProgressForAssignment(progressOption)) {
                 toast({
                     title: "Progress permission denied",
                     description: "You can only submit progress for subjects assigned to you.",
@@ -84,10 +92,17 @@ const useTeacherDashboardActions = ({
                     checkIns: [
                         {
                             date: progressForm.date || new Date(),
-                            summary: trimmedNotes || "Progress update logged via dashboard",
+                            summary: trimmedNotes || progressForm.observation?.trim() || "Progress update logged via dashboard",
                             nextSteps: trimmedNotes || undefined,
                             value: Number.isFinite(parsedScoreValue) ? parsedScoreValue : undefined,
                             unit: progressForm.scoreUnit,
+                            signal: progressForm.signal || undefined,
+                            tags: progressForm.tags?.length ? progressForm.tags : undefined,
+                            context: progressForm.context?.trim() || undefined,
+                            observation: progressForm.observation?.trim() || undefined,
+                            response: progressForm.response?.trim() || undefined,
+                            nextStep: progressForm.nextStep?.trim() || undefined,
+                            weeklyFocus: progressForm.weeklyFocus || undefined,
                                 performed: progressForm.performed === "yes",
                                 skipReason: progressForm.performed !== "yes" ? (progressForm.skipReason || undefined) : undefined,
                                 skipReasonNote: progressForm.performed !== "yes" && progressForm.skipReason === "other" ? (progressForm.skipReasonNote || undefined) : undefined,
@@ -166,15 +181,31 @@ const useTeacherDashboardActions = ({
 
                 const trimmedNotes = formState.notes?.trim() || "";
                 const parsedScoreValue = formState.scoreValue !== "" ? Number(formState.scoreValue) : undefined;
+                const isQualitative = selectedOption?.mode === "qualitative" || formState.mode === "qualitative";
+                if (formState.performed === "yes" && isQualitative && !formState.observation?.trim()) {
+                    toast({
+                        title: "Observation required",
+                        description: "Add a qualitative observation before saving this update.",
+                        variant: "destructive",
+                    });
+                    return;
+                }
 
                 await updateMentorAssignment(assignmentId, {
                     checkIns: [
                         {
                             date: formState.date,
-                            summary: trimmedNotes || "Quick update",
+                            summary: trimmedNotes || formState.observation?.trim() || "Quick update",
                             nextSteps: trimmedNotes || undefined,
                             value: Number.isFinite(parsedScoreValue) ? parsedScoreValue : undefined,
                             unit: formState.scoreUnit,
+                            signal: formState.signal || undefined,
+                            tags: formState.tags?.length ? formState.tags : undefined,
+                            context: formState.context?.trim() || undefined,
+                            observation: formState.observation?.trim() || undefined,
+                            response: formState.response?.trim() || undefined,
+                            nextStep: formState.nextStep?.trim() || undefined,
+                            weeklyFocus: formState.weeklyFocus || undefined,
                                 performed: formState.performed === "yes",
                                 skipReason: formState.performed !== "yes" ? (formState.skipReason || undefined) : undefined,
                                 skipReasonNote: formState.performed !== "yes" && formState.skipReason === "other" ? (formState.skipReasonNote || undefined) : undefined,

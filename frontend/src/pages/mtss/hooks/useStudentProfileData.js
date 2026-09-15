@@ -25,9 +25,29 @@ const useStudentProfileData = (slug) => {
             const requestConfig = signal ? { signal } : {};
             const payload = await fetchMtssStudentById(slug, requestConfig);
             const nextStudent = payload?.student || null;
-            setStudent(nextStudent);
+            const studentId = nextStudent?._id || nextStudent?.id;
+            let assignments = [];
+            if (studentId) {
+                const assignmentPayload = await fetchMentorAssignments({ studentId }, requestConfig);
+                assignments = assignmentPayload?.assignments || [];
+            }
+            const assignmentsById = new Map(assignments.map((assignment) => [
+                String(assignment?._id || assignment?.id || assignment?.assignmentId || ""),
+                assignment,
+            ]));
+            const details = (nextStudent?.interventionDetails || []).map((detail) => {
+                const assignment = assignmentsById.get(String(detail?.assignmentId || ""));
+                if (!assignment) return detail;
+                return {
+                    ...detail,
+                    viewerPermissions: assignment.viewerPermissions || null,
+                    viewerCanEditPlan: assignment.viewerCanEditPlan,
+                    viewerCanSubmitProgress: assignment.viewerCanSubmitProgress,
+                };
+            });
+            const hydratedStudent = nextStudent ? { ...nextStudent, interventionDetails: details } : null;
+            setStudent(hydratedStudent);
 
-            const details = nextStudent?.interventionDetails || [];
             setSelectedIntervention((previousSelection) => {
                 if (!details.length) return null;
                 if (!previousSelection) return details[0];
@@ -109,6 +129,7 @@ const useStudentProfileData = (slug) => {
         error,
         selectedIntervention,
         setSelectedIntervention,
+        refresh: () => loadStudent({ silent: true }),
     };
 };
 

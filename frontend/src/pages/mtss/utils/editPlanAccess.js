@@ -7,7 +7,7 @@ const SUBJECT_ALIAS_MAP = {
     indonesian: ["indonesian", "bahasa indonesia", "bahasa", "bi"],
     universal: ["universal", "all", "schoolwide", "whole school"],
 };
-const EDITABLE_STATUSES = new Set(["active", "paused", "monitoring", "on track"]);
+const PROGRESSABLE_STATUSES = new Set(["active", "paused", "monitoring", "on track"]);
 
 const readBooleanFlag = (assignmentOption = {}, directKey = "", nestedKey = "") => {
     if (typeof assignmentOption?.[directKey] === "boolean") return assignmentOption[directKey];
@@ -132,10 +132,10 @@ const resolveClassSubjectKeys = (classAssignment = {}) => {
     return Array.from(new Set(candidates.map((value) => canonicalizeSubjectKey(value)).filter(Boolean)));
 };
 
-const isEditableAssignmentStatus = (status = "") => {
+const isProgressableAssignmentStatus = (status = "") => {
     const normalized = normalizeText(status);
     if (!normalized) return true;
-    return EDITABLE_STATUSES.has(normalized);
+    return PROGRESSABLE_STATUSES.has(normalized);
 };
 
 const isEscalatedAssignment = (option = {}) => {
@@ -145,12 +145,12 @@ const isEscalatedAssignment = (option = {}) => {
 
 const getCandidateAssignmentOptions = (student = {}) =>
     Array.isArray(student.assignmentOptions)
-        ? student.assignmentOptions.filter((option) => option?.assignmentId && isEditableAssignmentStatus(option?.statusKey || option?.status))
+        ? student.assignmentOptions.filter((option) => option?.assignmentId)
         : [];
 
 export const canUserSubmitProgressForAssignment = (assignmentOption = {}) => {
     if (!assignmentOption?.assignmentId) return false;
-    if (!isEditableAssignmentStatus(assignmentOption?.statusKey || assignmentOption?.status)) return false;
+    if (!isProgressableAssignmentStatus(assignmentOption?.statusKey || assignmentOption?.status)) return false;
     const explicit = readBooleanFlag(assignmentOption, "viewerCanSubmitProgress", "canSubmitProgress");
     return explicit === true;
 };

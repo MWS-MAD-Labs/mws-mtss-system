@@ -16,6 +16,7 @@ const GrowthJourneySection = memo(({
     monitoringMethodLabel,
     startDateLabel,
     notesLabel,
+    statusAction,
 }) => {
     const config = INTERVENTION_CONFIG[intervention?.type] || INTERVENTION_CONFIG.SEL;
     const CurrentIcon = config.icon || Sparkles;
@@ -45,6 +46,7 @@ const GrowthJourneySection = memo(({
                     monitoringMethodLabel={monitoringMethodLabel}
                     startDateLabel={startDateLabel}
                     notesLabel={notesLabel}
+                    statusAction={statusAction}
                 />
                 <GrowthJourneyHistory intervention={intervention} config={config} glassStyles={glassStyles} />
             </div>

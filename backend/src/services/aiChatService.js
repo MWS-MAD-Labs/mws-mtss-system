@@ -20,6 +20,7 @@ const {
 const { INTERVENTION_TYPES, INTERVENTION_TYPE_KEYS, TIER_LABELS } = require('../constants/mtss');
 const { assistantOrchestrator, twinRepository } = require('../modules/ai-assistant');
 const { normalizeAssistantIntentText } = require('../utils/assistantIntentNormalizer');
+const { normalizeInterventionDuration, calculateDirectionalProgress } = require('../utils/mtssIntervention');
 
 class AIChatService {
     constructor() {
@@ -4669,17 +4670,7 @@ ${teacherLines}`;
             const rawTarget = assignment.targetScore?.value != null ? Number(assignment.targetScore.value) : null;
             // Fallback: +20% OR +5 points (handles baseline === 0 edge case)
             const target = rawTarget != null ? rawTarget : baseline + Math.max(baseline * 0.2, 5);
-            const denom = target - baseline;
-            const trend = lastVal > firstVal ? 'improving' : lastVal < firstVal ? 'declining' : 'stable';
-
-            if (denom === 0) {
-                // Cannot calculate ratio — baseline equals target; treat as stable 50%
-                return { percentage: 50, trend };
-            }
-
-            const progress = ((lastVal - baseline) / denom) * 100;
-            const percentage = Math.max(0, Math.min(100, Math.round(progress)));
-            return { percentage, trend };
+            return calculateDirectionalProgress({ baseline, target, current: lastVal, previous: firstVal });
         }
 
         return { percentage: 25, trend: 'in_progress' };
@@ -6249,10 +6240,7 @@ Critical language requirement:
                 }
             );
 
-        const allowedDurations = new Set(['4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', '16 weeks', '20 weeks', '24 weeks']);
-        const duration = allowedDurations.has(String(payload.duration || '').trim())
-            ? String(payload.duration).trim()
-            : undefined;
+        const duration = normalizeInterventionDuration(payload.duration) || undefined;
         const allowedMonitoringMethods = new Set([
             'Option 1 - Direct Observation',
             'Option 2 - Student Self-Report',
@@ -7077,7 +7065,6 @@ Critical language requirement:
             });
         };
 
-        const allowedDurations = new Set(['4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', '16 weeks', '20 weeks', '24 weeks']);
         const allowedMonitoringMethods = new Set([
             'Option 1 - Direct Observation',
             'Option 2 - Student Self-Report',
@@ -7104,9 +7091,7 @@ Critical language requirement:
         }
 
         if (payload.duration !== undefined) {
-            const duration = allowedDurations.has(String(payload.duration || '').trim())
-                ? String(payload.duration).trim()
-                : undefined;
+            const duration = normalizeInterventionDuration(payload.duration) || undefined;
             logPlanChange('duration', 'Duration', assignment.duration, duration);
             assignment.duration = duration;
         }

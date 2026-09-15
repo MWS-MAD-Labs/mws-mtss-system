@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { resolveTypeKey } from "../utils/interventionNormalize";
 import { TYPE_LOOKUP } from "../utils/interventionConstants";
 import { getProgressAssignmentOptions } from "../utils/editPlanAccess";
-import { SKIP_REASONS } from "../config/interventionFormConfig";
+import { QUALITATIVE_SIGNALS, QUALITATIVE_TAGS, SKIP_REASONS, WEEKLY_FOCUS_OPTIONS } from "../config/interventionFormConfig";
 import EvidenceUploader from "./EvidenceUploader";
 import InterventionActivityLog from "./InterventionActivityLog";
 import { lockBodyScroll } from "../utils/bodyScrollLock";
@@ -64,6 +64,14 @@ const QuickUpdateModal = memo(({ student, onClose, onSubmit, submitting = false,
         notes: "",
         badge: "🎉 Progress Party",
         assignmentId: defaultAssignmentId,
+        mode: defaultOption?.mode || "quantitative",
+        signal: "",
+        tags: [],
+        context: "",
+        observation: "",
+        response: "",
+        nextStep: "",
+        weeklyFocus: "",
     });
     const [evidenceFiles, setEvidenceFiles] = useState([]);
     const [isMobileSheet, setIsMobileSheet] = useState(() =>
@@ -81,13 +89,16 @@ const QuickUpdateModal = memo(({ student, onClose, onSubmit, submitting = false,
         };
     }, [selectedOption, student]);
     const lockedUnit = selectedOption?.metricLabel || formState.scoreUnit || "score";
+    const isQualitative = selectedOption?.mode === "qualitative";
     const gradeLabel = student?.grade || student?.currentGrade || "Grade";
         const skipReasonValid =
             formState.performed === "yes" ||
             Boolean(formState.skipReason && (formState.skipReason !== "other" || formState.skipReasonNote?.trim()));
         const lateSubmission = isLateProgressDate(formState.date, initialDate);
         const lateReasonValid = !lateSubmission || Boolean(formState.lateReason?.trim());
-        const canSubmit = Boolean(formState.assignmentId && formState.date && skipReasonValid && lateReasonValid);
+        const progressValueValid = formState.performed === "no"
+            || (isQualitative ? Boolean(formState.observation?.trim()) : formState.scoreValue !== "");
+        const canSubmit = Boolean(formState.assignmentId && formState.date && progressValueValid && skipReasonValid && lateReasonValid);
 
     useEffect(() => {
         if (typeof window === "undefined") return undefined;
@@ -114,7 +125,7 @@ const QuickUpdateModal = memo(({ student, onClose, onSubmit, submitting = false,
         const handleChange = (field, value) => {
             if (field === "assignmentId") {
                 const option = assignmentOptions.find((opt) => opt.assignmentId === value);
-                setFormState((prev) => ({ ...prev, assignmentId: value, scoreUnit: option?.metricLabel || prev.scoreUnit }));
+                setFormState((prev) => ({ ...prev, assignmentId: value, scoreUnit: option?.metricLabel || prev.scoreUnit, mode: option?.mode || "quantitative" }));
                 return;
             }
             if (field === "date") {
@@ -301,7 +312,20 @@ const QuickUpdateModal = memo(({ student, onClose, onSubmit, submitting = false,
                                     </div>
                                 )}
 
-                                <div className="grid md:grid-cols-2 gap-4">
+                                {isQualitative && formState.performed !== "no" && (
+                                    <div className="rounded-2xl border border-violet-200/60 bg-violet-50/60 p-4 space-y-4 dark:border-violet-500/25 dark:bg-violet-900/15">
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="flex flex-col gap-2"><label className={labelClass}>Development Signal</label><select className={baseField} value={formState.signal} onChange={(event) => handleChange("signal", event.target.value)}><option value="">Select signal</option>{QUALITATIVE_SIGNALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+                                            <div className="flex flex-col gap-2"><label className={labelClass}>Weekly Focus</label><select className={baseField} value={formState.weeklyFocus} onChange={(event) => handleChange("weeklyFocus", event.target.value)}><option value="">Select focus</option>{WEEKLY_FOCUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">{QUALITATIVE_TAGS.map((tag) => { const selected = formState.tags.includes(tag.value); return <button key={tag.value} type="button" onClick={() => handleChange("tags", selected ? formState.tags.filter((value) => value !== tag.value) : [...formState.tags, tag.value])} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${selected ? "border-violet-500 bg-violet-500 text-white" : "border-violet-200 bg-white text-violet-700 dark:border-violet-500/30 dark:bg-white/10 dark:text-violet-100"}`}>{tag.label}</button>; })}</div>
+                                        <textarea className={`${baseField} min-h-[110px] resize-y`} placeholder="Observation (required)" value={formState.observation} onChange={(event) => handleChange("observation", event.target.value)} />
+                                        <div className="grid md:grid-cols-2 gap-4"><input className={baseField} placeholder="Context" value={formState.context} onChange={(event) => handleChange("context", event.target.value)} /><input className={baseField} placeholder="Student response" value={formState.response} onChange={(event) => handleChange("response", event.target.value)} /></div>
+                                        <input className={baseField} placeholder="Next step" value={formState.nextStep} onChange={(event) => handleChange("nextStep", event.target.value)} />
+                                    </div>
+                                )}
+
+                                {!isQualitative && <div className="grid md:grid-cols-2 gap-4">
                                     <div className="flex flex-col gap-2">
                                         <label className={labelClass}>Status or Score</label>
                                         <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -327,7 +351,7 @@ const QuickUpdateModal = memo(({ student, onClose, onSubmit, submitting = false,
                                             <option value="🌈 Focus Mode">🌈 Focus Mode</option>
                                         </select>
                                     </div>
-                                </div>
+                                </div>}
 
                                 <div className="flex flex-col gap-2">
                                     <label className={labelClass}>Notes & Observations</label>

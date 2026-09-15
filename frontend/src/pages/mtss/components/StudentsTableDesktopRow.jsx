@@ -53,6 +53,7 @@ const StudentsTableDesktopRow = memo(
         selectable,
         selected,
         onSelect,
+        compactRoster = false,
     }) => {
         const [expanded, setExpanded] = useState(false);
         const supportRows = useMemo(
@@ -134,6 +135,81 @@ const StudentsTableDesktopRow = memo(
 
         /* Accent bar: tier-based for escalated, decorative for universal */
         const accentColor = getAccentColor(interventions, index);
+
+        if (compactRoster) {
+            const primarySupport = assignmentOptions[0];
+            const focusLabel = primarySupport?.focus || getSupportSubjectLabel(primaryStudent);
+            const tierLabel = primarySupport?.tier || primaryStudent?.tier || "Tier 1";
+            const statusLabel = isGrouped ? groupedProgressLabel : student.progress;
+            const activityLabel = isGrouped ? groupedLastUpdate.dateLabel : lastUpdateDisplay.dateLabel;
+
+            return (
+                <tr
+                    onClick={() => onView?.(primaryStudent)}
+                    className="group border-b border-slate-100/80 last:border-none cursor-pointer transition-colors hover:bg-slate-50/80 dark:border-slate-700/40 dark:hover:bg-white/[0.04]"
+                >
+                    <td className="w-1.5 py-0">
+                        <div className={`my-auto h-8 w-1 rounded-full bg-gradient-to-b ${accentColor} opacity-60 transition group-hover:opacity-100`} />
+                    </td>
+                    {selectable && (
+                        <td className="py-4 pl-2" onClick={(event) => event.stopPropagation()}>
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded-md border-slate-300 text-indigo-500"
+                                checked={selected}
+                                onChange={() => onSelect?.(student)}
+                            />
+                        </td>
+                    )}
+                    <td className="w-[28%] py-4 pl-3 pr-4">
+                        <p className="truncate text-sm font-bold text-slate-800 transition group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-300">
+                            {student.name}
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
+                            {[student.grade, classLabel !== student.grade ? classLabel : null].filter(Boolean).join(" · ")}
+                        </p>
+                    </td>
+                    <td className="w-[26%] py-4 pr-4">
+                        <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{focusLabel}</p>
+                        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            {isGrouped ? `${supportRows.length} active supports` : tierLabel}
+                        </p>
+                    </td>
+                    <td className="w-[18%] py-4 pr-4">
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                            {activityLabel || "No activity yet"}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">
+                            {activityLabel ? "Progress or plan update" : "Awaiting first check-in"}
+                        </p>
+                    </td>
+                    <td className="w-[14%] py-4 pr-3">
+                        <ProgressBadge status={statusLabel} compact />
+                    </td>
+                    {showActions && (
+                        <td className="w-[14%] py-4 pr-6" onClick={(event) => event.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                                {actionButtons.map((action) => {
+                                    const Icon = action.icon;
+                                    return (
+                                        <button
+                                            key={action.key}
+                                            type="button"
+                                            onClick={action.onClick}
+                                            title={action.label}
+                                            aria-label={action.label}
+                                            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition hover:-translate-y-0.5 hover:shadow-sm ${action.className}`}
+                                        >
+                                            <Icon className="h-3.5 w-3.5" />
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </td>
+                    )}
+                </tr>
+            );
+        }
 
         return (
             <>

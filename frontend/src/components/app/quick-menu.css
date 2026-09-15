@@ -131,12 +131,12 @@
         display: none;
     }
 
-    /* Panel opens upward from bottom-left trigger */
+    /* Keep the menu card below the trigger on mobile. */
     .qm-panel {
-        top: auto;
-        bottom: calc(100% + 10px);
+        top: calc(100% + 10px);
+        bottom: auto;
         left: 0;
-        transform-origin: bottom left;
+        transform-origin: top left;
     }
 
     @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {

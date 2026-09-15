@@ -1,5 +1,6 @@
 import { Building2, UserCheck, Star } from "lucide-react";
 import { getAssignmentSupportUnitCount } from "./supportUnitUtils";
+import { isDirectionalTargetMet } from "./directionalProgress";
 
 const STAT_CARD_TEMPLATE = [
     {
@@ -46,7 +47,7 @@ export const isAssignmentTargetMet = (assignment) => {
     if (target != null) {
         const checkIns = assignment.checkIns || [];
         const latest = checkIns.filter((c) => c.value != null).slice(-1)[0];
-        if (latest && latest.value >= target) return true;
+        if (latest && isDirectionalTargetMet(assignment.baselineScore?.value, latest.value, target)) return true;
     }
 
     return false;

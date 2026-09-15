@@ -4,6 +4,7 @@
 
 import { ClipboardCheck, ShieldCheck, Star } from "lucide-react";
 import { getStoredAuthUser } from "@/utils/authStorage";
+import { isDirectionalTargetMet } from "./directionalProgress";
 
 export const STAT_TEMPLATE = [
     { key: "active", label: "Active Interventions", shortLabel: "Active", sub: "Students in a boost bubble", icon: ShieldCheck, accent: "from-[#0ea5e9]/90 via-[#818cf8]/85 to-[#34d399]/80" },
@@ -57,7 +58,7 @@ const isTargetMet = (assignment) => {
     if (target != null) {
         const checkIns = assignment.checkIns || [];
         const latest = checkIns.filter((c) => c.value != null).slice(-1)[0];
-        if (latest && latest.value >= target) return true;
+        if (latest && isDirectionalTargetMet(assignment.baselineScore?.value, latest.value, target)) return true;
     }
 
     return false;

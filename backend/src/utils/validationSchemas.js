@@ -4,8 +4,13 @@ const {
     INTERVENTION_TIER_CODES,
     INTERVENTION_STATUSES
 } = require('../constants/mtss');
+const { normalizeInterventionDuration } = require('./mtssIntervention');
 
 const objectIdSchema = Joi.string().regex(/^[0-9a-fA-F]{24}$/);
+const interventionDurationSchema = Joi.string().trim().custom((value, helpers) => {
+    const normalized = normalizeInterventionDuration(value);
+    return normalized || helpers.error('any.invalid');
+}, 'MTSS intervention duration');
 const supportContactObjectIdPattern = /^[0-9a-fA-F]{24}$/;
 
 const supportContactUserIdSchema = Joi.alternatives().try(
@@ -285,7 +290,7 @@ const mentorAssignmentCreateSchema = Joi.object({
     tier: Joi.string().valid('tier1', 'tier2', 'tier3').required(),
     focusAreas: Joi.array().items(Joi.string().trim().min(1)).min(1).required(),
     startDate: Joi.date().optional(),
-    duration: Joi.string().valid('2 weeks', '4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', '16 weeks', '20 weeks', '24 weeks', 'Custom').optional(),
+    duration: interventionDurationSchema.optional(),
     strategyId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(null),
     strategyName: Joi.string().trim().optional().allow('', null),
     monitoringMethod: Joi.string().valid(
@@ -307,7 +312,8 @@ const mentorAssignmentCreateSchema = Joi.object({
     }).optional(),
     goals: Joi.array().items(Joi.object({
         description: Joi.string().required(),
-        successCriteria: Joi.string().optional().allow('', null)
+        successCriteria: Joi.string().optional().allow('', null),
+        completed: Joi.boolean().optional()
     })).optional(),
     initialCheckIn: Joi.object({
         date: Joi.date().optional(),
@@ -325,7 +331,7 @@ const mentorAssignmentCreateSchema = Joi.object({
         weeklyFocus: Joi.string().valid('continue', 'try', 'support_needed').allow('', null).optional()
     }).optional(),
     notes: Joi.string().optional().allow(''),
-    mode: Joi.string().valid('quantitative').optional()
+    mode: Joi.string().valid('quantitative', 'qualitative').optional()
 });
 
 const mentorAssignmentUpdateSchema = Joi.object({
@@ -338,7 +344,7 @@ const mentorAssignmentUpdateSchema = Joi.object({
     status: Joi.string().valid('active', 'paused', 'completed', 'closed').optional(),
     startDate: Joi.date().optional(),
     endDate: Joi.date().optional(),
-    duration: Joi.string().valid('2 weeks', '4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', '16 weeks', '20 weeks', '24 weeks', 'Custom').optional().allow('', null),
+    duration: Joi.alternatives().try(interventionDurationSchema, Joi.valid('', null)).optional(),
     strategyId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow('', null),
     strategyName: Joi.string().trim().optional().allow('', null),
     monitoringMethod: Joi.string().valid(
@@ -350,7 +356,7 @@ const mentorAssignmentUpdateSchema = Joi.object({
     customFrequencyDays: Joi.array().items(Joi.string().valid('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday')).optional(),
     customFrequencyNote: Joi.string().trim().optional().allow('', null),
     notes: Joi.string().optional().allow(''),
-    mode: Joi.string().valid('quantitative').optional(),
+    mode: Joi.string().valid('quantitative', 'qualitative').optional(),
     metricLabel: Joi.string().allow('', null),
     baselineScore: Joi.object({
         value: Joi.number().optional(),
@@ -365,6 +371,19 @@ const mentorAssignmentUpdateSchema = Joi.object({
         successCriteria: Joi.string().optional().allow('', null),
         completed: Joi.boolean().optional()
     })).optional(),
+    initialCheckIn: Joi.object({
+        date: Joi.date().optional(),
+        summary: Joi.string().trim().allow('', null).optional(),
+        nextSteps: Joi.string().allow('', null).optional(),
+        performed: Joi.boolean().optional(),
+        signal: Joi.string().valid('emerging', 'developing', 'consistent').allow('', null).optional(),
+        tags: Joi.array().items(Joi.string().valid('emotional_regulation', 'language', 'social', 'motor', 'independence')).max(5).optional(),
+        context: Joi.string().max(300).allow('', null).optional(),
+        observation: Joi.string().max(500).allow('', null).optional(),
+        response: Joi.string().max(300).allow('', null).optional(),
+        nextStep: Joi.string().max(300).allow('', null).optional(),
+        weeklyFocus: Joi.string().valid('continue', 'try', 'support_needed').allow('', null).optional()
+    }).optional(),
     checkIns: Joi.array().items(Joi.object({
         date: Joi.date().optional(),
         summary: Joi.string().trim().required(),

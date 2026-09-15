@@ -8,12 +8,8 @@ const formatScore = (value, unit = "") => {
     return `${value}${unit ? ` ${unit}` : ""}`;
 };
 
-const toProgressPercent = (current, target) => {
-    const currentValue = toSafeNumber(current);
-    const targetValue = toSafeNumber(target);
-    if (currentValue === null || targetValue === null || targetValue <= 0) return null;
-    return Math.max(0, Math.min(100, Math.round((currentValue / targetValue) * 100)));
-};
+const toProgressPercent = (current, target, baseline = 0) =>
+    getDirectionalProgress({ baseline, current, target }).percent;
 
 const buildFallbackChart = (current, target) => {
     const currentValue = toSafeNumber(current) ?? 0;
@@ -149,3 +145,4 @@ export {
     toSafeNumber,
     buildTrendSeries,
 };
+import { getDirectionalProgress } from "../utils/directionalProgress";

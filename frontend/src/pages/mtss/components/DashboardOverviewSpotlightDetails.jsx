@@ -1,4 +1,5 @@
 import { Clock8, Clock4, UserRound, Layers, TrendingUp, MessageSquareText } from "lucide-react";
+import { getDirectionalProgress } from "../utils/directionalProgress";
 
 const DashboardOverviewSpotlightDetails = ({
     spotlightStudent,
@@ -19,14 +20,9 @@ const DashboardOverviewSpotlightDetails = ({
     const baseline = baselineValue ?? spotlightProfile?.baseline ?? null;
     const current = currentValue ?? spotlightProfile?.current ?? null;
     const target = targetValue ?? spotlightProfile?.target ?? null;
-    const gap = target != null && current != null ? Math.max(0, target - current) : null;
-    const progressValue = (() => {
-        if (current == null || target == null || target === 0) return spotlightStatus || 0;
-        const base = baseline ?? 0;
-        const denom = target - base;
-        if (denom === 0) return current >= target ? 100 : 0;
-        return Math.min(100, Math.max(0, Math.round(((current - base) / denom) * 100)));
-    })();
+    const directionalProgress = getDirectionalProgress({ baseline, current, target });
+    const gap = directionalProgress.gap;
+    const progressValue = directionalProgress.percent ?? spotlightStatus ?? 0;
     const formatValue = (value) => (value == null ? "-" : `${value} ${progressUnit}`);
     const classLabel = spotlightStudent?.className || spotlightStudent?.class || "-";
     const lastCheckIn = history?.[0]?.date || "No recent updates";

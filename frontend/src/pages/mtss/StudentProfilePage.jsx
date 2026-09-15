@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useCallback } from "react";
+import { memo, useEffect, useMemo, useCallback, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import AOS from "aos";
@@ -13,12 +13,25 @@ import StudentNoInterventionFallback from "./components/StudentNoInterventionFal
 import { StudentProfileLoading, StudentProfileError } from "./components/StudentProfileStates";
 import useStudentProfileData from "./hooks/useStudentProfileData";
 import { buildStudentProfileView } from "./utils/studentProfileUtils";
+import { updateMentorAssignment } from "@/services/mtssService";
+import { useToast } from "@/components/ui/use-toast";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 const StudentProfilePage = memo(() => {
     const { slug } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-    const { student, loading, error, selectedIntervention, setSelectedIntervention } = useStudentProfileData(slug);
+    const { toast } = useToast();
+    const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+    const [savingStatus, setSavingStatus] = useState(false);
+    const { student, loading, error, selectedIntervention, setSelectedIntervention, refresh } = useStudentProfileData(slug);
 
     useEffect(() => {
         AOS.init({
@@ -75,6 +88,45 @@ const StudentProfilePage = memo(() => {
         () => buildStudentProfileView(student, selectedIntervention),
         [student, selectedIntervention],
     );
+    const normalizedStatus = String(currentIntervention?.status || "active").toLowerCase();
+    const canEditCurrentIntervention = currentIntervention?.viewerCanEditPlan === true
+        || currentIntervention?.viewerPermissions?.canEditPlan === true;
+    const statusActionKind = normalizedStatus === "closed"
+        ? "reopen"
+        : (["active", "paused"].includes(normalizedStatus) ? "cancel" : null);
+    const statusAction = canEditCurrentIntervention && currentIntervention?.assignmentId && statusActionKind
+        ? {
+            kind: statusActionKind,
+            label: statusActionKind === "reopen" ? "Reopen Intervention" : "Cancel Intervention",
+            disabled: savingStatus,
+            onClick: () => setStatusDialogOpen(true),
+        }
+        : null;
+
+    const handleStatusChange = useCallback(async () => {
+        if (!currentIntervention?.assignmentId || !statusActionKind || savingStatus) return;
+        const nextStatus = statusActionKind === "reopen" ? "active" : "closed";
+        try {
+            setSavingStatus(true);
+            await updateMentorAssignment(currentIntervention.assignmentId, { status: nextStatus });
+            await refresh();
+            setStatusDialogOpen(false);
+            toast({
+                title: nextStatus === "closed" ? "Intervention canceled" : "Intervention reopened",
+                description: nextStatus === "closed"
+                    ? "The plan is closed. Goals, evidence, and progress history are still retained."
+                    : "The plan is active again and can receive progress updates.",
+            });
+        } catch (statusError) {
+            toast({
+                title: "Unable to update intervention",
+                description: statusError?.response?.data?.message || statusError?.message || "Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setSavingStatus(false);
+        }
+    }, [currentIntervention, refresh, savingStatus, statusActionKind, toast]);
 
     if (loading) {
         return <StudentProfileLoading />;
@@ -141,6 +193,7 @@ const StudentProfilePage = memo(() => {
                                     monitoringMethodLabel={monitoringMethodLabel}
                                     startDateLabel={startDateLabel}
                                     notesLabel={notesLabel}
+                                    statusAction={statusAction}
                                 />
                             )}
                         </AnimatePresence>
@@ -151,6 +204,38 @@ const StudentProfilePage = memo(() => {
                     </div>
                 </motion.div>
             </div>
+            <Dialog open={statusDialogOpen} onOpenChange={(open) => !savingStatus && setStatusDialogOpen(open)}>
+                <DialogContent className="mx-4 max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {statusActionKind === "reopen" ? "Reopen this intervention?" : "Cancel this intervention?"}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {statusActionKind === "reopen"
+                                ? `This will make ${currentIntervention?.label || "the intervention"} active again and allow new progress updates. Existing history remains unchanged.`
+                                : `This will close ${currentIntervention?.label || "the intervention"} for ${student?.name || "this student"}. Goals, evidence, and progress history will be retained, but no new progress can be submitted until it is reopened.`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <button
+                            type="button"
+                            onClick={() => setStatusDialogOpen(false)}
+                            disabled={savingStatus}
+                            className="rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-50"
+                        >
+                            {statusActionKind === "reopen" ? "Keep Closed" : "Keep Intervention"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleStatusChange}
+                            disabled={savingStatus}
+                            className={`rounded-full px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${statusActionKind === "reopen" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"}`}
+                        >
+                            {savingStatus ? "Saving..." : (statusActionKind === "reopen" ? "Reopen Intervention" : "Cancel Intervention")}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 });

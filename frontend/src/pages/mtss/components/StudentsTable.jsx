@@ -22,6 +22,13 @@ const HEADER_COLS = [
     { label: "Next Update", align: "text-left", width: "w-[12%]" },
 ];
 
+const COMPACT_HEADER_COLS = [
+    { label: "Student", align: "text-left", width: "w-[28%]" },
+    { label: "Active Support", align: "text-left", width: "w-[26%]" },
+    { label: "Last Activity", align: "text-left", width: "w-[18%]" },
+    { label: "Status", align: "text-left", width: "w-[14%]" },
+];
+
 const getStudentRowId = (student = {}) =>
     student.id || student._id || student.supportUnit?.assignmentId || student.baseStudentId || student.slug || student.name;
 
@@ -94,6 +101,7 @@ const StudentsTable = memo(
         selectable = false,
         selectedIds = [],
         onSelect,
+        compactRoster = false,
     }) => {
         const activeSelectedIds = selectedIds || [];
         const groupedStudents = groupStudentsForTable(students);
@@ -133,7 +141,7 @@ const StudentsTable = memo(
                                         Sel
                                     </th>
                                 )}
-                                {HEADER_COLS.map((col) => (
+                                {(compactRoster ? COMPACT_HEADER_COLS : HEADER_COLS).map((col) => (
                                     <th
                                         key={col.label}
                                         className={`py-3.5 font-semibold ${col.align} ${col.width} tracking-[0.14em] uppercase text-[10px] text-slate-500 dark:text-slate-300 whitespace-nowrap ${dense ? "text-[9px]" : ""}`}
@@ -168,6 +176,7 @@ const StudentsTable = memo(
                                         selectable={selectable}
                                         selected={selected}
                                         onSelect={onSelect}
+                                        compactRoster={compactRoster}
                                     />
                                 );
                             })}
@@ -196,6 +205,7 @@ const StudentsTable = memo(
                                 selectable={selectable}
                                 selected={selected}
                                 onSelect={onSelect}
+                                compactRoster={compactRoster}
                             />
                         );
                     })}

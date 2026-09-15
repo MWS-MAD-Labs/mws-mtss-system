@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeInterventionDuration } = require('../utils/mtssIntervention');
 
 const mentorAssignmentSchema = new mongoose.Schema({
     mentorId: {
@@ -35,8 +36,12 @@ const mentorAssignmentSchema = new mongoose.Schema({
     },
     duration: {
         type: String,
-        enum: ['2 weeks', '4 weeks', '6 weeks', '8 weeks', '10 weeks', '12 weeks', '16 weeks', '20 weeks', '24 weeks', 'Custom'],
-        trim: true
+        trim: true,
+        set: (value) => value == null || value === '' ? value : (normalizeInterventionDuration(value) || value),
+        validate: {
+            validator: (value) => value == null || value === '' || Boolean(normalizeInterventionDuration(value)),
+            message: 'Invalid intervention duration'
+        }
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,

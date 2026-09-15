@@ -83,7 +83,6 @@ const InterventionFormPanel = memo(({
         onChange("studentName", student?.name || "");
         onChange("grade", student?.grade || student?.currentGrade || "");
         onChange("className", student?.className || "");
-        onChange("mode", "quantitative");
         // Reset type if it's no longer allowed for the newly selected student
         if (nextAllowed && formState.type && !nextAllowed.has(formState.type)) {
             onChange("type", "");

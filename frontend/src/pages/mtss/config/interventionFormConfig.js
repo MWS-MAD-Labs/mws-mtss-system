@@ -55,6 +55,33 @@ export const SKIP_REASONS = [
 ];
 
 export const SCORE_UNITS = ["wpm", "%", "pts", "score"];
+export const INTERVENTION_MODES = [
+    { label: "Quantitative", value: "quantitative" },
+    { label: "Qualitative", value: "qualitative" },
+];
+export const ASSIGNMENT_STATUSES = [
+    { label: "Active", value: "active" },
+    { label: "Paused", value: "paused" },
+    { label: "Completed", value: "completed" },
+    { label: "Closed", value: "closed" },
+];
+export const QUALITATIVE_SIGNALS = [
+    { label: "Emerging", value: "emerging" },
+    { label: "Developing", value: "developing" },
+    { label: "Consistent", value: "consistent" },
+];
+export const WEEKLY_FOCUS_OPTIONS = [
+    { label: "Continue", value: "continue" },
+    { label: "Try something new", value: "try" },
+    { label: "Support needed", value: "support_needed" },
+];
+export const QUALITATIVE_TAGS = [
+    { label: "Emotional regulation", value: "emotional_regulation" },
+    { label: "Language", value: "language" },
+    { label: "Social", value: "social" },
+    { label: "Motor", value: "motor" },
+    { label: "Independence", value: "independence" },
+];
 
 export const filterStrategiesByType = (strategies, type) => {
     if (!type) return strategies;
@@ -99,6 +126,7 @@ export const getInterventionFormErrors = (formState = {}) => {
     if (!formState.startDate) errors.startDate = "Select a start date";
     if (!formState.monitorFrequency) errors.monitorFrequency = "Select a monitoring frequency";
     if (!formState.monitorMethod) errors.monitorMethod = "Select a monitoring method";
+    if (!formState.mode) errors.mode = "Select a progress mode";
 
     if ((formState.goal || "").length > GOAL_NOTES_MAX_LENGTH) {
         errors.goal = `Goal must be ${GOAL_NOTES_MAX_LENGTH} characters or fewer`;
@@ -109,20 +137,25 @@ export const getInterventionFormErrors = (formState = {}) => {
 
     // Only the custom "NNN days" format is bounded here - the weekly
     // presets ("2 weeks" ... "8 weeks") never approach this ceiling anyway.
-    const customDurationMatch = (formState.duration || "").match(/^(\d+)\s*days$/);
-    if (customDurationMatch && Number(customDurationMatch[1]) > MAX_CUSTOM_DURATION_DAYS) {
-        errors.duration = `Duration can't be above ${MAX_CUSTOM_DURATION_DAYS} days`;
+    const duration = (formState.duration || "").trim();
+    const customDurationMatch = duration.match(/^(\d+)\s+days$/i);
+    if (duration === "Custom") {
+        errors.duration = "Enter the custom duration in days";
+    } else if (duration && !DURATIONS.includes(duration) && !customDurationMatch) {
+        errors.duration = "Custom duration must use the format N days";
+    } else if (customDurationMatch && (Number(customDurationMatch[1]) < 1 || Number(customDurationMatch[1]) > MAX_CUSTOM_DURATION_DAYS)) {
+        errors.duration = `Duration must be between 1 and ${MAX_CUSTOM_DURATION_DAYS} days`;
     }
 
     const scoreCapped = CAPPED_SCORE_UNITS.has(formState.baselineUnit);
     const baseline = formState.baselineValue === "" || formState.baselineValue == null ? null : Number(formState.baselineValue);
     const target = formState.targetValue === "" || formState.targetValue == null ? null : Number(formState.targetValue);
 
-    if (baseline != null) {
+    if (formState.mode !== "qualitative" && baseline != null) {
         if (baseline < 0) errors.baselineValue = "Baseline can't be negative";
         else if (scoreCapped && baseline > MAX_CAPPED_SCORE) errors.baselineValue = `Baseline can't be above ${MAX_CAPPED_SCORE} for this unit`;
     }
-    if (target != null) {
+    if (formState.mode !== "qualitative" && target != null) {
         if (target < 0) errors.targetValue = "Target can't be negative";
         else if (scoreCapped && target > MAX_CAPPED_SCORE) errors.targetValue = `Target can't be above ${MAX_CAPPED_SCORE} for this unit`;
     }
@@ -130,7 +163,7 @@ export const getInterventionFormErrors = (formState = {}) => {
     // behavior incidents, fewer absences) legitimately has target < baseline.
     // The progress-percentage formula (DashboardOverviewSpotlightDetails)
     // only breaks when they're exactly equal (divide by zero).
-    if (baseline != null && target != null && baseline === target) {
+    if (formState.mode !== "qualitative" && baseline != null && target != null && baseline === target) {
         errors.targetValue = "Target can't be the same as baseline";
     }
 

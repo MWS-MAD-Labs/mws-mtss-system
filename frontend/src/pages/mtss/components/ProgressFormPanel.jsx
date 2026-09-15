@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ClipboardCheck, Loader2 } from "lucide-react";
 import { getProgressAssignmentOptions } from "../utils/editPlanAccess";
-import { SKIP_REASONS } from "../config/interventionFormConfig";
+import { QUALITATIVE_SIGNALS, QUALITATIVE_TAGS, SKIP_REASONS, WEEKLY_FOCUS_OPTIONS } from "../config/interventionFormConfig";
 import EvidenceUploader from "./EvidenceUploader";
 
 const readonlyField =
@@ -86,6 +86,7 @@ const ProgressFormPanel = memo(
         );
 
         const lockedUnit = selectedOption?.metricLabel || "score";
+        const isQualitative = selectedOption?.mode === "qualitative";
         const strategyDetail = selectedOption?.strategyName || selectedOption?.strategy || selectedOption?.focus || "Not set";
         const goalDetail = resolveGoalValue(selectedOption) || "Not set";
         const durationDetail = selectedOption?.duration || "Ongoing";
@@ -102,6 +103,7 @@ const ProgressFormPanel = memo(
             const firstOption = options[0];
             onChange("assignmentId", firstOption?.assignmentId || student?.assignmentId || "");
             onChange("scoreUnit", firstOption?.metricLabel || "score");
+            onChange("mode", firstOption?.mode || "quantitative");
         };
 
         const handleAssignmentChange = (event) => {
@@ -109,6 +111,7 @@ const ProgressFormPanel = memo(
             onChange("assignmentId", id);
             const option = assignmentOptions.find((o) => o.assignmentId === id);
             onChange("scoreUnit", option?.metricLabel || "score");
+            onChange("mode", option?.mode || "quantitative");
         };
 
             const skipReasonValid =
@@ -117,7 +120,9 @@ const ProgressFormPanel = memo(
             const todayValue = getTodayInputValue();
             const lateSubmission = isLateProgressDate(formState.date, todayValue);
             const lateReasonValid = !lateSubmission || Boolean(formState.lateReason?.trim());
-            const isValid = Boolean(formState.studentId && formState.date && formState.scoreValue !== "" && skipReasonValid && lateReasonValid);
+            const progressValueValid = formState.performed === "no"
+                || (isQualitative ? Boolean(formState.observation?.trim()) : formState.scoreValue !== "");
+            const isValid = Boolean(formState.studentId && formState.date && progressValueValid && skipReasonValid && lateReasonValid);
 
         const handleSubmit = (event) => {
             event.preventDefault();
@@ -310,7 +315,7 @@ const ProgressFormPanel = memo(
                         </div>
                     )}
 
-                    <div className="grid md:grid-cols-2 gap-4">
+                    {!isQualitative && <div className="grid md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
                                 Status or Score
@@ -346,7 +351,39 @@ const ProgressFormPanel = memo(
                                 <option value="🌱 Keep Going">🌱 Keep Going</option>
                             </select>
                         </div>
-                    </div>
+                    </div>}
+                    {isQualitative && formState.performed !== "no" && (
+                        <div className="rounded-2xl border border-violet-200/60 bg-violet-50/50 p-4 space-y-4 dark:border-violet-500/25 dark:bg-violet-900/15">
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Development Signal</label>
+                                    <select className={baseFieldClass} value={formState.signal || ""} onChange={(e) => onChange("signal", e.target.value)}>
+                                        <option value="">Select signal</option>
+                                        {QUALITATIVE_SIGNALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                    </select>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Weekly Focus</label>
+                                    <select className={baseFieldClass} value={formState.weeklyFocus || ""} onChange={(e) => onChange("weeklyFocus", e.target.value)}>
+                                        <option value="">Select focus</option>
+                                        {WEEKLY_FOCUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {QUALITATIVE_TAGS.map((tag) => {
+                                    const selected = (formState.tags || []).includes(tag.value);
+                                    return <button key={tag.value} type="button" onClick={() => onChange("tags", selected ? formState.tags.filter((value) => value !== tag.value) : [...(formState.tags || []), tag.value])} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${selected ? "border-violet-500 bg-violet-500 text-white" : "border-violet-200 bg-white text-violet-700 dark:border-violet-500/30 dark:bg-white/10 dark:text-violet-100"}`}>{tag.label}</button>;
+                                })}
+                            </div>
+                            <textarea className={textareaClass} placeholder="Observation (required)" value={formState.observation || ""} onChange={(e) => onChange("observation", e.target.value)} />
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <input className={baseFieldClass} placeholder="Context" value={formState.context || ""} onChange={(e) => onChange("context", e.target.value)} />
+                                <input className={baseFieldClass} placeholder="Student response" value={formState.response || ""} onChange={(e) => onChange("response", e.target.value)} />
+                            </div>
+                            <input className={baseFieldClass} placeholder="Next step" value={formState.nextStep || ""} onChange={(e) => onChange("nextStep", e.target.value)} />
+                        </div>
+                    )}
                     <div className="flex flex-col gap-2">
                         <label className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
                             Notes & Observations

@@ -63,6 +63,7 @@ const DashboardOverviewRoster = ({ students, TierPill, ProgressBadge, onView, on
                     TierPill={TierPill}
                     ProgressBadge={ProgressBadge}
                     dense
+                    compactRoster
                     showActions
                     onView={onView}
                     onUpdate={onUpdate}

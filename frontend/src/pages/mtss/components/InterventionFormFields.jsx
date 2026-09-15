@@ -9,6 +9,11 @@ import {
     WEEKDAYS,
     METHODS,
     SCORE_UNITS,
+    INTERVENTION_MODES,
+    ASSIGNMENT_STATUSES,
+    QUALITATIVE_SIGNALS,
+    WEEKLY_FOCUS_OPTIONS,
+    QUALITATIVE_TAGS,
     GOAL_NOTES_MAX_LENGTH,
     MAX_CAPPED_SCORE,
     MAX_CUSTOM_DURATION_DAYS,
@@ -44,6 +49,7 @@ const InterventionFormFields = memo(({
     const dropdownPanelClass = "rounded-2xl border border-white/70 dark:border-white/15 bg-white dark:bg-slate-900 shadow-[0_20px_50px_-20px_rgba(15,23,42,0.35)]";
     const errorTextClass = "text-xs font-medium text-rose-600 dark:text-rose-400";
     const errors = getInterventionFormErrors(formState);
+    const isQualitative = formState.mode === "qualitative";
     const scoreCapped = SCORE_CAPPED_UNITS.has(formState.baselineUnit);
     // The HTML `max`/`min` attributes on a number input only affect the
     // spinner arrows and :invalid state - they don't stop someone from
@@ -78,6 +84,44 @@ const InterventionFormFields = memo(({
 
     return (
         <>
+            <div className="grid md:grid-cols-2 gap-4">
+                <div className={`${fieldWrap} flex flex-col gap-2`}>
+                    <label className={labelClass}>Progress Mode</label>
+                    <Dropdown
+                        options={INTERVENTION_MODES}
+                        value={formState.mode}
+                        onChange={(value) => onChange("mode", value)}
+                        placeholder="Select mode"
+                        triggerClassName={fieldClass}
+                        panelClassName={dropdownPanelClass}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        {isQualitative ? "Track observations, response, and developmental signals." : "Track baseline, target, and numeric check-ins."}
+                    </p>
+                </div>
+                {isEditing ? (
+                    <div className={`${fieldWrap} flex flex-col gap-2`}>
+                        <label className={labelClass}>Plan Status</label>
+                        <Dropdown
+                            options={ASSIGNMENT_STATUSES}
+                            value={formState.status}
+                            onChange={(value) => onChange("status", value)}
+                            placeholder="Select status"
+                            triggerClassName={fieldClass}
+                            panelClassName={dropdownPanelClass}
+                        />
+                        <p className="text-xs text-muted-foreground">Completed and closed plans remain editable, but cannot receive progress updates.</p>
+                    </div>
+                ) : (
+                    <div className={`${fieldWrap} flex flex-col gap-2`}>
+                        <label className={labelClass}>Plan Status</label>
+                        <div className="px-4 py-3 rounded-2xl bg-white/70 dark:bg-white/10 border border-white/40 dark:border-white/10 text-sm text-slate-600 dark:text-slate-200">
+                            Active
+                        </div>
+                    </div>
+                )}
+            </div>
+
             <div className="grid md:grid-cols-2 gap-4">
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>
@@ -215,6 +259,23 @@ const InterventionFormFields = memo(({
                     onChange={(e) => onChange("goal", e.target.value)}
                 />
                 {errors.goal && <p className={errorTextClass}>{errors.goal}</p>}
+                <input
+                    type="text"
+                    className={fieldClass}
+                    placeholder="Success criteria (optional)"
+                    value={formState.goalSuccessCriteria || ""}
+                    onChange={(e) => onChange("goalSuccessCriteria", e.target.value)}
+                />
+                {isEditing && (
+                    <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        <input
+                            type="checkbox"
+                            checked={Boolean(formState.goalCompleted)}
+                            onChange={(e) => onChange("goalCompleted", e.target.checked)}
+                        />
+                        Primary goal completed
+                    </label>
+                )}
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
@@ -242,6 +303,56 @@ const InterventionFormFields = memo(({
                     )}
                 </div>
             </div>
+
+            {isQualitative && !isEditing && (
+                <div className={`${fieldWrap} space-y-4`}>
+                    <div>
+                        <label className={labelClass}>Initial Observation</label>
+                        <p className="mt-1 text-xs text-muted-foreground">Optional, but useful when starting a qualitative plan with a meaningful baseline observation.</p>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <Dropdown
+                            options={QUALITATIVE_SIGNALS}
+                            value={formState.initialSignal || ""}
+                            onChange={(value) => onChange("initialSignal", value)}
+                            placeholder="Development signal"
+                            triggerClassName={fieldClass}
+                            panelClassName={dropdownPanelClass}
+                        />
+                        <Dropdown
+                            options={WEEKLY_FOCUS_OPTIONS}
+                            value={formState.initialWeeklyFocus || ""}
+                            onChange={(value) => onChange("initialWeeklyFocus", value)}
+                            placeholder="Weekly focus"
+                            triggerClassName={fieldClass}
+                            panelClassName={dropdownPanelClass}
+                        />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {QUALITATIVE_TAGS.map((tag) => {
+                            const selected = (formState.initialTags || []).includes(tag.value);
+                            return (
+                                <button
+                                    key={tag.value}
+                                    type="button"
+                                    onClick={() => onChange("initialTags", selected
+                                        ? formState.initialTags.filter((value) => value !== tag.value)
+                                        : [...(formState.initialTags || []), tag.value])}
+                                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${selected ? "border-primary bg-primary text-white" : "border-primary/20 bg-white/70 text-muted-foreground dark:bg-white/10"}`}
+                                >
+                                    {tag.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <textarea className={textareaFieldClass} placeholder="What did you observe?" value={formState.initialObservation || ""} onChange={(e) => onChange("initialObservation", e.target.value)} />
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <input className={fieldClass} placeholder="Context" value={formState.initialContext || ""} onChange={(e) => onChange("initialContext", e.target.value)} />
+                        <input className={fieldClass} placeholder="Student response" value={formState.initialResponse || ""} onChange={(e) => onChange("initialResponse", e.target.value)} />
+                    </div>
+                    <input className={fieldClass} placeholder="Next step" value={formState.initialNextStep || ""} onChange={(e) => onChange("initialNextStep", e.target.value)} />
+                </div>
+            )}
 
             {formState.monitorFrequency === "Custom" && (
                 <div className="flex flex-col gap-3 p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-900/20 border border-blue-200/40 dark:border-blue-700/30">
@@ -309,7 +420,7 @@ const InterventionFormFields = memo(({
                 </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            {!isQualitative && <div className="grid md:grid-cols-2 gap-4">
                 <div className={`${fieldWrap} flex flex-col gap-2`}>
                     <label className={labelClass}>Baseline Score</label>
                     <div className="flex gap-2">
@@ -355,7 +466,7 @@ const InterventionFormFields = memo(({
                     {scoreCapped && <p className="text-[11px] text-muted-foreground">0-{MAX_CAPPED_SCORE} for this unit.</p>}
                     {errors.targetValue && <p className={errorTextClass}>{errors.targetValue}</p>}
                 </div>
-            </div>
+            </div>}
         </>
     );
 });

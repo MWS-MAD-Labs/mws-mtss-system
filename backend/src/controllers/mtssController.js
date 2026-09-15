@@ -4,8 +4,10 @@ const { sendSuccess, sendError } = require('../utils/response');
 const MentorAssignment = require('../models/MentorAssignment');
 const User = require('../models/User');
 const MTSSStudent = require('../models/MTSSStudent');
+const mongoose = require('mongoose');
 const openRouterChat = require('../config/openRouterChat');
 const { emitAssignmentEvent } = require('../services/mtssRealtimeService');
+const { queueAssignmentMutationNotifications } = require('../services/mtssNotificationService');
 const {
     KINDERGARTEN_SIGNAL_LEVELS,
     KINDERGARTEN_WEEKLY_FOCUS_OPTIONS,
@@ -50,6 +52,7 @@ const TYPE_ALIAS_MAP = {
 // for assignments" trying to assign themselves as a mentor.
 const MTSS_MENTOR_ROLES = [...MTSS_NATIVE_TEACHER_ROLES, 'head_unit', 'admin', 'directorate'];
 const DUPLICATE_BLOCKING_STATUSES = ['active', 'paused'];
+const PROGRESSABLE_ASSIGNMENT_STATUSES = new Set(['active', 'paused']);
 const PLAN_EDITABLE_FIELDS = new Set([
     'focusAreas',
     'tier',
@@ -313,6 +316,15 @@ const isAssignmentOwnerOrAdmin = ({ viewer = {}, assignment = {} }) => {
     ].filter(Boolean);
 
     return ownerIds.includes(viewerId);
+};
+
+const canViewerSeeAssignment = ({ viewer = {}, assignment = {}, students = [] }) => {
+    if (isMTSSAdminRole(viewer?.role)) return true;
+    const viewerId = resolveActorId(viewer?.id || viewer?._id || viewer);
+    const mentorId = resolveActorId(assignment?.mentorId);
+    const creatorId = resolveActorId(assignment?.createdBy);
+    return Boolean(viewerId && (viewerId === mentorId || viewerId === creatorId))
+        || isAssignmentInViewerTeachingScope({ viewer, assignment, students });
 };
 
 const canViewerSubmitProgressForAssignment = ({ viewer = {}, assignment = {} }) => {
@@ -858,7 +870,7 @@ const ensureMentorEligibility = async (mentorId) => {
 };
 
 const ensureStudentsValid = async (studentIds) => {
-    const students = await MTSSStudent.find({ _id: { $in: studentIds } }).select('name status currentGrade className');
+    const students = await MTSSStudent.find({ _id: { $in: studentIds } }).select('name email status currentGrade className');
     if (students.length !== studentIds.length) {
         throw new Error('One or more students were not found in the MTSS roster');
     }
@@ -1261,7 +1273,7 @@ const createMentorAssignment = async (req, res) => {
             ? focusAreas.map(area => area?.trim()).filter(Boolean)
             : [];
 
-        const resolvedMode = 'quantitative';
+        const resolvedMode = mode === 'qualitative' ? 'qualitative' : 'quantitative';
         const focusAreasOverridden = !normalizedFocusAreas.length;
         const resolvedFocusAreas = normalizedFocusAreas.length ? normalizedFocusAreas : ['Universal Supports'];
 
@@ -1278,8 +1290,9 @@ const createMentorAssignment = async (req, res) => {
             return sendError(res, buildDuplicateInterventionMessage(conflicts), 409);
         }
 
-        const sanitizedBaseline = sanitizeScorePayload(baselineScore);
-        const sanitizedTarget = sanitizeScorePayload(targetScore);
+        const sanitizedBaseline = resolvedMode === 'qualitative' ? undefined : sanitizeScorePayload(baselineScore);
+        const sanitizedTarget = resolvedMode === 'qualitative' ? undefined : sanitizeScorePayload(targetScore);
+        const sanitizedInitialCheckIn = initialCheckIn ? sanitizeCheckIn(initialCheckIn) : null;
 
         const assignment = await MentorAssignment.create({
             mentorId,
@@ -1297,13 +1310,18 @@ const createMentorAssignment = async (req, res) => {
             goals,
             notes,
             mode: resolvedMode,
-            metricLabel: metricLabel?.trim() || undefined,
+            metricLabel: resolvedMode === 'qualitative' ? undefined : metricLabel?.trim() || undefined,
             baselineScore: sanitizedBaseline,
             targetScore: sanitizedTarget,
             createdBy: req.user?.id || null,
             lastPlanUpdatedAt: new Date(),
             lastPlanUpdatedBy: req.user?.id || null
         });
+
+        if (sanitizedInitialCheckIn) {
+            assignment.checkIns.push(sanitizedInitialCheckIn);
+            await assignment.save();
+        }
 
         // Post-creation TOCTOU guard: a concurrent request may have won the race.
         // If we find a conflict (excluding ourselves), roll back and return 409.
@@ -1323,6 +1341,19 @@ const createMentorAssignment = async (req, res) => {
         }
         sendSuccess(res, 'Intervention plan created', responsePayload, 201);
 
+        queueAssignmentMutationNotifications({
+            students: scopedStudents,
+            actor: req.user,
+            mentorId: assignment.mentorId,
+            assignmentId: assignment._id,
+            operation: 'create_mtss_intervention',
+            title: 'New MTSS intervention created',
+            message: `${req.user?.name || 'An MTSS team member'} created a new MTSS support plan.`,
+            notifyMentor: isAdmin && requestedMentorId !== viewerId,
+            category: 'alert',
+            priority: 'high'
+        });
+
         emitAssignmentEvent(assignment._id, 'created').catch((error) => {
             console.error('Failed to broadcast new mentor assignment:', error);
         });
@@ -1339,8 +1370,6 @@ const getMentorAssignments = async (req, res) => {
         const { mentorId, studentId, status, tier } = req.query;
         const filter = {};
         const isAdmin = isMTSSAdminRole(req.user.role);
-        const viewerId = req.user?.id?.toString?.() || req.user?._id?.toString?.();
-
         if (mentorId) filter.mentorId = mentorId;
         if (studentId) filter.studentIds = studentId;
         if (status) filter.status = status;
@@ -1355,18 +1384,11 @@ const getMentorAssignments = async (req, res) => {
         const hydratedAssignments = await hydrateAssignmentStudents(assignmentsRaw);
         const scopedAssignments = isAdmin
             ? hydratedAssignments
-            : hydratedAssignments.filter((assignment) => {
-                const mentorKey = assignment?.mentorId?._id?.toString?.() || assignment?.mentorId?.toString?.();
-                const creatorKey = assignment?.createdBy?._id?.toString?.() || assignment?.createdBy?.toString?.();
-                if (viewerId && (mentorKey === viewerId || creatorKey === viewerId)) return true;
-
-                const assignmentStudents = Array.isArray(assignment?.studentIds) ? assignment.studentIds : [];
-                return isAssignmentInViewerTeachingScope({
-                    viewer: req.user,
-                    assignment,
-                    students: assignmentStudents
-                });
-            });
+            : hydratedAssignments.filter((assignment) => canViewerSeeAssignment({
+                viewer: req.user,
+                assignment,
+                students: Array.isArray(assignment?.studentIds) ? assignment.studentIds : []
+            }));
 
         const assignments = scopedAssignments.map((assignment) => enrichAssignmentForTeacherTools(assignment, req.user));
         const mentorSubjectCoverage = buildMentorSubjectCoverageRows(assignments);
@@ -1468,6 +1490,9 @@ const getAssignmentsNeedingReassignment = async (req, res) => {
 
 const getMentorAssignmentById = async (req, res) => {
     try {
+        if (!mongoose.isValidObjectId(req.params.id)) {
+            return sendError(res, 'Mentor assignment not found', 404);
+        }
         const assignmentRaw = await MentorAssignment.findById(req.params.id)
             .populate('mentorId', 'name role email username jobPosition')
             .populate('createdBy', 'name role')
@@ -1479,6 +1504,13 @@ const getMentorAssignmentById = async (req, res) => {
         }
 
         const [assignmentHydrated] = await hydrateAssignmentStudents([assignmentRaw]);
+        if (!canViewerSeeAssignment({
+            viewer: req.user,
+            assignment: assignmentHydrated,
+            students: assignmentHydrated?.studentIds || []
+        })) {
+            return sendError(res, 'Mentor assignment not found', 404);
+        }
         const assignment = enrichAssignmentForTeacherTools(assignmentHydrated, req.user);
 
         sendSuccess(res, 'Mentor assignment retrieved', { assignment });
@@ -1509,7 +1541,8 @@ const updateMentorAssignment = async (req, res) => {
             metricLabel,
             baselineScore,
             targetScore,
-            mode
+            mode,
+            initialCheckIn
         } = req.body;
         const assignment = await MentorAssignment.findById(req.params.id);
 
@@ -1522,7 +1555,7 @@ const updateMentorAssignment = async (req, res) => {
         const isAssignedMentor = assignment.mentorId?.toString() === viewerId;
         const isCreator = assignment.createdBy?.toString?.() === viewerId;
         const includesPlanEdits = hasPlanEditPayload(req.body);
-        const hasCheckInUpdates = Boolean(Array.isArray(checkIns) && checkIns.length);
+        const hasCheckInUpdates = Boolean((Array.isArray(checkIns) && checkIns.length) || initialCheckIn);
         if (hasCheckInUpdates && checkIns.some((checkIn = {}) => checkIn.performed === false && !checkIn.skipReason)) {
             return sendError(res, 'A skip reason is required when an intervention is marked as skipped.', 400);
         }
@@ -1556,6 +1589,9 @@ const updateMentorAssignment = async (req, res) => {
         }
 
         if (hasCheckInUpdates) {
+            if (!PROGRESSABLE_ASSIGNMENT_STATUSES.has(assignment.status)) {
+                return sendError(res, 'Completed or closed interventions cannot receive progress updates. Reopen the plan first.', 409);
+            }
             const canSubmitProgress = canViewerSubmitProgressForAssignment({
                 viewer: req.user,
                 assignment
@@ -1582,8 +1618,10 @@ const updateMentorAssignment = async (req, res) => {
                 ? strategyName.trim()
                 : strategyName;
         const nextStrategyName = hasStrategyNameUpdate ? cleanedStrategyName : assignment.strategyName;
+        const isReopening = ['active', 'paused'].includes(status)
+            && ['completed', 'closed'].includes(assignment.status);
 
-        if (hasFocusAreasUpdate || hasStrategyNameUpdate) {
+        if (hasFocusAreasUpdate || hasStrategyNameUpdate || isReopening) {
             const conflicts = await findSubjectConflicts({
                 studentIds: assignment.studentIds || [],
                 subjectKeys: extractAssignmentSubjectKeys({
@@ -1698,22 +1736,23 @@ const updateMentorAssignment = async (req, res) => {
                 assignment.customFrequencyNote = customFrequencyNote ? customFrequencyNote.toString().trim() : undefined;
             }
         }
-        if (mode !== undefined && mode === 'quantitative') {
-            logChange('mode', 'Mode', assignment.mode, 'quantitative');
-            assignment.mode = 'quantitative';
+        if (mode !== undefined) {
+            logChange('mode', 'Mode', assignment.mode, mode);
+            assignment.mode = mode;
         }
         if (notes !== undefined && typeof notes === 'string') {
             logChange('notes', 'Notes', assignment.notes, notes || null);
             assignment.notes = notes;
         }
         if (goals !== undefined) assignment.goals = goals;
-        if (metricLabel !== undefined) {
+        const nextMode = mode || assignment.mode || 'quantitative';
+        if (metricLabel !== undefined && nextMode !== 'qualitative') {
             logChange('metricLabel', 'Metric Label', assignment.metricLabel, metricLabel?.trim() || null);
             assignment.metricLabel = metricLabel?.trim() || undefined;
         }
 
         const sanitizedBaseline = sanitizeScorePayload(baselineScore);
-        if (baselineScore !== undefined) {
+        if (baselineScore !== undefined && nextMode !== 'qualitative') {
             logChange('baselineScore', 'Baseline', formatScoreForLog(assignment.baselineScore), formatScoreForLog(sanitizedBaseline));
             assignment.baselineScore = sanitizedBaseline || {
                 value: null,
@@ -1722,7 +1761,7 @@ const updateMentorAssignment = async (req, res) => {
         }
 
         const sanitizedTarget = sanitizeScorePayload(targetScore);
-        if (targetScore !== undefined) {
+        if (targetScore !== undefined && nextMode !== 'qualitative') {
             logChange('targetScore', 'Target', formatScoreForLog(assignment.targetScore), formatScoreForLog(sanitizedTarget));
             assignment.targetScore = sanitizedTarget || {
                 value: null,
@@ -1733,6 +1772,9 @@ const updateMentorAssignment = async (req, res) => {
         if (Array.isArray(checkIns)) {
             checkIns.forEach(checkIn => assignment.checkIns.push(sanitizeCheckIn(checkIn)));
         }
+        if (initialCheckIn) {
+            assignment.checkIns.push(sanitizeCheckIn(initialCheckIn));
+        }
 
         if (includesPlanEdits) {
             assignment.lastPlanUpdatedAt = new Date();
@@ -1742,6 +1784,23 @@ const updateMentorAssignment = async (req, res) => {
         await assignment.save();
 
         sendSuccess(res, 'Mentor assignment updated', { assignment });
+
+        const operation = hasCheckInUpdates || initialCheckIn
+            ? 'append_mtss_progress_checkin'
+            : 'update_mtss_intervention_plan';
+        const title = hasCheckInUpdates || initialCheckIn ? 'Progress update posted' : 'MTSS intervention updated';
+        queueAssignmentMutationNotifications({
+            studentIds: assignment.studentIds || [],
+            actor: req.user,
+            mentorId: assignment.mentorId,
+            assignmentId: assignment._id,
+            operation,
+            title,
+            message: `${req.user?.name || 'An MTSS team member'} updated this MTSS support plan.`,
+            notifyMentor: assignment.mentorId?.toString() !== viewerId,
+            category: hasCheckInUpdates || initialCheckIn ? 'reminder' : 'alert',
+            priority: 'medium'
+        });
 
         emitAssignmentEvent(assignment._id, 'updated').catch((error) => {
             console.error('Failed to broadcast mentor assignment update:', error);
@@ -2385,6 +2444,7 @@ const getKindergartenInterventionBank = async (_req, res) => {
 module.exports = {
     isAssignmentOwnerOrAdmin,
     isAssignmentInViewerTeachingScope,
+    canViewerSeeAssignment,
     getTierMetadata,
     upsertTier,
     getStrategies,

@@ -264,6 +264,7 @@ const StudentsPanel = memo(({ students, TierPill, ProgressBadge, onRefresh, onEd
                             students={visibleStudents}
                             TierPill={TierPill}
                             ProgressBadge={ProgressBadge}
+                            compactRoster
                             showActions
                             pilotHintAction={pilotGuide?.studentAction || null}
                             onView={handleView}

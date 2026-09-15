@@ -1,4 +1,8 @@
-const { isAssignmentOwnerOrAdmin, isAssignmentInViewerTeachingScope } = require('../../src/controllers/mtssController');
+const {
+    isAssignmentOwnerOrAdmin,
+    isAssignmentInViewerTeachingScope,
+    canViewerSeeAssignment
+} = require('../../src/controllers/mtssController');
 
 // Editing an intervention plan (type, status, dates, strategy, frequency,
 // goals - anything in PLAN_EDITABLE_FIELDS) used to be gated the same way
@@ -96,5 +100,25 @@ describe('isAssignmentInViewerTeachingScope - visibility is unaffected by the ow
         expect(
             isAssignmentInViewerTeachingScope({ viewer, assignment, students: [student] }),
         ).toBe(false);
+    });
+});
+
+describe('canViewerSeeAssignment - shared list/detail visibility', () => {
+    const students = [{ currentGrade: 'Grade 3', className: 'Grade 3 - B' }];
+    const assignment = { createdBy: 'creator-id', mentorId: 'mentor-id', focusAreas: ['Math'] };
+
+    test('owners and admins can see an assignment', () => {
+        expect(canViewerSeeAssignment({ viewer: { id: 'mentor-id', role: 'teacher' }, assignment, students })).toBe(true);
+        expect(canViewerSeeAssignment({ viewer: { id: 'admin-id', role: 'admin' }, assignment, students })).toBe(true);
+    });
+
+    test('teaching scope grants visibility but unrelated teachers are denied', () => {
+        const mathTeacher = {
+            id: 'math-teacher-id',
+            role: 'teacher',
+            classes: [{ role: 'Subject Teacher', grade: 'Grade 3', className: 'Grade 3 - B', subject: 'Math' }]
+        };
+        expect(canViewerSeeAssignment({ viewer: mathTeacher, assignment, students })).toBe(true);
+        expect(canViewerSeeAssignment({ viewer: { id: 'other-id', role: 'teacher', classes: [] }, assignment, students })).toBe(false);
     });
 });

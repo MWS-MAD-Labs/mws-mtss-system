@@ -15,7 +15,7 @@ import { goToHubSupport, hasSupportHubAccess } from "@/utils/hubConfig";
 import { useToast } from "@/components/ui/use-toast";
 import { getSyncStatus, triggerSync } from "@/services/syncService";
 import gsap from "gsap";
-import { animate, stagger } from "animejs";
+import { animate } from "animejs";
 import "./quick-menu.css";
 
 /* Merges every roster/assignment/deactivation job's own return shape into
@@ -112,29 +112,14 @@ const QuickMenu = memo(() => {
         burgerTl.current?.play();
     }, []);
 
-    /* Animate items after panel mounts */
-    const animateIn = useCallback(() => {
-        const items = itemsRef.current.filter(Boolean);
-        if (!items.length) return;
-        gsap.set(items, { opacity: 0, y: -6 });
-        animate(items, {
-            opacity: [0, 1],
-            translateY: [-6, 0],
-            delay: stagger(45, { start: 50 }),
-            duration: 240,
-            ease: "outExpo",
-        });
-    }, []);
-
     /* Close panel */
     const close = useCallback(() => {
         burgerTl.current?.reverse();
         if (!panelRef.current) { setIsOpen(false); return; }
-        const isMobile = window.innerWidth < 768;
         gsap.to(panelRef.current, {
             opacity: 0,
             scale: 0.92,
-            y: isMobile ? 6 : -6,
+            y: -6,
             duration: 0.20,
             ease: "power2.in",
             onComplete: () => setIsOpen(false),
@@ -145,27 +130,15 @@ const QuickMenu = memo(() => {
         if (isOpen) close(); else open();
     }, [isOpen, open, close]);
 
-    /* Panel entrance after mount — direction-aware for mobile (opens upward) */
+    /* Panel entrance after mount */
     useEffect(() => {
         if (!isOpen || !panelRef.current) return;
-        // Hide items before the panel's own fade-in starts, not just at its
-        // completion. Item opacity is relative to the panel's (a parent's
-        // opacity multiplies through its subtree), so without this the
-        // items were already visible for the whole 0.32s panel fade, then
-        // instantly snapped invisible (gsap.set, no tween) right as
-        // animateIn kicked off its stagger - a visible "pop"/flicker every
-        // single open, not the sync-status fetch this was first mistaken for.
-        const items = itemsRef.current.filter(Boolean);
-        if (items.length) gsap.set(items, { opacity: 0, y: -6 });
-        const isMobile = window.innerWidth < 768;
-        const origin = isMobile ? "bottom left" : "top left";
-        const yFrom = isMobile ? 10 : -10;
         gsap.fromTo(
             panelRef.current,
-            { opacity: 0, scale: 0.88, y: yFrom, transformOrigin: origin },
-            { opacity: 1, scale: 1, y: 0, duration: 0.32, ease: "back.out(1.6)", onComplete: animateIn }
+            { opacity: 0, scale: 0.88, y: -10, transformOrigin: "top left" },
+            { opacity: 1, scale: 1, y: 0, duration: 0.24, ease: "back.out(1.4)" }
         );
-    }, [isOpen, animateIn]);
+    }, [isOpen]);
 
     /* Click-outside to close */
     useEffect(() => {

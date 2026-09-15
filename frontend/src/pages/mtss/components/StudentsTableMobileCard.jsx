@@ -57,6 +57,7 @@ const StudentsTableMobileCard = memo(
         selectable,
         selected,
         onSelect,
+        compactRoster = false,
     }) => {
         const [expanded, setExpanded] = useState(false);
         const supportRows = useMemo(
@@ -146,6 +147,71 @@ const StudentsTableMobileCard = memo(
                 ? classLabel
                 : `${gradeLabel} · ${classLabel}`)
             : gradeLabel;
+
+        if (compactRoster) {
+            const primarySupport = assignmentOptions[0];
+            const focusLabel = primarySupport?.focus || getSupportSubjectLabel(primaryStudent);
+            const tierLabel = primarySupport?.tier || primaryStudent?.tier || "Tier 1";
+            const statusLabel = isGrouped ? groupedProgressLabel : student.progress;
+            const activityLabel = isGrouped ? groupedLastUpdate.dateLabel : lastUpdateDisplay.dateLabel;
+
+            return (
+                <div
+                    onClick={() => onView?.(primaryStudent)}
+                    className={`relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/90 shadow-[0_6px_24px_rgba(15,23,42,0.07)] transition active:scale-[0.99] dark:border-slate-700/50 dark:bg-slate-900/70 ${cardRing}`}
+                >
+                    <div className={`h-1 w-full bg-gradient-to-r ${accent}`} />
+                    <div className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-slate-800 dark:text-white">{student.name}</p>
+                                <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">{subtitle}</p>
+                            </div>
+                            <ProgressBadge status={statusLabel} compact />
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-white/[0.05]">
+                            <div className="min-w-0">
+                                <p className="truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{focusLabel}</p>
+                                <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                                    {isGrouped ? `${supportRows.length} active supports` : tierLabel}
+                                </p>
+                            </div>
+                            {selectable && (
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded-md border-slate-300 text-indigo-500"
+                                    checked={selected}
+                                    onClick={(event) => event.stopPropagation()}
+                                    onChange={() => onSelect?.(student)}
+                                />
+                            )}
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3 px-1 text-[10px]">
+                            <span className="font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">Last activity</span>
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">{activityLabel || "No activity yet"}</span>
+                        </div>
+                        {showActions && actionButtons.length > 0 && (
+                            <div className="mt-3 flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                                {actionButtons.map((action) => {
+                                    const Icon = action.icon;
+                                    return (
+                                        <button
+                                            key={action.key}
+                                            type="button"
+                                            onClick={action.onClick}
+                                            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[10px] font-semibold ${action.className}`}
+                                        >
+                                            <Icon className="h-3 w-3" />
+                                            {action.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
 
         return (
             <div

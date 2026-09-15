@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { TrendingUp, Zap, Clock, BarChart3, Award, Target, ClipboardList, CalendarDays, FileText, ChevronRight } from "lucide-react";
+import { TrendingUp, Zap, Clock, BarChart3, Award, Target, ClipboardList, CalendarDays, FileText, ChevronRight, RotateCcw, XCircle } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Line, ReferenceLine, Legend } from "recharts";
 import NotesBottomSheet from "./NotesBottomSheet";
 import InfoCardDetailSheet from "./InfoCardDetailSheet";
@@ -104,6 +104,7 @@ const GrowthJourneyMain = ({
     monitoringMethodLabel,
     startDateLabel,
     notesLabel,
+    statusAction,
 }) => {
     const hasStrategy = isMeaningfulValue(strategyLabel);
     const hasDuration = isMeaningfulValue(durationLabel);
@@ -126,7 +127,7 @@ const GrowthJourneyMain = ({
 
     return (
         <div className="flex-1 space-y-3 sm:space-y-5">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-lg flex-shrink-0`}>
                         <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
@@ -143,9 +144,22 @@ const GrowthJourneyMain = ({
                         </h3>
                     </div>
                 </div>
-                <span className={`text-2xl sm:text-5xl font-black bg-gradient-to-r ${config.gradient} text-transparent bg-clip-text flex-shrink-0`}>
-                    {intervention.progress ?? 0}%
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                    <span className={`text-2xl sm:text-5xl font-black bg-gradient-to-r ${config.gradient} text-transparent bg-clip-text flex-shrink-0`}>
+                        {intervention.progress ?? 0}%
+                    </span>
+                    {statusAction && (
+                        <button
+                            type="button"
+                            onClick={statusAction.onClick}
+                            disabled={statusAction.disabled}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 sm:text-xs ${statusAction.kind === "reopen" ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-900/20 dark:text-emerald-200" : "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-900/20 dark:text-rose-200"}`}
+                        >
+                            {statusAction.kind === "reopen" ? <RotateCcw className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                            {statusAction.label}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {hasPairing && (

@@ -18,11 +18,16 @@ export const createDefaultInterventionForm = () => ({
     studentName: '',
     grade: '',
     className: '',
+    mode: 'quantitative',
+    status: 'active',
     type: '',
     strategyId: '',
     strategyName: '',
     tier: 'tier2',
     goal: '',
+    goals: [],
+    goalSuccessCriteria: '',
+    goalCompleted: false,
     notes: '',
     startDate: '',
     duration: '',
@@ -34,6 +39,13 @@ export const createDefaultInterventionForm = () => ({
     baselineUnit: 'score',
     targetValue: '',
     targetUnit: 'score',
+    initialSignal: '',
+    initialTags: [],
+    initialContext: '',
+    initialObservation: '',
+    initialResponse: '',
+    initialNextStep: '',
+    initialWeeklyFocus: '',
 });
 
 // Default form state for progress updates
@@ -48,6 +60,14 @@ export const createDefaultProgressForm = () => ({
     celebration: '',
     summary: '',
     nextSteps: '',
+    mode: 'quantitative',
+    signal: '',
+    tags: [],
+    context: '',
+    observation: '',
+    response: '',
+    nextStep: '',
+    weeklyFocus: '',
 });
 
 // Async Thunks
@@ -114,22 +134,35 @@ export const createInterventionPlan = createAsyncThunk(
                 focusAreas: formData.type ? [formData.type] : ['Universal Supports'],
                 startDate: formData.startDate || new Date().toISOString(),
                 duration: formData.duration || undefined,
+                mode: formData.mode || 'quantitative',
                 strategyId: formData.strategyId || undefined,
                 strategyName: formData.strategyName || undefined,
                 monitoringMethod: formData.monitorMethod || undefined,
                 monitoringFrequency: formData.monitorFrequency || undefined,
                 customFrequencyDays: formData.monitorFrequency === 'Custom' && formData.customFrequencyDays?.length ? formData.customFrequencyDays : undefined,
                 customFrequencyNote: formData.monitorFrequency === 'Custom' && formData.customFrequencyNote ? formData.customFrequencyNote : undefined,
-                metricLabel: formData.baselineUnit || formData.targetUnit || 'score',
-                baselineScore: formData.baselineValue
+                metricLabel: formData.mode === 'qualitative' ? undefined : (formData.baselineUnit || formData.targetUnit || 'score'),
+                baselineScore: formData.mode !== 'qualitative' && formData.baselineValue
                     ? { value: Number(formData.baselineValue), unit: formData.baselineUnit || 'score' }
                     : undefined,
-                targetScore: formData.targetValue
+                targetScore: formData.mode !== 'qualitative' && formData.targetValue
                     ? { value: Number(formData.targetValue), unit: formData.targetUnit || 'score' }
                     : undefined,
                 notes: formData.notes || undefined,
                 goals: formData.goal
-                    ? [{ description: formData.goal, successCriteria: '' }]
+                    ? [{ description: formData.goal, successCriteria: formData.goalSuccessCriteria || '', completed: Boolean(formData.goalCompleted) }]
+                    : undefined,
+                initialCheckIn: formData.mode === 'qualitative' && formData.initialObservation
+                    ? {
+                        summary: formData.initialObservation,
+                        signal: formData.initialSignal || undefined,
+                        tags: formData.initialTags?.length ? formData.initialTags : undefined,
+                        context: formData.initialContext || undefined,
+                        observation: formData.initialObservation,
+                        response: formData.initialResponse || undefined,
+                        nextStep: formData.initialNextStep || undefined,
+                        weeklyFocus: formData.initialWeeklyFocus || undefined,
+                    }
                     : undefined,
             };
 
@@ -149,7 +182,7 @@ export const submitProgressUpdate = createAsyncThunk(
             const payload = {
                 checkIns: [{
                     date: formData.date || new Date().toISOString(),
-                    summary: formData.summary || 'Progress update',
+                    summary: formData.summary || formData.observation || 'Progress update',
                     nextSteps: formData.nextSteps || undefined,
                     value: formData.scoreValue ? Number(formData.scoreValue) : undefined,
                     unit: formData.scoreUnit || 'score',
@@ -157,6 +190,13 @@ export const submitProgressUpdate = createAsyncThunk(
                     skipReason: formData.performed === false ? (formData.skipReason || undefined) : undefined,
                     skipReasonNote: formData.performed === false && formData.skipReason === 'other' ? (formData.skipReasonNote || undefined) : undefined,
                     celebration: formData.celebration || undefined,
+                    signal: formData.signal || undefined,
+                    tags: formData.tags?.length ? formData.tags : undefined,
+                    context: formData.context || undefined,
+                    observation: formData.observation || undefined,
+                    response: formData.response || undefined,
+                    nextStep: formData.nextStep || undefined,
+                    weeklyFocus: formData.weeklyFocus || undefined,
                 }],
             };
 

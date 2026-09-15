@@ -1,5 +1,6 @@
 import { isAssignmentTargetMet } from "./adminDashboardStats";
 import { getAssignmentSupportUnitCount } from "./supportUnitUtils";
+import { getDirectionalProgress } from "./directionalProgress";
 
 export const formatDateLabel = (value) => {
     if (!value) return "-";
@@ -35,8 +36,8 @@ const getProgressRatio = (assignment = {}, value) => {
         return latestValue > 0 ? 1 : 0;
     }
 
-    const rawRatio = (latestValue - baselineValue) / (targetValue - baselineValue);
-    return Math.max(0, rawRatio);
+    const percent = getDirectionalProgress({ baseline: baselineValue, current: latestValue, target: targetValue }).percent;
+    return percent == null ? null : percent / 100;
 };
 
 const buildTrendPaths = (trendData = []) => {
