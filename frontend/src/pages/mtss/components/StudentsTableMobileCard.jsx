@@ -5,6 +5,7 @@ import { resolveProgressAssignmentForStudent } from "../utils/editPlanAccess";
 import { getStudentLastUpdateDisplay, getStudentNextUpdateDisplay } from "../utils/studentUpdateUtils";
 import InterventionChips, { getAccentColor, getMaxTierCode } from "./InterventionChips";
 import StudentUpdateValue from "./StudentUpdateValue";
+import { formatCrewRosterSupportLabel, getCrewRosterSummary } from "../utils/crewRosterSummary";
 
 const getSupportRowKey = (unit = {}, index = 0) =>
     unit.id || unit._id || unit.supportUnit?.assignmentId || `${unit.name || "unit"}-${index}`;
@@ -150,10 +151,11 @@ const StudentsTableMobileCard = memo(
 
         if (compactRoster) {
             const primarySupport = assignmentOptions[0];
-            const focusLabel = primarySupport?.focus || getSupportSubjectLabel(primaryStudent);
+            const focusLabel = formatCrewRosterSupportLabel(primarySupport?.focus || getSupportSubjectLabel(primaryStudent));
             const tierLabel = primarySupport?.tier || primaryStudent?.tier || "Tier 1";
             const statusLabel = isGrouped ? groupedProgressLabel : student.progress;
             const activityLabel = isGrouped ? groupedLastUpdate.dateLabel : lastUpdateDisplay.dateLabel;
+            const summary = getCrewRosterSummary(primarySupport || primaryStudent);
 
             return (
                 <div
@@ -189,6 +191,18 @@ const StudentsTableMobileCard = memo(
                         <div className="mt-2 flex items-center justify-between gap-3 px-1 text-[10px]">
                             <span className="font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">Last activity</span>
                             <span className="font-semibold text-slate-600 dark:text-slate-300">{activityLabel || "No activity yet"}</span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                            <div className="rounded-xl border border-slate-100 bg-white px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+                                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">Progress</p>
+                                <p className="mt-1 text-sm font-bold text-slate-800 dark:text-white">{summary.progressLabel}</p>
+                                <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">{summary.progressDetail}</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-100 bg-white px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03]">
+                                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">Next action</p>
+                                <p className={`mt-1 truncate text-xs font-bold ${summary.nextActionTone === "danger" ? "text-rose-600 dark:text-rose-300" : summary.nextActionTone === "warning" ? "text-amber-600 dark:text-amber-300" : "text-slate-700 dark:text-slate-200"}`}>{summary.nextActionLabel}</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">{statusLabel}</p>
+                            </div>
                         </div>
                         {showActions && actionButtons.length > 0 && (
                             <div className="mt-3 flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>

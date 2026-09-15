@@ -23,10 +23,11 @@ const HEADER_COLS = [
 ];
 
 const COMPACT_HEADER_COLS = [
-    { label: "Student", align: "text-left", width: "w-[28%]" },
-    { label: "Active Support", align: "text-left", width: "w-[26%]" },
-    { label: "Last Activity", align: "text-left", width: "w-[18%]" },
-    { label: "Status", align: "text-left", width: "w-[14%]" },
+    { label: "Student", align: "text-left", width: "w-[22%]" },
+    { label: "Active Support", align: "text-left", width: "w-[20%]" },
+    { label: "Progress", align: "text-left", width: "w-[15%]" },
+    { label: "Next Action", align: "text-left", width: "w-[17%]" },
+    { label: "Last Activity", align: "text-left", width: "w-[14%]" },
 ];
 
 const getStudentRowId = (student = {}) =>

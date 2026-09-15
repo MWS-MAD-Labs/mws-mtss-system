@@ -5,6 +5,7 @@ import { resolveProgressAssignmentForStudent } from "../utils/editPlanAccess";
 import { getStudentLastUpdateDisplay, getStudentNextUpdateDisplay } from "../utils/studentUpdateUtils";
 import InterventionChips, { getAccentColor } from "./InterventionChips";
 import StudentUpdateValue from "./StudentUpdateValue";
+import { formatCrewRosterSupportLabel, getCrewRosterSummary } from "../utils/crewRosterSummary";
 
 const getSupportRowKey = (unit = {}, index = 0) =>
     unit.id || unit._id || unit.supportUnit?.assignmentId || `${unit.name || "unit"}-${index}`;
@@ -138,10 +139,16 @@ const StudentsTableDesktopRow = memo(
 
         if (compactRoster) {
             const primarySupport = assignmentOptions[0];
-            const focusLabel = primarySupport?.focus || getSupportSubjectLabel(primaryStudent);
+            const focusLabel = formatCrewRosterSupportLabel(primarySupport?.focus || getSupportSubjectLabel(primaryStudent));
             const tierLabel = primarySupport?.tier || primaryStudent?.tier || "Tier 1";
             const statusLabel = isGrouped ? groupedProgressLabel : student.progress;
             const activityLabel = isGrouped ? groupedLastUpdate.dateLabel : lastUpdateDisplay.dateLabel;
+            const summary = getCrewRosterSummary(primarySupport || primaryStudent);
+            const actionTone = summary.nextActionTone === "danger"
+                ? "text-rose-600 dark:text-rose-300"
+                : summary.nextActionTone === "warning"
+                    ? "text-amber-600 dark:text-amber-300"
+                    : "text-slate-700 dark:text-slate-200";
 
             return (
                 <tr
@@ -161,7 +168,7 @@ const StudentsTableDesktopRow = memo(
                             />
                         </td>
                     )}
-                    <td className="w-[28%] py-4 pl-3 pr-4">
+                    <td className="w-[22%] py-4 pl-3 pr-4">
                         <p className="truncate text-sm font-bold text-slate-800 transition group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-300">
                             {student.name}
                         </p>
@@ -169,13 +176,21 @@ const StudentsTableDesktopRow = memo(
                             {[student.grade, classLabel !== student.grade ? classLabel : null].filter(Boolean).join(" · ")}
                         </p>
                     </td>
-                    <td className="w-[26%] py-4 pr-4">
+                    <td className="w-[20%] py-4 pr-4">
                         <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{focusLabel}</p>
                         <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                             {isGrouped ? `${supportRows.length} active supports` : tierLabel}
                         </p>
                     </td>
-                    <td className="w-[18%] py-4 pr-4">
+                    <td className="w-[15%] py-4 pr-4">
+                        <p className="text-sm font-bold text-slate-800 dark:text-white">{summary.progressLabel}</p>
+                        <p className="mt-0.5 truncate text-[10px] text-slate-500 dark:text-slate-400">{summary.progressDetail}</p>
+                    </td>
+                    <td className="w-[17%] py-4 pr-4">
+                        <p className={`text-xs font-bold ${actionTone}`}>{summary.nextActionLabel}</p>
+                        <p className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{statusLabel}</p>
+                    </td>
+                    <td className="w-[14%] py-4 pr-4">
                         <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                             {activityLabel || "No activity yet"}
                         </p>
@@ -183,11 +198,8 @@ const StudentsTableDesktopRow = memo(
                             {activityLabel ? "Progress or plan update" : "Awaiting first check-in"}
                         </p>
                     </td>
-                    <td className="w-[14%] py-4 pr-3">
-                        <ProgressBadge status={statusLabel} compact />
-                    </td>
                     {showActions && (
-                        <td className="w-[14%] py-4 pr-6" onClick={(event) => event.stopPropagation()}>
+                        <td className="w-[12%] py-4 pr-6" onClick={(event) => event.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
                                 {actionButtons.map((action) => {
                                     const Icon = action.icon;
