@@ -17,7 +17,9 @@
     "seed:mtss": "node src/scripts/seedMtssData.js",
     "seed:mtss-helix": "node src/scripts/seedMtssGrade7HelixComplete.js",
     "seed:mtss-pilot-units": "node src/scripts/seedMtssPilotUnitClasses.js",
-    "cleanup:mtss:orphan-assignments": "node src/scripts/cleanupOrphanMentorAssignments.js --apply"
+    "cleanup:mtss:orphan-assignments": "node src/scripts/cleanupOrphanMentorAssignments.js --apply",
+    "reset:mtss:tier1:dry-run": "node src/scripts/resetInterventionsToTier1.js",
+    "reset:mtss:tier1:apply": "node src/scripts/resetInterventionsToTier1.js --apply"
   },
   "keywords": [
     "mtss",

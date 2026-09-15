@@ -26,6 +26,14 @@ const interventionHistorySchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    assignedMentor: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    strategies: [{
+        type: String,
+        trim: true
+    }],
     updatedAt: {
         type: Date,
         default: Date.now
