@@ -36,7 +36,6 @@ const getConfiguredOrigins = () => {
 
     return [
         normalizeOrigin(process.env.FRONTEND_URL),
-        normalizeOrigin(process.env.GOOGLE_REDIRECT_URL),
         normalizeOrigin(process.env.OPENROUTER_HTTP_REFERER),
         ...corsOrigins
     ].filter(Boolean);

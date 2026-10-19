@@ -11,13 +11,11 @@ services:
       FRONTEND_URL: https://app.millenniaws.sch.id
       CORS_ORIGINS: https://app.millenniaws.sch.id,http://localhost:5173
       MONGODB_URI: ${MONGODB_URI}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: 1d
+      HUB_BASE_URL: ${HUB_BASE_URL}
+      CENTRAL_ORGANIZATION_ID: ${CENTRAL_ORGANIZATION_ID:-}
+      CENTRAL_API_BASE_URL: ${CENTRAL_API_BASE_URL:-}
+      CENTRAL_API_TOKEN: ${CENTRAL_API_TOKEN:-}
       AI_CHAT_PROXY_SECRET: ${AI_CHAT_PROXY_SECRET}
-      SESSION_SECRET: ${JWT_SECRET}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_REDIRECT_URL: https://app.millenniaws.sch.id/auth/google/callback
       GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY}
       GOOGLE_AI_MODEL: gemini-flash-latest
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}

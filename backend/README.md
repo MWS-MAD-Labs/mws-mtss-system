@@ -4,7 +4,7 @@ Backend API for IntegraLearn Hub Emotional Wellness Platform - A comprehensive e
 
 ## Features
 
-- ✅ **Custom Authentication** with JWT (weekly expiry)
+- ✅ **Hub shared session** with permissions from Central
 - ✅ **Emotional Check-in System** for staff/teacher
 - ✅ **Google AI Integration** for psychological analysis
 - ✅ **Real-time Dashboard** with Socket.io
@@ -21,7 +21,7 @@ Backend API for IntegraLearn Hub Emotional Wellness Platform - A comprehensive e
 - **Database**: MongoDB with Mongoose
 - **Real-time**: Socket.io
 - **AI**: Google AI Studio (Gemini)
-- **Authentication**: JWT
+- **Authentication**: Hub shared session, permissions from Central
 - **Caching**: NodeCache (in-memory)
 - **Validation**: Joi
 - **Security**: Helmet, CORS, Rate Limiting
@@ -70,11 +70,10 @@ Server will be running at `http://localhost:3001`
 ## API Endpoints
 
 ### Authentication
+There is no sign-in or sign-out here. The Hub's session cookie (on the parent domain) is the only session, and
+Central decides what each person may do (see `docs/PEOPLE_AND_PERMISSIONS.md`).
 ```
-POST /api/auth/login          # Login user
-GET  /api/auth/me            # Get current user
-POST /api/auth/logout        # Logout user
-POST /api/auth/register      # Register user (admin only)
+GET  /api/v1/auth/me         # Who is signed in, with permissions and MTSS scope
 ```
 
 ### Emotional Check-in
@@ -100,22 +99,12 @@ GET /api/health              # API health status
 ## Postman Collection
 
 ### Authentication Flow
-1. **Login** → Get JWT token
-2. **Use token** in Authorization header: `Bearer <token>`
-3. **Token expires** every Monday (weekly reset)
+1. Open the app from the Hub. The Hub sets its session cookie.
+2. Requests carry that cookie. The Postman collection needs the cookie copied from a signed-in browser.
 
 ### Sample Requests
 
-#### 1. Login
-```json
-POST /api/auth/login
-{
-  "email": "staff@school.com",
-  "password": "password123"
-}
-```
-
-#### 2. Submit Emotional Check-in
+#### 1. Submit Emotional Check-in
 ```json
 POST /api/checkin/submit
 Authorization: Bearer <token>
@@ -129,7 +118,7 @@ Authorization: Bearer <token>
 }
 ```
 
-#### 3. Get Dashboard Stats (Admin only)
+#### 2. Get Dashboard Stats (Admin only)
 ```json
 GET /api/dashboard/stats
 Authorization: Bearer <admin_token>
@@ -208,9 +197,11 @@ NODE_ENV=development
 # Database
 MONGODB_URI=mongodb://localhost:27017/integra-learn
 
-# JWT
-JWT_SECRET=your_super_secret_jwt_key
-JWT_EXPIRES_IN=7d
+# Hub shared session and Central (see ../.env.example)
+HUB_BASE_URL=http://localhost:5175
+CENTRAL_ORGANIZATION_ID=your_central_organization_id
+CENTRAL_API_BASE_URL=https://central.example.com/api/internal
+CENTRAL_API_TOKEN=your_central_service_token
 
 # Google AI
 GOOGLE_AI_API_KEY=your_google_ai_api_key
@@ -261,7 +252,7 @@ pm2 start src/server.js --name "integra-learn-backend"
 
 ## Security Features
 
-- **JWT Authentication** with weekly token rotation
+- **Hub shared session**, short access token renewed by the page
 - **Password Hashing** with bcrypt
 - **Input Validation** and sanitization
 - **Rate Limiting** to prevent abuse

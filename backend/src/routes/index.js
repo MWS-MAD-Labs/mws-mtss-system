@@ -213,7 +213,9 @@ router.get('/health', (req, res) => {
         success: true,
         message: 'MWS MTSS System Backend API is running',
         timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.0.0',
+        // The commit this image was built from. A deploy waits for it.
+        buildId: process.env.BUILD_ID || 'dev'
     });
 });
 

@@ -24,22 +24,3 @@ jest.mock('../src/services/cacheService', () => ({
     setCheckinAnalysis: jest.fn(),
     getCheckinAnalysis: jest.fn()
 }));
-
-// Global test utilities
-global.testUtils = {
-    createTestUser: async (User, overrides = {}) => {
-        const defaultUser = {
-            email: `test${Date.now()}@school.com`,
-            password: 'password123',
-            name: 'Test User',
-            role: 'staff',
-            ...overrides
-        };
-        return await User.create(defaultUser);
-    },
-
-    generateToken: (userId) => {
-        const jwt = require('jsonwebtoken');
-        return jwt.sign({ userId }, process.env.JWT_SECRET || 'test-secret');
-    }
-};
