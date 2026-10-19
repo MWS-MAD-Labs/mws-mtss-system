@@ -143,6 +143,8 @@ CENTRAL_ORGANIZATION_ID=org_...
 
 The four Central lines come from the block Central shows when MTSS is added there. The token is shown once. `JWT_SECRET`, `SESSION_SECRET`, `GOOGLE_*`, `HUB_SSO_PUBLIC_KEY` and `HUB_INTERNAL_SECRET` are not used any more and can be removed from the Environment field.
 
+`HUB_ACCESS_COOKIE_NAME` is optional (default `hub_at`). Staging and production Hubs share the parent domain `mws.web.id`, so give staging its own name (for example `hub_at_stg`) on the staging Hub and on every staging app. Deploy the apps first, then set it everywhere together and sign in again.
+
 MTSS reads the Hub's session cookie on the parent domain, so the app and the Hub must be under the same registrable domain. Staging (`app-stg.mws.web.id`) is. Production is not yet: the Hub is on `app.mws.web.id` and MTSS on `app.millenniaws.sch.id`. Do not merge the shared session to `main` until MTSS is served under the Hub's domain.
 
 ## Before the First Deploy
