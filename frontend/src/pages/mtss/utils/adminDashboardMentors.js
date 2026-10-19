@@ -28,7 +28,7 @@ const buildPairingLabel = (studentName = "", subject = "", mentorName = "") =>
 export const buildMentorSpotlights = (assignments = []) => {
     const map = new Map();
     assignments.forEach((assignment) => {
-        const mentorName = assignment.mentorId?.name || "Unassigned Mentor";
+        const mentorName = assignment.mentorId?.name || assignment.mentorName || "Unassigned Mentor";
         if (!map.has(mentorName)) {
             map.set(mentorName, {
                 name: mentorName,
@@ -69,7 +69,7 @@ export const buildMentorRoster = (assignments = []) => {
             map.set(mentorKey, {
                 id: mentorId,
                 email: mentorEmail,
-                name: assignment.mentorId?.name || "Unassigned",
+                name: assignment.mentorId?.name || assignment.mentorName || "Unassigned",
                 role: assignment.mentorId?.jobPosition || assignment.mentorId?.role || "Mentor",
                 students: 0,
                 total: 0,

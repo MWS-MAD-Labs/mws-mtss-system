@@ -34,7 +34,8 @@ Pick one person and one student in Central and check each field in MTSS.
 - [ ] Withdraw or graduate a student in Central. They leave "All Students" (status filter) at the next roster sync.
 - [ ] User Management shows "Synced with Central" and a last check time under a minute old. A red problem line there means Central cannot be reached.
 - [ ] No mentor shows as "Unassigned" on a plan whose mentor still works at the school. If one does, that plan still points at an id from before the move: read `docs/PEOPLE_AND_PERMISSIONS.md`, section "Moving from the old collections": `npm run migrate:people` copies the old users with their ids and is the normal move (before the first start of the new version). `npm run migrate:people:refs` is only for a database where the sync already ran first, and cannot be undone.
-- [ ] Students that Central no longer lists are marked orphaned. Their number should be small and explainable.
+- [ ] A student who is `REGISTERED` (not yet in a class) or no longer in Central does not appear in MTSS, neither in the student lists nor on a plan. Make one `ACTIVE` in Central: within a minute they appear.
+- [ ] A plan whose mentor left or lost access reads "Mentor no longer has access", not "Unassigned". Reassign it from the dashboard.
 
 ## 6. Live updates and the audit trail
 - [ ] Open MTSS in two browsers as two people. Create an intervention as one: the other's list refreshes without reload.

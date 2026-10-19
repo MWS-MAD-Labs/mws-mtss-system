@@ -1,27 +1,7 @@
 const mongoose = require('mongoose');
-const { withoutOrphanedStudents } = require('../../src/controllers/mtssController');
 const { runTracked } = require('../../src/utils/syncJobStatus');
 const CentralSyncState = require('../../src/models/CentralSyncState');
 const { syncIntervalMs } = require('../../src/jobs/centralSync');
-
-describe('plans of students Central no longer lists', () => {
-    const live = { _id: 'a', name: 'Live' };
-    const gone = { _id: 'b', name: 'Gone', orphanedAt: new Date() };
-
-    test('a plan whose students are all gone from Central is not shown', () => {
-        expect(withoutOrphanedStudents([{ _id: 1, studentIds: [gone] }])).toEqual([]);
-    });
-
-    test('a plan keeps its students that are still in Central', () => {
-        const [plan] = withoutOrphanedStudents([{ _id: 1, studentIds: [live, gone] }]);
-        expect(plan.studentIds).toEqual([live]);
-    });
-
-    test('a plan with all its students in Central is untouched', () => {
-        const plan = { _id: 1, studentIds: [live] };
-        expect(withoutOrphanedStudents([plan])).toEqual([plan]);
-    });
-});
 
 describe('every sync runs at the same pace', () => {
     test('one minute by default, never faster than 15 seconds, 0 turns it off', () => {

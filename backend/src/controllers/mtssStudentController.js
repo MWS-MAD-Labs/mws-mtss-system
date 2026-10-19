@@ -4,6 +4,7 @@ const MentorAssignment = require('../models/MentorAssignment');
 const { calculateDirectionalProgress } = require('../utils/mtssIntervention');
 const Person = require('../models/Person');
 const { SCOPE_MODE, isStudent } = require('../utils/accessScope');
+const { VISIBLE_STUDENT_FILTER } = require('../utils/studentVisibility');
 const { mentorFilter } = require('../utils/mentorEligibility');
 const { sendSuccess, sendError } = require('../utils/response');
 const {
@@ -319,38 +320,9 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
 const buildFilter = (query = {}, skipGradeClassFilter = false) => {
     const filter = {};
 
-    // Default to active-only - there's no Status filter control in the UI
-    // yet, so with no explicit query param this silently showed every
-    // status including graduated/transferred/inactive students forever
-    // (mtssStudentRosterSync.js keeps their status field in sync with
-    // Central, but that's meaningless if nothing ever reads it here).
-    // Pass status=all explicitly to see everyone regardless of status.
-    // 'all' is a local-only sentinel, not a Central value - checked
-    // case-insensitively on its own, separate from the real status values
-    // below which are upper-cased to match Central's exact casing.
-    const rawStatusList = normalizeList(query.status);
-    const isAllSentinel = rawStatusList.some((status) => status.toLowerCase() === 'all');
-    const statusList = rawStatusList.map((status) => status.toUpperCase());
-    if (statusList.length && !isAllSentinel) {
-        filter.status = { $in: statusList };
-    } else if (!statusList.length) {
-        filter.status = 'ACTIVE';
-    }
-
-    // Orphaned (no Central match at all - see orphanedAt on the schema and
-    // mtssStudentRosterSync.js) records are excluded from the normal roster
-    // by default - a stale/manually-added record showing up on a teacher's
-    // live "My Students" as if it's a real, currently-enrolled student is
-    // exactly the confusion this flag exists to prevent. Pass
-    // orphaned=true to see ONLY orphaned records (a review queue for an
-    // admin to clean up), or orphaned=all to see everyone regardless.
-    const orphanedParam = normalizeValue(query.orphaned)?.toLowerCase();
-    if (orphanedParam === 'true') {
-        filter.orphanedAt = { $ne: null };
-        delete filter.status; // an orphan's status is frozen/stale - not a useful filter here
-    } else if (orphanedParam !== 'all') {
-        filter.orphanedAt = null;
-    }
+    // Only students Central has put in a class (ACTIVE) and still lists are seen in MTSS. A status or orphaned value in
+    // the query cannot widen this (utils/studentVisibility.js).
+    Object.assign(filter, VISIBLE_STUDENT_FILTER);
 
     // Only apply grade/className filters from query params for privileged users
     // For teachers, the applyViewerScope will handle this
@@ -631,7 +603,7 @@ const buildFallbackSummary = (mentors = []) => {
 };
 
 const resolveScopedStudent = async ({ id, viewer }) => {
-    const filter = mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { slug: id };
+    const filter = { ...(mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { slug: id }), ...VISIBLE_STUDENT_FILTER };
     const student = await MTSSStudent.findOne(filter);
     if (!student) {
         return { student: null, statusCode: 404, error: 'Student not found' };
@@ -1268,5 +1240,6 @@ module.exports = {
     submitKindergartenHomeObservation,
     // Exported for direct testing (see tests/smoke/) - a pure function,
     // no need to spin up a full request/response cycle to exercise it.
-    applyViewerScope
+    applyViewerScope,
+    buildFilter
 };

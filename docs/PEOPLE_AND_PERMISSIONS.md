@@ -10,7 +10,7 @@ The sync asks Central one small question every minute (the key of `/application-
 
 There is no button to run it. User Management shows when MTSS last checked Central, when something last changed, how old the student roster is, and any problem in plain words (for people with `sync.read`). The same is at `GET /api/v1/sync/status` and in the `centralsyncstates` collection. A list Central could not be read in full is skipped and never used to deactivate anyone or to clear classes.
 
-Students Central no longer lists are marked orphaned. They are hidden from the student lists and from intervention plans, and nothing is deleted.
+Only students Central has put in a class (status `ACTIVE`) and still lists are seen in MTSS. Students who are not yet in a class (`REGISTERED`), who left, or whom Central no longer lists are hidden from the student lists and from intervention plans, and a plan with no visible student is not shown. Nothing is deleted: the record waits and the student shows again when Central makes them `ACTIVE`. The rule is in `backend/src/utils/studentVisibility.js`.
 
 ### What MTSS's API token needs in Central
 
