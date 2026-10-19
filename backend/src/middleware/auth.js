@@ -15,6 +15,7 @@ const { requirePermission, requireAnyPermission } = require('./permissionGuard')
 const buildRequestUser = (person) => {
     const user = {
         id: person._id,
+        _id: person._id,
         centralPersonId: person.centralPersonId,
         personType: person.personType,
         email: person.email,

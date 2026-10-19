@@ -8,8 +8,6 @@ const OPEN = new Set([
     'GET /public',
     'GET /health',
     'GET /ready',
-    // Client-side audit sink, takes no data from the database.
-    'POST /v1/audit/events',
     // Each person's own notifications, always filtered to the caller.
     'GET /',
     'GET /stats',

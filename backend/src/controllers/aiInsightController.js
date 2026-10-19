@@ -2,7 +2,7 @@ const aiInsightService = require('../services/aiInsightService');
 const TeacherAlert = require('../models/TeacherAlert');
 const MentorAssignment = require('../models/MentorAssignment');
 const Person = require('../models/Person');
-const { SCOPE_MODE } = require('../utils/accessScope');
+const { studentInViewerScope } = require('../utils/insightAccess');
 const { sendSuccess, sendError } = require('../utils/response');
 
 const VALID_STATUSES = new Set(['new', 'acknowledged', 'in_progress', 'resolved', 'dismissed']);
@@ -25,10 +25,9 @@ const getStudentInsights = async (req, res) => {
         }
 
         // AI-1: Verify teacher/mentor has an active assignment for this student
-        const isPrivileged = [SCOPE_MODE.ALL, SCOPE_MODE.UNIT].includes(req.user.mtssScope?.mode);
-        if (!isPrivileged) {
+        if (!studentInViewerScope(req.user, student)) {
             const hasAssignment = await MentorAssignment.exists({
-                mentorId: req.user._id,
+                mentorId: req.user.id,
                 studentIds: { $in: [studentId] },
                 status: { $ne: 'archived' },
             });
@@ -180,10 +179,13 @@ const getStudentAlerts = async (req, res) => {
             return sendError(res, `Invalid status value: ${status}`, 400);
         }
 
-        const isPrivileged = [SCOPE_MODE.ALL, SCOPE_MODE.UNIT].includes(req.user.mtssScope?.mode);
-        if (!isPrivileged) {
+        const student = await Person.findById(studentId).select('currentGrade').lean();
+        if (!student) {
+            return sendError(res, 'Student not found', 404);
+        }
+        if (!studentInViewerScope(req.user, student)) {
             const hasAssignment = await MentorAssignment.exists({
-                mentorId: req.user._id,
+                mentorId: req.user.id,
                 studentIds: { $in: [studentId] },
                 status: { $ne: 'archived' },
             });
