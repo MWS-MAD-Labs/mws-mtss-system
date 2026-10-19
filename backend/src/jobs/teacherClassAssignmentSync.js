@@ -1,4 +1,6 @@
 const winston = require('winston');
+const { JOBS, runTracked } = require('../utils/syncJobStatus');
+const { syncIntervalMs } = require('./centralSync');
 const Person = require('../models/Person');
 const { listClassTeacherAssignments } = require('../services/mwsDataCenterClient');
 
@@ -10,10 +12,8 @@ const { listClassTeacherAssignments } = require('../services/mwsDataCenterClient
 // whatever Central currently says, including clearing it back to [] for a
 // teacher Central no longer shows any active assignment for.
 //
-// Same interval class as mtssStudentRosterSync.js - a stale class list
-// showing up a bit late is low-severity, not an access-control risk like
-// the two deactivation jobs.
-const DEFAULT_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+// Runs on the same interval as the access sync (MTSS_AUTO_SYNC_SECONDS), so a changed class shows up within that
+// time.
 
 const ROLE_LABELS = {
     HOMEROOM: 'Homeroom Teacher',
@@ -86,14 +86,14 @@ async function syncTeacherClassAssignments() {
 let intervalHandle = null;
 let isRunning = false;
 
-function start(intervalMs = DEFAULT_INTERVAL_MS) {
-    if (intervalHandle) return;
+function start(intervalMs = syncIntervalMs(process.env.MTSS_AUTO_SYNC_SECONDS)) {
+    if (intervalHandle || intervalMs <= 0) return;
 
     const tick = async () => {
         if (isRunning) return; // previous run still in progress - skip this tick
         isRunning = true;
         try {
-            await syncTeacherClassAssignments();
+            await runTracked(JOBS.classes, syncTeacherClassAssignments);
         } catch (error) {
             winston.error('teacherClassAssignmentSync: run failed:', error);
         } finally {
@@ -103,7 +103,7 @@ function start(intervalMs = DEFAULT_INTERVAL_MS) {
 
     intervalHandle = setInterval(tick, intervalMs);
     setTimeout(tick, 30 * 1000);
-    winston.info(`teacherClassAssignmentSync: scheduled every ${Math.round(intervalMs / 60000)} minutes`);
+    winston.info(`teacherClassAssignmentSync: scheduled every ${Math.round(intervalMs / 1000)} seconds`);
 }
 
 function stop() {

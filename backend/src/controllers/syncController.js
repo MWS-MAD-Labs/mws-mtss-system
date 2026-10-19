@@ -12,6 +12,7 @@ const getSyncStatus = async (req, res) => {
         lastError: state?.lastError || null,
         warnings: state?.warnings || [],
         summary: state?.lastSummary || null,
+        jobs: state?.jobs || {},
     });
 };
 

@@ -2,6 +2,13 @@ import { memo, useEffect, useState } from "react";
 import { getSyncStatus } from "@/services/syncService";
 
 const REFRESH_MS = 60 * 1000;
+// Every kind of data is asked of Central about once a minute. Older than this means something is stuck.
+const STALE_AFTER_MS = 5 * 60 * 1000;
+const JOB_LABELS = {
+    roster: "Student roster",
+    classes: "Classes taught",
+    support: "Students supported",
+};
 
 const ago = (value, now) => {
     if (!value) return "not yet";
@@ -30,7 +37,13 @@ const SyncStatusLine = memo(() => {
 
     if (!status) return null;
 
-    const problems = [status.lastError && `Sync with Central is failing: ${status.lastError}`, ...(status.warnings || [])].filter(Boolean);
+    const jobProblems = Object.entries(status.jobs || {}).flatMap(([name, job]) => {
+        const label = JOB_LABELS[name] || name;
+        if (job?.error) return [`${label} is not syncing: ${job.error}`];
+        if (job?.at && now - new Date(job.at).getTime() > STALE_AFTER_MS) return [`${label} was last synced ${ago(job.at, now)}.`];
+        return [];
+    });
+    const problems = [status.lastError && `Sync with Central is failing: ${status.lastError}`, ...(status.warnings || []), ...jobProblems].filter(Boolean);
 
     return (
         <section className="mt-2 space-y-1 text-sm text-muted-foreground" aria-live="polite">

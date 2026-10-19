@@ -588,7 +588,7 @@ const hydrateAssignmentStudents = async (assignmentList = []) => {
 
     const ids = Array.from(idSet);
     const students = await MTSSStudent.find({ _id: { $in: ids } })
-        .select('name nickname username gender status email currentGrade className joinAcademicYear slug')
+        .select('name nickname username gender status email currentGrade className joinAcademicYear slug orphanedAt')
         .lean();
     const studentMap = new Map(students.map((student) => [student._id.toString(), { ...student, id: student._id }]));
 
@@ -1372,6 +1372,16 @@ const createMentorAssignment = async (req, res) => {
 };
 
 
+// Students Central no longer lists (orphanedAt, see jobs/mtssStudentRosterSync.js) are not shown on plans, and a plan
+// left with none of its students is not shown at all. Nothing is deleted: includeOrphaned=true shows them again.
+const withoutOrphanedStudents = (assignments = []) => assignments.reduce((kept, assignment) => {
+    const students = Array.isArray(assignment.studentIds) ? assignment.studentIds : [];
+    const visible = students.filter((student) => !student?.orphanedAt);
+    if (students.length > 0 && visible.length === 0) return kept;
+    kept.push(visible.length === students.length ? assignment : { ...assignment, studentIds: visible });
+    return kept;
+}, []);
+
 const getMentorAssignments = async (req, res) => {
     try {
         const { mentorId, studentId, status, tier } = req.query;
@@ -1388,7 +1398,9 @@ const getMentorAssignments = async (req, res) => {
             .populate('lastPlanUpdatedBy', 'name username email')
             .populate('planChangeLog.changedBy', 'name username email')
             .lean();
-        const hydratedAssignments = await hydrateAssignmentStudents(assignmentsRaw);
+        const hydratedAssignments = req.query.includeOrphaned === 'true'
+            ? await hydrateAssignmentStudents(assignmentsRaw)
+            : withoutOrphanedStudents(await hydrateAssignmentStudents(assignmentsRaw));
         const scopedAssignments = isAdmin
             ? hydratedAssignments
             : hydratedAssignments.filter((assignment) => canViewerSeeAssignment({
@@ -1446,7 +1458,7 @@ const getAssignmentsNeedingReassignment = async (req, res) => {
         const assignmentsRaw = await MentorAssignment.find({ status: { $in: ['active', 'paused'] } })
             .populate('mentorId', 'name role email username jobPosition unit classes supportedStudentIds')
             .lean();
-        const hydrated = await hydrateAssignmentStudents(assignmentsRaw);
+        const hydrated = withoutOrphanedStudents(await hydrateAssignmentStudents(assignmentsRaw));
 
         // Candidate pool for the "reassign to" suggestions below - every
         // active mentor-eligible user, not just the ones already carrying
@@ -1826,7 +1838,7 @@ const getMyAssignedStudents = async (req, res) => {
             mentorId: req.user.id,
             status: { $in: ['active', 'paused'] }
         }).lean();
-        const assignments = await hydrateAssignmentStudents(assignmentsRaw);
+        const assignments = withoutOrphanedStudents(await hydrateAssignmentStudents(assignmentsRaw));
 
         const studentsMap = new Map();
         assignments.forEach(assignment => {
@@ -2448,6 +2460,7 @@ const getKindergartenInterventionBank = async (_req, res) => {
 };
 
 module.exports = {
+    withoutOrphanedStudents,
     isAssignmentOwnerOrAdmin,
     isAssignmentInViewerTeachingScope,
     canViewerSeeAssignment,

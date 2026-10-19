@@ -1,4 +1,6 @@
 const winston = require('winston');
+const { JOBS, runTracked } = require('../utils/syncJobStatus');
+const { syncIntervalMs } = require('./centralSync');
 const MTSSStudent = require('../models/MTSSStudent');
 const { listStudentsByStatus } = require('../services/mwsDataCenterClient');
 const { normalizeGender } = require('../utils/studentUserHelpers');
@@ -30,10 +32,8 @@ const { normalizeGender } = require('../utils/studentUserHelpers');
 const ENROLLED_STATUSES = new Set(['REGISTERED', 'ACTIVE']);
 const ALL_STATUSES = ['REGISTERED', 'ACTIVE', 'INACTIVE', 'GRADUATED', 'TRANSFERRED', 'WITHDRAWN', 'ARCHIVED'];
 
-// Longer than the 5-minute deactivation jobs - a new/updated roster row
-// showing up a bit late is lower-severity than a revoked account staying
-// active.
-const DEFAULT_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+// Runs on the same interval as the access sync (MTSS_AUTO_SYNC_SECONDS, 60 seconds by default), so nothing in MTSS is
+// older than that behind Central.
 
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 
@@ -198,14 +198,14 @@ async function syncStudentRoster() {
 let intervalHandle = null;
 let isRunning = false;
 
-function start(intervalMs = DEFAULT_INTERVAL_MS) {
-    if (intervalHandle) return;
+function start(intervalMs = syncIntervalMs(process.env.MTSS_AUTO_SYNC_SECONDS)) {
+    if (intervalHandle || intervalMs <= 0) return;
 
     const tick = async () => {
         if (isRunning) return; // previous run still in progress - skip this tick
         isRunning = true;
         try {
-            await syncStudentRoster();
+            await runTracked(JOBS.roster, syncStudentRoster);
         } catch (error) {
             winston.error('mtssStudentRosterSync: run failed:', error);
         } finally {
@@ -218,7 +218,7 @@ function start(intervalMs = DEFAULT_INTERVAL_MS) {
     // while the server was down gets caught without waiting a full
     // interval.
     setTimeout(tick, 30 * 1000);
-    winston.info(`mtssStudentRosterSync: scheduled every ${Math.round(intervalMs / 60000)} minutes`);
+    winston.info(`mtssStudentRosterSync: scheduled every ${Math.round(intervalMs / 1000)} seconds`);
 }
 
 function stop() {

@@ -1,4 +1,6 @@
 const winston = require('winston');
+const { JOBS, runTracked } = require('../utils/syncJobStatus');
+const { syncIntervalMs } = require('./centralSync');
 const Person = require('../models/Person');
 const MTSSStudent = require('../models/MTSSStudent');
 const { listStudentSupportAssignments } = require('../services/mwsDataCenterClient');
@@ -13,10 +15,8 @@ const { listStudentSupportAssignments } = require('../services/mwsDataCenterClie
 // clearing it back to [] for an SE teacher Central no longer shows any
 // active assignment for.
 //
-// Same interval class as teacherClassAssignmentSync.js - a stale student
-// list showing up a bit late is low-severity, not an access-control risk
-// like the two deactivation jobs.
-const DEFAULT_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+// Runs on the same interval as the access sync (MTSS_AUTO_SYNC_SECONDS), so a changed support assignment shows up
+// within that time.
 
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 
@@ -83,14 +83,14 @@ async function syncStudentSupportAssignments() {
 let intervalHandle = null;
 let isRunning = false;
 
-function start(intervalMs = DEFAULT_INTERVAL_MS) {
-    if (intervalHandle) return;
+function start(intervalMs = syncIntervalMs(process.env.MTSS_AUTO_SYNC_SECONDS)) {
+    if (intervalHandle || intervalMs <= 0) return;
 
     const tick = async () => {
         if (isRunning) return; // previous run still in progress - skip this tick
         isRunning = true;
         try {
-            await syncStudentSupportAssignments();
+            await runTracked(JOBS.support, syncStudentSupportAssignments);
         } catch (error) {
             winston.error('studentSupportAssignmentSync: run failed:', error);
         } finally {
@@ -100,7 +100,7 @@ function start(intervalMs = DEFAULT_INTERVAL_MS) {
 
     intervalHandle = setInterval(tick, intervalMs);
     setTimeout(tick, 30 * 1000);
-    winston.info(`studentSupportAssignmentSync: scheduled every ${Math.round(intervalMs / 60000)} minutes`);
+    winston.info(`studentSupportAssignmentSync: scheduled every ${Math.round(intervalMs / 1000)} seconds`);
 }
 
 function stop() {

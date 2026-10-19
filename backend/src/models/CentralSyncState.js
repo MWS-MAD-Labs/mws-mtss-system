@@ -11,6 +11,8 @@ const centralSyncStateSchema = new mongoose.Schema({
     lastError: { type: String, default: null },
     warnings: [String],
     lastSummary: mongoose.Schema.Types.Mixed,
+    // When each follow-up job last ran and how it went, keyed by job name (utils/syncJobStatus.js).
+    jobs: mongoose.Schema.Types.Mixed,
     lockedUntil: Date,
 }, { collection: 'centralsyncstates' });
 
