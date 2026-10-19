@@ -24,8 +24,14 @@ Use the existing staging stack if it already exists:
 | Gateway hostname | `https://app-stg.mws.web.id` |
 | Path | `/mtss/` |
 
-Compose reference is also available in the gateway repo:
-`mws-gateway/deploy/mtss-system.compose.yml`.
+The staging stack runs `deploy/staging.compose.yml` (not the `docker-compose.yml` at the repo root, which is only a
+local reference). In the Komodo stack: Run Directory `deploy`, File Path `staging.compose.yml`, branch `staging`.
+
+What matters in it: the frontend container is named `mtss-system-fe` and joins the external network `mws-unified`. The
+gateway finds MTSS by that name on that network. A stack that only sits on its own network (for example the root
+`docker-compose.yml`, which publishes port 8082) is invisible to the gateway, and every address under `/mtss/` answers
+`502` from Cloudflare, including `/mtss/auth/sso` from the Hub card, even though both containers show as running.
+Check with `https://app-stg.mws.web.id/mtss/api/health`: it must answer 200 and show a `buildId`.
 
 Required GitHub Actions secrets:
 
