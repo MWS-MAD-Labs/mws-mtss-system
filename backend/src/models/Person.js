@@ -36,8 +36,6 @@ const personSchema = new mongoose.Schema({
     employmentStatus: { type: String },
     joinDate: { type: Date },
     endDate: { type: Date },
-    reportsTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Person' },
-    subordinates: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Person' }],
     // Where and what they teach, from Central's class assignments.
     classes: [{
         grade: String,

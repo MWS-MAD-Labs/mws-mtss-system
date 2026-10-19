@@ -38,37 +38,11 @@ export const fetchOrganizationStructure = createAsyncThunk(
     }
 );
 
-export const getOrganizationMembers = createAsyncThunk(
-    'users/getOrganizationMembers',
-    async (organizationId, { rejectWithValue }) => {
-        try {
-            const response = await api.get(`/users/organization/${organizationId}/members`);
-            return response.data;
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to get organization members');
-        }
-    }
-);
-
-export const getUserOrganizations = createAsyncThunk(
-    'users/getUserOrganizations',
-    async (userId, { rejectWithValue }) => {
-        try {
-            const response = await api.get(`/users/${userId}/organizations`);
-            return response.data;
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to get user organizations');
-        }
-    }
-);
-
 // Initial state
 const initialState = {
     users: [],
     currentUser: null,
     organizationStructure: null,
-    organizationMembers: null,
-    userOrganizations: null,
     pagination: {
         currentPage: 1,
         totalPages: 1,
@@ -163,34 +137,6 @@ const userSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
-
-            // Organization members
-            .addCase(getOrganizationMembers.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(getOrganizationMembers.fulfilled, (state, action) => {
-                state.loading = false;
-                state.organizationMembers = action.payload.data;
-            })
-            .addCase(getOrganizationMembers.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            })
-
-            // Get user organizations
-            .addCase(getUserOrganizations.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(getUserOrganizations.fulfilled, (state, action) => {
-                state.loading = false;
-                state.userOrganizations = action.payload.data;
-            })
-            .addCase(getUserOrganizations.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            });
     },
 });
 

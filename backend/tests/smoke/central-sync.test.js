@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Person = require('../../src/models/Person');
+const MTSSStudent = require('../../src/models/MTSSStudent');
 const CentralSyncState = require('../../src/models/CentralSyncState');
 const { runSync, syncAccess, syncProfiles, syncIntervalMs } = require('../../src/jobs/centralSync');
 
@@ -29,6 +30,8 @@ const fakeApi = (over = {}) => ({
     lookupStudentByEmail: jest.fn().mockResolvedValue(null),
     listActiveEmployees: jest.fn().mockResolvedValue([employee()]),
     listStudentsByStatus: jest.fn().mockResolvedValue([]),
+    listClassTeacherAssignments: jest.fn().mockResolvedValue([]),
+    listStudentSupportAssignments: jest.fn().mockResolvedValue([]),
     ...over,
 });
 
@@ -138,6 +141,47 @@ describe('sync with Central', () => {
         const gone = await syncProfiles(fakeApi({ listActiveEmployees: jest.fn().mockResolvedValue([]) }));
         expect(gone.deactivated).toBe(1);
         expect((await Person.findOne({ centralPersonId: 'p-1' })).isActive).toBe(false);
+    });
+
+    it('keeps the classes a teacher teaches and the students a special education teacher supports', async () => {
+        await syncAccess(fakeApi());
+        const kid = await MTSSStudent.create({ name: 'Kid One', email: 'kid@sync-test.id', status: 'ACTIVE', currentGrade: 'Grade 4' });
+        try {
+            const api = fakeApi({
+                listClassTeacherAssignments: jest.fn().mockResolvedValue([
+                    { employee_email: 'one@sync-test.id', grade_name: 'Grade 4', additional_grade_names: ['Grade 5'], class_name: 'Orion', role: 'HOMEROOM' },
+                ]),
+                listStudentSupportAssignments: jest.fn().mockResolvedValue([
+                    { employee_email: 'one@sync-test.id', student_email: 'kid@sync-test.id' },
+                ]),
+            });
+            const first = await syncProfiles(api);
+            expect(first.updated).toBe(1);
+            const person = await Person.findOne({ centralPersonId: 'p-1' });
+            expect(person.classes.map((c) => `${c.grade}|${c.className}|${c.role}`).sort()).toEqual(['Grade 4|Orion|Homeroom Teacher', 'Grade 5|Orion|Homeroom Teacher']);
+            expect(person.supportedStudentIds.map(String)).toEqual([String(kid._id)]);
+
+            // Nothing changed in Central: nothing written.
+            expect((await syncProfiles(api)).updated).toBe(0);
+
+            // Central takes the class away: it is cleared.
+            const cleared = await syncProfiles(fakeApi({ listStudentSupportAssignments: api.listStudentSupportAssignments }));
+            expect(cleared.updated).toBe(1);
+            expect((await Person.findOne({ centralPersonId: 'p-1' })).classes).toHaveLength(0);
+        } finally {
+            await MTSSStudent.deleteOne({ _id: kid._id });
+        }
+    });
+
+    it('leaves classes and supported students alone when their list could not be read', async () => {
+        await syncAccess(fakeApi());
+        await Person.updateOne({ centralPersonId: 'p-1' }, { classes: [{ grade: 'Grade 4', className: 'Orion', role: 'Homeroom Teacher' }] });
+        const result = await syncProfiles(fakeApi({
+            listClassTeacherAssignments: jest.fn().mockRejectedValue(new Error('page 2 failed')),
+            listStudentSupportAssignments: jest.fn().mockRejectedValue(new Error('timeout')),
+        }));
+        expect(result.warnings).toEqual(['Class assignments skipped: page 2 failed', 'Student support assignments skipped: timeout']);
+        expect((await Person.findOne({ centralPersonId: 'p-1' })).classes).toHaveLength(1);
     });
 
     it('never deactivates anyone when a list could not be read in full', async () => {

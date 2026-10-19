@@ -6,8 +6,6 @@ const REFRESH_MS = 60 * 1000;
 const STALE_AFTER_MS = 5 * 60 * 1000;
 const JOB_LABELS = {
     roster: "Student roster",
-    classes: "Classes taught",
-    support: "Students supported",
 };
 
 const ago = (value, now) => {

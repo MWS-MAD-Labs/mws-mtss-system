@@ -289,8 +289,8 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
 
     if (scope.mode === SCOPE_MODE.ASSIGNED) {
         // Students supported directly (StudentSupportAssignment in Central, kept in supportedStudentIds by
-        // studentSupportAssignmentSync.js) and the classes taught (ClassTeacherAssignment, kept in classes[] by
-        // teacherClassAssignmentSync.js, matched by real class name and never widened to a grade or unit).
+        // jobs/centralSync.js) and the classes taught (ClassTeacherAssignment, kept in classes[] by
+        // jobs/centralSync.js, matched by real class name and never widened to a grade or unit).
         const supportedIds = Array.isArray(viewer.supportedStudentIds)
             ? viewer.supportedStudentIds.filter(Boolean)
             : [];

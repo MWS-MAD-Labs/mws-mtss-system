@@ -153,21 +153,21 @@ MTSS reads the Hub's session cookie on the parent domain, so the app and the Hub
 2. In the GitHub repository open Settings, then Secrets and variables, then Actions, and add these repository secrets: `STAGING_CENTRAL_API_BASE_URL`, `STAGING_CENTRAL_API_TOKEN` and `STAGING_CENTRAL_ORGANIZATION_ID`, and the same three with `PRODUCTION_` in front. The deploy workflow sends the permission list to Central with them, and stops before deploying if Central says no. Names without the prefix are read too, when the prefixed one is missing.
 3. Remove `MWS_DATA_CENTER_API_URL` and `MWS_DATA_CENTER_API_TOKEN` from the Komodo Environment if they are still there. The app reads the `CENTRAL_API_*` names first, but the old ones are used if the new ones are empty.
 4. In Central, give the roles of MTSS the permissions they need (the list is in `docs/PEOPLE_AND_PERMISSIONS.md`). Until a role holds `mtss.read`, nobody gets in.
-5. Back up the database, then move the old users over once, after the first Central sync has filled the people collection (the app logs `centralSync` lines when it runs):
+5. Back up the database, then move the old users over once, BEFORE the new version starts for the first time (the script needs `CENTRAL_API_*` in `backend/.env` because it asks Central for each person's id):
 
 ```bash
 cd backend
-npm run migrate:people              # dry-run, prints what it would change
-npm run migrate:people -- --apply   # writes
+npm run migrate:people          # dry-run, prints what it would do
+npm run migrate:people:apply    # writes
 ```
 
-Running it again changes nothing for ids that are already moved.
+Each person keeps their `_id`, so nothing else has to change, and going back is deploying the old version. If the new version already ran, see `docs/PEOPLE_AND_PERMISSIONS.md` for the emergency tool.
 
 ## After a Deploy
 
 The webhook only starts the deploy in Komodo. If the stack fails there (a wrong file path, a bad env), the webhook still answered and the pipeline would be green. The last step of the deploy job asks the health address which build it runs and waits until it is the commit that was just built. If the old version keeps running, the job turns red and says to read the last update of the stack in Komodo.
 
-It needs the public address of the backend health route as `STAGING_HEALTH_URL` (and `PRODUCTION_HEALTH_URL` for main) in the repository secrets or variables, for example `https://app-stg.mws.web.id/mtss/api/v1/health`. Open it in a browser first to check that the gateway passes it on and that it shows `buildId`. Without the address the step only warns.
+It needs the public address of the backend health route as `STAGING_HEALTH_URL` (and `PRODUCTION_HEALTH_URL` for main) in the repository secrets or variables, for example `https://app-stg.mws.web.id/mtss/api/health`. Open it in a browser first to check that the gateway passes it on and that it shows `buildId`. Without the address the step only warns.
 
 ## Deploy Flow
 

@@ -35,8 +35,6 @@ const buildRequestUser = (person) => {
         currentGrade: person.currentGrade,
         className: person.className,
         joinAcademicYear: person.joinAcademicYear,
-        reportsTo: person.reportsTo,
-        subordinates: person.subordinates || [],
         permissions: person.centralEntitlementPermissions || [],
         entitlementRole: person.centralEntitlementRole || null,
         entitlementId: person.centralEntitlementId || null,

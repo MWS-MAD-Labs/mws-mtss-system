@@ -7,7 +7,7 @@ const { applyViewerScope } = require('../../src/controllers/mtssStudentControlle
 // deriveAllowedGradesForUser's "no specific classes -> assume this
 // person's whole unit" behavior, granting unit-wide roster access (all of
 // Grade 7/8/9 for Junior High) despite Central confirming no assignment at
-// all. teacherClassAssignmentSync.js keeps classes[] authoritatively in
+// all. jobs/centralSync.js keeps classes[] authoritatively in
 // sync with Central every 15 minutes, so an empty classes[] now reliably
 // means "Central confirms zero assignments," not "not synced yet" - the
 // roster (and anything that must match it) should deny-all here, the same

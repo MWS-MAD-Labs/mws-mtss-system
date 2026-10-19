@@ -50,7 +50,7 @@ describe('applyViewerScope - exact class scoping (no grade/unit widening)', () =
     });
 
     test('a mixed-age Kindergarten room still matches by class name alone, no grade clause needed', () => {
-        // teacherClassAssignmentSync.js pushes one classes[] entry per grade
+        // jobs/centralSync.js pushes one classes[] entry per grade
         // a mixed room holds, all sharing the same className - matching by
         // className already covers every grade physically in that room.
         const viewer = {

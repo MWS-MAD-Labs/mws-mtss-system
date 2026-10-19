@@ -1,5 +1,4 @@
 const Person = require('../models/Person');
-const Organization = require('../models/Organization');
 const { sendSuccess, sendError } = require('../utils/response');
 
 // The people of MTSS are the people Central lists for it (jobs/centralSync.js). They are read here and never
@@ -38,7 +37,6 @@ const getUsers = async (req, res) => {
 
         const total = await Person.countDocuments(filter);
         const users = await Person.find(filter)
-            .populate('reportsTo', 'name jobPosition')
             .sort({ name: 1 })
             .skip(skip)
             .limit(limit);
@@ -64,26 +62,13 @@ const getUsers = async (req, res) => {
 // Get a person by ID with full details
 const getUserById = async (req, res) => {
     try {
-        const user = await Person.findById(req.params.id)
-            .populate('reportsTo', 'name jobPosition department')
-            .populate('subordinates', 'name jobPosition department');
+        const user = await Person.findById(req.params.id);
 
         if (!user) {
             return sendError(res, 'User not found', 404);
         }
 
-        // Get the person's organizations
-        const organizations = await Organization.find({
-            $or: [
-                { headId: user._id },
-                { 'members.userId': user._id }
-            ]
-        }).populate('headId', 'name').populate('members.userId', 'name');
-
-        sendSuccess(res, 'User details retrieved', {
-            user,
-            organizations
-        });
+        sendSuccess(res, 'User details retrieved', { user });
     } catch (error) {
         console.error('Get user by ID error:', error);
         sendError(res, 'Failed to retrieve user details', 500);
@@ -135,90 +120,8 @@ const getOrganizationStructure = async (req, res) => {
     }
 };
 
-// Get organization members
-const getOrganizationMembers = async (req, res) => {
-    try {
-        const { organizationId } = req.params;
-
-        const organization = await Organization.findById(organizationId)
-            .populate('headId', 'name email jobPosition')
-            .populate('members.userId', 'name email department jobPosition isActive centralEntitlementRole');
-
-        if (!organization) {
-            return sendError(res, 'Organization not found', 404);
-        }
-
-        // Get detailed member information
-        const members = organization.members
-            .filter((member) => member.userId)
-            .map(member => ({
-                id: member.userId._id,
-                name: member.userId.name,
-                email: member.userId.email,
-                role: member.role,
-                department: member.userId.department,
-                jobPosition: member.userId.jobPosition,
-                isActive: member.userId.isActive,
-                joinedAt: member.joinedAt
-            }));
-
-        sendSuccess(res, 'Organization members retrieved', {
-            organization: {
-                id: organization._id,
-                name: organization.name,
-                type: organization.type,
-                head: organization.headId ? {
-                    id: organization.headId._id,
-                    name: organization.headId.name,
-                    email: organization.headId.email,
-                    jobPosition: organization.headId.jobPosition
-                } : null,
-                metadata: organization.metadata
-            },
-            members
-        });
-    } catch (error) {
-        console.error('Get organization members error:', error);
-        sendError(res, 'Failed to get organization members', 500);
-    }
-};
-
-// Get a person's organizations and assignments
-const getUserOrganizations = async (req, res) => {
-    try {
-        const { userId } = req.params;
-
-        const organizations = await Organization.find({
-            $or: [
-                { headId: userId },
-                { 'members.userId': userId }
-            ]
-        }).populate('headId', 'name email jobPosition');
-
-        const userOrganizations = organizations.map(org => {
-            const memberInfo = org.members.find(m => m.userId.toString() === userId);
-            return {
-                id: org._id,
-                name: org.name,
-                type: org.type,
-                role: memberInfo ? memberInfo.role : 'head',
-                isHead: org.headId?._id.toString() === userId,
-                joinedAt: memberInfo ? memberInfo.joinedAt : null,
-                metadata: org.metadata
-            };
-        });
-
-        sendSuccess(res, 'User organizations retrieved', { organizations: userOrganizations });
-    } catch (error) {
-        console.error('Get user organizations error:', error);
-        sendError(res, 'Failed to get user organizations', 500);
-    }
-};
-
 module.exports = {
     getUsers,
     getUserById,
-    getOrganizationStructure,
-    getOrganizationMembers,
-    getUserOrganizations
+    getOrganizationStructure
 };

@@ -14,8 +14,10 @@
     "seed:mtss": "node src/scripts/seedMtssData.js",
     "reset:mtss:tier1:dry-run": "node src/scripts/resetInterventionsToTier1.js",
     "reset:mtss:tier1:apply": "node src/scripts/resetInterventionsToTier1.js --apply",
-    "migrate:people": "node src/scripts/migratePeople.js",
-    "predev": "node src/scripts/syncPermissions.js --soft",
+    "migrate:people": "node src/scripts/migrateToPerson.js",
+    "migrate:people:apply": "node src/scripts/migrateToPerson.js --apply",
+    "migrate:people:refs": "node src/scripts/remapPeopleRefs.js",
+    "predev": "node src/scripts/syncPermissions.js --soft --retries 1 --wait 3",
     "permissions:sync": "node src/scripts/syncPermissions.js",
     "permissions:check": "node src/scripts/syncPermissions.js --check"
   },

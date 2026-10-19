@@ -3,9 +3,7 @@ const router = express.Router();
 const {
     getUsers,
     getUserById,
-    getOrganizationStructure,
-    getOrganizationMembers,
-    getUserOrganizations
+    getOrganizationStructure
 } = require('../controllers/userController');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { validateQuery } = require('../middleware/validation');
@@ -25,11 +23,5 @@ router.get('/', canReadUsers, validateQuery(paginationSchema), getUsers);
 
 // Get a person by ID
 router.get('/:id', canReadUsers, getUserById);
-
-// Get organization members
-router.get('/organization/:organizationId/members', canReadUsers, getOrganizationMembers);
-
-// Get a person's organizations
-router.get('/:userId/organizations', canReadUsers, getUserOrganizations);
 
 module.exports = router;

@@ -5,17 +5,26 @@ const central = require('../services/mwsDataCenterClient');
 const { PERSON_TYPE, CENTRAL_STATUS } = require('../constants/person');
 const { APP_ID, validateEntitlement, expectedOrganizationId, entitlementProjection, projectionChanged } = require('../utils/centralEntitlement');
 const { mapCentralEmployee } = require('../utils/employeeCentralSync');
+const MTSSStudent = require('../models/MTSSStudent');
 const { mapCentralStudent } = require('../utils/studentCentralSync');
 const { normalizeEmail } = require('../utils/studentUserHelpers');
 
 // Keeps the people of this app in line with Central, by itself, inside the server. Each tick is one small
 // question (the key); the full list of who may use the app is read only when the key moved. What Central keeps
-// about a person that is not part of the key (unit, job, grade, class) is read in bulk every few minutes.
-// Whatever Central stops listing keeps its history and loses access. Who teaches which class and which students
-// a special education teacher supports stay with the assignment jobs.
+// about a person that is not part of the key (unit, job, grade, class, who teaches what, which students a special
+// education teacher supports) is read in bulk every minute too. Whatever Central stops listing keeps its history and
+// loses access.
 const MIN_SECONDS = 15;
 const DEFAULT_SECONDS = 60;
-const PROFILE_EVERY_MS = 2 * 60 * 1000;
+const PROFILE_EVERY_MS = 60 * 1000;
+// A tick can land a moment early; this keeps the profiles from slipping to every second tick.
+const PROFILE_SLACK_MS = 5 * 1000;
+
+const CLASS_ROLE_LABELS = {
+    HOMEROOM: 'Homeroom Teacher',
+    SUPPORTING_HOMEROOM: 'Homeroom Teacher',
+    SUBJECT_TEACHER: 'Subject Teacher',
+};
 const LEASE_MS = 3 * 60 * 1000;
 const FIRST_RUN_MS = 5 * 1000;
 const ENROLLED_STUDENT_STATUSES = ['REGISTERED', 'ACTIVE'];
@@ -150,6 +159,61 @@ async function buildNewPerson(api, row, projection, warnings) {
     };
 }
 
+const sameClasses = (a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    const key = (entry) => `${entry.grade || ''}|${entry.className || ''}|${entry.subject || ''}|${entry.role || ''}`;
+    const left = a.map(key).sort();
+    const right = b.map(key).sort();
+    return left.every((value, index) => value === right[index]);
+};
+
+const sameIds = (a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    const left = a.map((id) => id.toString()).sort();
+    const right = b.map((id) => id.toString()).sort();
+    return left.every((value, index) => value === right[index]);
+};
+
+function classesByEmail(assignments) {
+    const map = new Map();
+    for (const assignment of assignments) {
+        const email = normalizeEmail(assignment.employee_email);
+        if (!email) continue;
+        if (!map.has(email)) map.set(email, []);
+        // A mixed-age room holds students of more than one grade: one entry per grade the class teaches.
+        const grades = [assignment.grade_name, ...(assignment.additional_grade_names || [])].filter(Boolean);
+        grades.forEach((grade) => {
+            map.get(email).push({
+                grade,
+                className: assignment.class_name || undefined,
+                subject: assignment.subject || undefined,
+                role: CLASS_ROLE_LABELS[assignment.role] || undefined,
+            });
+        });
+    }
+    return map;
+}
+
+// The students each special education teacher supports, as MTSS student ids, by the teacher's email.
+async function supportedIdsByEmail(assignments) {
+    const studentEmailsByEmployee = new Map();
+    for (const assignment of assignments) {
+        const employeeEmail = normalizeEmail(assignment.employee_email);
+        const studentEmail = normalizeEmail(assignment.student_email);
+        if (!employeeEmail || !studentEmail) continue;
+        if (!studentEmailsByEmployee.has(employeeEmail)) studentEmailsByEmployee.set(employeeEmail, new Set());
+        studentEmailsByEmployee.get(employeeEmail).add(studentEmail);
+    }
+    const allStudentEmails = [...new Set([...studentEmailsByEmployee.values()].flatMap((set) => [...set]))];
+    const students = allStudentEmails.length ? await MTSSStudent.find({ email: { $in: allStudentEmails } }).select('_id email') : [];
+    const idByEmail = new Map(students.map((student) => [normalizeEmail(student.email), student._id]));
+    const result = new Map();
+    for (const [employeeEmail, emails] of studentEmailsByEmployee) {
+        result.set(employeeEmail, [...emails].map((email) => idByEmail.get(email)).filter(Boolean));
+    }
+    return result;
+}
+
 const differs = (person, fields) => Object.entries(fields).some(([key, value]) => value !== undefined && String(person[key] ?? '') !== String(value ?? ''));
 
 // What Central keeps about each person outside the key: unit, job, grade, class, and whether they are still
@@ -178,8 +242,13 @@ async function syncProfiles(api = central) {
         }
         return byEmail;
     });
+    const classAssignments = await read('Class assignments', () => api.listClassTeacherAssignments());
+    const supportAssignments = await read('Student support assignments', () => api.listStudentSupportAssignments());
     summary.warnings = [...warnings];
-    if (!employees && !students) return { ...summary, skipped: true };
+    if (!employees && !students && !classAssignments && !supportAssignments) return { ...summary, skipped: true };
+
+    const teachingClasses = classAssignments ? classesByEmail(classAssignments) : null;
+    const supportedStudents = supportAssignments ? await supportedIdsByEmail(supportAssignments) : null;
 
     const employeesByPersonId = employees ? new Map(employees.map((e) => [e.person_id, e])) : null;
     const people = await Person.find({ personType: { $exists: true } });
@@ -204,13 +273,23 @@ async function syncProfiles(api = central) {
             }
         }
 
-        if (!(next && differs(person, next))) continue;
+        // Who teaches which class, and which students a special education teacher supports. A list that could not be
+        // read leaves what is stored as it is.
+        const isEmployee = person.personType === PERSON_TYPE.EMPLOYEE;
+        const email = normalizeEmail(person.email);
+        const classes = isEmployee && teachingClasses ? teachingClasses.get(email) || [] : null;
+        const supported = isEmployee && supportedStudents ? supportedStudents.get(email) || [] : null;
+        const classesChanged = classes && !sameClasses(person.classes || [], classes);
+        const supportChanged = supported && !sameIds(person.supportedStudentIds || [], supported);
+        if (!(next && differs(person, next)) && !classesChanged && !supportChanged) continue;
 
         const wasActive = person.isActive;
-        Object.assign(person, Object.fromEntries(Object.entries(next).filter(([, value]) => value !== undefined)));
+        if (next) Object.assign(person, Object.fromEntries(Object.entries(next).filter(([, value]) => value !== undefined)));
+        if (classesChanged) person.classes = classes;
+        if (supportChanged) person.supportedStudentIds = supported;
         await person.save();
-        if (next.isActive === false && wasActive) summary.deactivated += 1;
-        else if (next.isActive && !wasActive) summary.reactivated += 1;
+        if (next?.isActive === false && wasActive) summary.deactivated += 1;
+        else if (next?.isActive && !wasActive) summary.reactivated += 1;
         else summary.updated += 1;
     }
     return summary;
@@ -247,7 +326,7 @@ async function runSync({ force = false, api = central, now = new Date() } = {}) 
             result.status = 'synced';
             result.summary = summary;
         }
-        const profilesDue = force || !state.profilesSyncedAt || now - state.profilesSyncedAt >= PROFILE_EVERY_MS;
+        const profilesDue = force || !state.profilesSyncedAt || now - state.profilesSyncedAt >= PROFILE_EVERY_MS - PROFILE_SLACK_MS;
         if (profilesDue) {
             const profiles = await syncProfiles(api);
             (profiles.warnings || []).forEach((warning) => warnings.add(warning));

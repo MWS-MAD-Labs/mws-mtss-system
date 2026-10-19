@@ -1,5 +1,5 @@
 const winston = require('winston');
-const { JOBS, runTracked } = require('../utils/syncJobStatus');
+const { JOBS, runTracked, withLease } = require('../utils/syncJobStatus');
 const { syncIntervalMs } = require('./centralSync');
 const MTSSStudent = require('../models/MTSSStudent');
 const { listStudentsByStatus } = require('../services/mwsDataCenterClient');
@@ -205,7 +205,7 @@ function start(intervalMs = syncIntervalMs(process.env.MTSS_AUTO_SYNC_SECONDS)) 
         if (isRunning) return; // previous run still in progress - skip this tick
         isRunning = true;
         try {
-            await runTracked(JOBS.roster, syncStudentRoster);
+            await runTracked(JOBS.roster, () => withLease('roster', 5 * 60 * 1000, syncStudentRoster));
         } catch (error) {
             winston.error('mtssStudentRosterSync: run failed:', error);
         } finally {

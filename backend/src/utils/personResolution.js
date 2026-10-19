@@ -8,10 +8,11 @@ const { applyEntitlementProjection } = require('./centralEntitlement');
 // Asks Central whether this person is an employee or a student and returns the fields to keep, or null when
 // Central has no active record of that kind. A lookup that fails is not an answer: the error goes up so the
 // caller can tell "not found" from "could not check" (only a failed student lookup is forgiven, see below).
-async function lookupAs(personType, email) {
+async function lookupAs(personType, email, centralPersonId) {
+    // Central finds a student by id, nis or email, not by person id.
     return personType === PERSON_TYPE.STUDENT
         ? syncStudentFromCentral(email)
-        : syncEmployeeFromCentral(email);
+        : syncEmployeeFromCentral(email, centralPersonId);
 }
 
 // The person behind a verified Hub token, made or brought up to date from Central. `claims` carries what the
@@ -34,7 +35,7 @@ async function resolveOrProvisionPerson(rawEmail, claims = {}) {
     let found = null;
     for (const personType of order) {
         try {
-            const fields = await lookupAs(personType, email);
+            const fields = await lookupAs(personType, email, personId);
             if (fields) {
                 found = { personType, fields };
                 break;
@@ -60,8 +61,8 @@ async function resolveOrProvisionPerson(rawEmail, claims = {}) {
         centralStatus: CENTRAL_STATUS.ACTIVE,
         lastLogin: new Date(),
     });
-    if (personId) person.centralPersonId = personId;
-    else if (!person.centralPersonId) person.centralPersonId = found.fields.centralPersonId;
+    // A person already linked to Central keeps that link. The id only fills a gap.
+    if (!person.centralPersonId) person.centralPersonId = personId || found.fields.centralPersonId;
     if (!person.name) person.name = email;
 
     if (claims.entitlement) {

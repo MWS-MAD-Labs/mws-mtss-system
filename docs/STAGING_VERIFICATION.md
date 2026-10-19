@@ -4,7 +4,7 @@ Run this after every staging deploy of MTSS. Tick each line. Anything that fails
 
 ## 1. The deploy itself
 - [ ] The GitHub Actions run is green, including `Send Permission List To Central` and `Wait for the new version`.
-- [ ] `STAGING_HEALTH_URL` (for example `https://app-stg.mws.web.id/mtss/api/v1/health`) shows a `buildId` equal to the commit that was deployed. If the old build keeps showing, read the last update of the stack in Komodo.
+- [ ] `STAGING_HEALTH_URL` (for example `https://app-stg.mws.web.id/mtss/api/health`) shows a `buildId` equal to the commit that was deployed. If the old build keeps showing, read the last update of the stack in Komodo.
 - [ ] The backend log has a `centralSync: asking Central every N seconds` line and no `[access] Central lookup failed` or `Central said 4xx/5xx` lines.
 
 ## 2. Central knows this version
@@ -33,7 +33,7 @@ Pick one person and one student in Central and check each field in MTSS.
 - [ ] Move a teacher to another class in Central. Within the class sync interval their student list follows.
 - [ ] Withdraw or graduate a student in Central. They leave "All Students" (status filter) at the next roster sync.
 - [ ] User Management shows "Synced with Central" and a last check time under a minute old. A red problem line there means Central cannot be reached.
-- [ ] No mentor shows as "Unassigned" on a plan whose mentor still works at the school. If one does, that plan still points at an id from before the move: run `npm run migrate:people` in `backend` (a dry run, it writes nothing), read what it lists, then back up and run it with `-- --apply`.
+- [ ] No mentor shows as "Unassigned" on a plan whose mentor still works at the school. If one does, that plan still points at an id from before the move: read `docs/PEOPLE_AND_PERMISSIONS.md`, section "Moving from the old collections": `npm run migrate:people` copies the old users with their ids and is the normal move (before the first start of the new version). `npm run migrate:people:refs` is only for a database where the sync already ran first, and cannot be undone.
 - [ ] Students that Central no longer lists are marked orphaned. Their number should be small and explainable.
 
 ## 6. Live updates and the audit trail
@@ -48,4 +48,4 @@ Pick one person and one student in Central and check each field in MTSS.
 
 ## 8. Before promoting to `main`
 - [ ] MTSS is served under the same registrable domain as the Hub. If it is not, the shared session cannot work and `main` must stay on the old version.
-- [ ] A backup of the database exists before `migrate:people -- --apply` runs anywhere.
+- [ ] A backup of the database exists before `migrate:people:apply` (or `migrate:people:refs -- --apply`) runs anywhere.

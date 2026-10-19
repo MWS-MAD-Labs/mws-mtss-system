@@ -1,8 +1,14 @@
-// Moves the ids of the old users (collections "users" and "userstudents") over to the people Central keeps.
-//   npm run migrate:people              shows what would change, writes nothing
-//   npm run migrate:people -- --apply   writes it
-// Run it after the first Central sync has filled the "people" collection. It matches by email, can be run again
-// safely, and never touches the old collections. Ids with no person behind them are listed and left as they were.
+// EMERGENCY TOOL. The normal move is `npm run migrate:people`, which copies the old users into "people" with the
+// same _id, so nothing else has to change and going back is deploying the old code.
+//
+// This one is only for a database where the Central sync already made the people with new ids before that copy ran.
+// It rewrites the old user ids kept in other collections (mentor, creator, check-ins, notifications and so on) to
+// the new ids, matching by email. It changes those collections in place, so it CANNOT be undone by deploying the old
+// code: back up first.
+//   npm run migrate:people:refs                shows what would change, writes nothing
+//   npm run migrate:people:refs -- --apply     writes it
+// It can be run again safely and never touches the old user collections. Ids with no person behind them are listed
+// and left as they were.
 require('dotenv').config();
 const mongoose = require('mongoose');
 const fs = require('fs');
