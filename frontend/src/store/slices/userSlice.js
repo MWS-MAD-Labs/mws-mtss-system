@@ -26,42 +26,6 @@ export const fetchUserById = createAsyncThunk(
     }
 );
 
-export const createUser = createAsyncThunk(
-    'users/createUser',
-    async (userData, { rejectWithValue }) => {
-        try {
-            const response = await api.post('/users', userData);
-            return response.data;
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to create user');
-        }
-    }
-);
-
-export const updateUser = createAsyncThunk(
-    'users/updateUser',
-    async ({ userId, userData }, { rejectWithValue }) => {
-        try {
-            const response = await api.put(`/users/${userId}`, userData);
-            return response.data;
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to update user');
-        }
-    }
-);
-
-export const deleteUser = createAsyncThunk(
-    'users/deleteUser',
-    async (userId, { rejectWithValue }) => {
-        try {
-            await api.delete(`/users/${userId}`);
-            return userId;
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to delete user');
-        }
-    }
-);
-
 export const fetchOrganizationStructure = createAsyncThunk(
     'users/fetchOrganizationStructure',
     async (_, { rejectWithValue }) => {
@@ -70,18 +34,6 @@ export const fetchOrganizationStructure = createAsyncThunk(
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch organization structure');
-        }
-    }
-);
-
-export const assignUserToOrganization = createAsyncThunk(
-    'users/assignUserToOrganization',
-    async (assignmentData, { rejectWithValue }) => {
-        try {
-            const response = await api.post('/users/assign-organization', assignmentData);
-            return response.data;
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to assign user');
         }
     }
 );
@@ -110,18 +62,6 @@ export const getUserOrganizations = createAsyncThunk(
     }
 );
 
-export const createOrganization = createAsyncThunk(
-    'users/createOrganization',
-    async (organizationData, { rejectWithValue }) => {
-        try {
-            const response = await api.post('/users/organization', organizationData);
-            return response.data;
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to create organization');
-        }
-    }
-);
-
 // Initial state
 const initialState = {
     users: [],
@@ -138,6 +78,7 @@ const initialState = {
     },
     filters: {
         role: '',
+        personType: '',
         department: '',
         unit: '',
         jobLevel: '',
@@ -209,57 +150,7 @@ const userSlice = createSlice({
                 state.error = action.payload;
             })
 
-            // Create user
-            .addCase(createUser.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(createUser.fulfilled, (state, action) => {
-                state.loading = false;
-                state.users.unshift(action.payload.user);
-                state.pagination.totalUsers += 1;
-            })
-            .addCase(createUser.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            })
-
-            // Update user
-            .addCase(updateUser.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(updateUser.fulfilled, (state, action) => {
-                state.loading = false;
-                const index = state.users.findIndex(user => user.id === action.payload.user.id);
-                if (index !== -1) {
-                    state.users[index] = action.payload.user;
-                }
-                if (state.currentUser && state.currentUser.id === action.payload.user.id) {
-                    state.currentUser = action.payload.user;
-                }
-            })
-            .addCase(updateUser.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            })
-
-            // Delete user
-            .addCase(deleteUser.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(deleteUser.fulfilled, (state, action) => {
-                state.loading = false;
-                state.users = state.users.filter(user => user.id !== action.payload);
-                state.pagination.totalUsers -= 1;
-            })
-            .addCase(deleteUser.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            })
-
-            // Fetch organization structure
+            // Organization structure
             .addCase(fetchOrganizationStructure.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -273,21 +164,7 @@ const userSlice = createSlice({
                 state.error = action.payload;
             })
 
-            // Assign user to organization
-            .addCase(assignUserToOrganization.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(assignUserToOrganization.fulfilled, (state) => {
-                state.loading = false;
-                // Optionally refresh users list or update specific user
-            })
-            .addCase(assignUserToOrganization.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            })
-
-            // Get organization members
+            // Organization members
             .addCase(getOrganizationMembers.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -311,20 +188,6 @@ const userSlice = createSlice({
                 state.userOrganizations = action.payload.data;
             })
             .addCase(getUserOrganizations.rejected, (state, action) => {
-                state.loading = false;
-                state.error = action.payload;
-            })
-
-            // Create organization
-            .addCase(createOrganization.pending, (state) => {
-                state.loading = true;
-                state.error = null;
-            })
-            .addCase(createOrganization.fulfilled, (state, action) => {
-                state.loading = false;
-                // Optionally refresh organization structure
-            })
-            .addCase(createOrganization.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             });

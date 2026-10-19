@@ -2,6 +2,7 @@ import React, { memo, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, Users, Sparkles } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { canAccessMtssAdmin } from "@/utils/mtssAccess";
 import { useSelector } from "react-redux";
 import { roles } from "./data/roleSelectionOptions";
 import RoleSelectionCard from "./components/RoleSelectionCard";
@@ -10,10 +11,7 @@ const MTSSRoleSelectionPage = memo(() => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const { user: currentUser } = useSelector((state) => state.auth);
-    const isAdminPrincipal = useMemo(
-        () => ["admin", "superadmin", "head_unit", "directorate"].includes(currentUser?.role),
-        [currentUser?.role],
-    );
+    const isAdminPrincipal = useMemo(() => canAccessMtssAdmin(currentUser), [currentUser]);
 
     const visibleRoles = useMemo(() => {
         if (!isAdminPrincipal) return roles;

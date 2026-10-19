@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Users, UserCheck, Building, GraduationCap, Briefcase, Crown } from "lucide-react";
+import { Users, UserCheck, Building, Briefcase } from "lucide-react";
 
 const StatCard = memo(({ icon: Icon, title, value, subtitle, color = "primary", delay = 0 }) => (
     <motion.div
@@ -29,23 +29,13 @@ const UserStatsOverview = memo(({ organizationStructure, totalUsers, lastUpdated
 
         return {
             totalUsers: totalUsers || orgStats?.totalUsers || 0,
-            directorate: orgStats?.byRole?.find(r => r._id === 'directorate')?.count || 0,
-            teachers: (orgStats?.byRole?.find(r => r._id === 'teacher')?.count || 0) +
-                (orgStats?.byRole?.find(r => r._id === 'se_teacher')?.count || 0),
-            staff: (orgStats?.byRole?.find(r => r._id === 'staff')?.count || 0) +
-                (orgStats?.byRole?.find(r => r._id === 'head_unit')?.count || 0),
-            supportStaff: orgStats?.byRole?.find(r => r._id === 'support_staff')?.count || 0,
-            students: orgStats?.byRole?.find(r => r._id === 'student')?.count || 0,
+            // The roles Central gave people in MTSS, most people first.
+            roles: [...(orgStats?.byRole || [])].sort((a, b) => b.count - a.count),
             permanent: orgStats?.byEmploymentStatus?.find(s => s._id === 'Permanent')?.count || 0,
             contract: orgStats?.byEmploymentStatus?.find(s => s._id === 'Contract')?.count || 0,
             probation: orgStats?.byEmploymentStatus?.find(s => s._id === 'Probation')?.count || 0
         };
     }, [organizationStructure, totalUsers]);
-
-    const directorateMembers = useMemo(() => {
-        return organizationStructure?.directorate || [];
-    }, [organizationStructure]);
-
 
     // Always show stats, even if organization structure is not loaded yet
     if (!stats) {
@@ -67,53 +57,9 @@ const UserStatsOverview = memo(({ organizationStructure, totalUsers, lastUpdated
                     icon={Users}
                     title="Total Users"
                     value={stats.totalUsers}
-                    subtitle="All registered users"
+                    subtitle="Active people from Central"
                     color="primary"
                     delay={0}
-                />
-                <StatCard
-                    icon={Crown}
-                    title="Directorate"
-                    value={stats.directorate}
-                    subtitle="Leadership team"
-                    color="gold"
-                    delay={0.1}
-                />
-                <StatCard
-                    icon={GraduationCap}
-                    title="Teachers"
-                    value={stats.teachers}
-                    subtitle="Teaching staff"
-                    color="blue"
-                    delay={0.2}
-                />
-                <StatCard
-                    icon={Briefcase}
-                    title="Staff"
-                    value={stats.staff}
-                    subtitle="Administrative staff"
-                    color="green"
-                    delay={0.3}
-                />
-            </div>
-
-            {/* Role-based Grouping Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                <StatCard
-                    icon={UserCheck}
-                    title="Support Staff"
-                    value={stats.supportStaff}
-                    subtitle="Operational support"
-                    color="orange"
-                    delay={0.4}
-                />
-                <StatCard
-                    icon={Building}
-                    title="Students"
-                    value={stats.students}
-                    subtitle="Student accounts"
-                    color="purple"
-                    delay={0.5}
                 />
                 <StatCard
                     icon={Briefcase}
@@ -121,7 +67,7 @@ const UserStatsOverview = memo(({ organizationStructure, totalUsers, lastUpdated
                     value={stats.contract}
                     subtitle="Contract employees"
                     color="secondary"
-                    delay={0.6}
+                    delay={0.1}
                 />
                 <StatCard
                     icon={UserCheck}
@@ -129,8 +75,28 @@ const UserStatsOverview = memo(({ organizationStructure, totalUsers, lastUpdated
                     value={stats.permanent}
                     subtitle="Full-time employees"
                     color="default"
-                    delay={0.7}
+                    delay={0.2}
                 />
+            </div>
+
+            {/* Roles in Central */}
+            <div className="glass glass-card p-4 md:p-6">
+                <h3 className="font-semibold text-foreground mb-3 flex items-center">
+                    <Users className="w-4 h-4 mr-2" />
+                    Roles in Central
+                </h3>
+                {stats.roles.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+                        {stats.roles.map((role) => (
+                            <div key={role._id || 'none'} className="flex justify-between">
+                                <span className="text-muted-foreground">{role._id || 'No role'}</span>
+                                <span className="font-medium">{role.count}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground">No roles yet.</p>
+                )}
             </div>
 
             {/* Employment Status Breakdown */}
@@ -237,38 +203,6 @@ const UserStatsOverview = memo(({ organizationStructure, totalUsers, lastUpdated
                     </motion.div>
                 </div>
             </div>
-
-            {/* Directorate Members */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7, duration: 0.5 }}
-                className="glass glass-card p-4 md:p-6"
-            >
-                <h3 className="text-lg font-semibold mb-4 flex items-center">
-                    <Crown className="w-5 h-5 mr-2 text-gold" />
-                    Directorate Members
-                </h3>
-                {directorateMembers && directorateMembers.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {directorateMembers.map((member, index) => (
-                            <motion.div
-                                key={member._id || index}
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: 0.8 + index * 0.1, duration: 0.3 }}
-                                className="p-4 bg-muted/30 rounded-lg"
-                            >
-                                <h4 className="font-medium text-foreground">{member.name}</h4>
-                                <p className="text-sm text-muted-foreground">{member.jobPosition}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{member.department}</p>
-                            </motion.div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-muted-foreground">No directorate members found</p>
-                )}
-            </motion.div>
 
             {/* Last Updated */}
             {lastUpdated && (

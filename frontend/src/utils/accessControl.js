@@ -1,46 +1,18 @@
-const NATIVE_DASHBOARD_ROLES = new Set(['directorate', 'superadmin', 'admin', 'head_unit']);
+import { PERSON_TYPE } from '@/constants/enums';
+import { PERMISSIONS } from '@/constants/permissions';
 
-export const getEmotionalDashboardRole = (user) => {
-    if (!user) return null;
-    return user.dashboardRole || user.dashboardAccess?.effectiveRole || user.role || null;
-};
+// What a person may open comes from the permissions Central gave them (user.permissions, from /auth/me).
+// Nothing here reads a role.
 
-export const hasEmotionalDashboardAccess = (user) => {
-    if (!user) return false;
+export const hasPermission = (user, permission) => (
+    Array.isArray(user?.permissions) && user.permissions.includes(permission)
+);
 
-    const role = user.role;
-    const effectiveRole = getEmotionalDashboardRole(user);
-    if (role && NATIVE_DASHBOARD_ROLES.has(role)) {
-        return true;
-    }
-    if (effectiveRole && NATIVE_DASHBOARD_ROLES.has(effectiveRole)) {
-        return true;
-    }
+export const hasAnyPermission = (user, permissions = []) => (
+    permissions.some((permission) => hasPermission(user, permission))
+);
 
-    const delegatedAccess = user.dashboardAccess;
-    if (!delegatedAccess) {
-        return false;
-    }
+export const isStudent = (user) => user?.personType === PERSON_TYPE.STUDENT;
 
-    if (delegatedAccess.hasDelegatedAccess === false) {
-        return false;
-    }
-
-    const scopes = Array.isArray(delegatedAccess.scope) ? delegatedAccess.scope : null;
-    if (scopes && scopes.length > 0) {
-        return scopes.includes('emotional_dashboard');
-    }
-
-    return Boolean(delegatedAccess.hasDelegatedAccess);
-};
-
-export const hasDelegatedDashboardAccess = (user) => {
-    return Boolean(user?.dashboardAccess?.hasDelegatedAccess);
-};
-
-export const getDelegatedDashboardDetails = (user) => {
-    if (!user?.dashboardAccess?.hasDelegatedAccess) {
-        return null;
-    }
-    return user.dashboardAccess;
-};
+// The emotional dashboard is its own permission in Central.
+export const hasEmotionalDashboardAccess = (user) => hasPermission(user, PERMISSIONS.EMOTIONAL_DASHBOARD_READ);

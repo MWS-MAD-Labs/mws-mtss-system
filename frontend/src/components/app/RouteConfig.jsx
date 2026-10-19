@@ -7,15 +7,11 @@ import PageTransition from "./PageTransition";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { getMtssAccessProfile } from "@/utils/mtssAccess";
 import { getStoredAuthUser } from "@/utils/authStorage";
-// Eager, not lazy: this is the very first thing rendered right after Hub
-// SSO hands back control, and it always renders its own <PageLoader/> while
-// it works anyway. Lazy-loading it just adds one extra Suspense-fallback
-// mount/unmount of the *same* loader right before it, which reads as a
-// visible flicker (the loader's entrance animation replaying) rather than a
-// smooth continuation.
-import AuthCallback from '@/pages/AuthCallback';
+import { PERMISSIONS } from "@/constants/permissions";
+import { PERSON_TYPE } from "@/constants/enums";
+import RootRedirect from "./RootRedirect";
 
-const LandingPage = lazy(() => import(/* webpackPrefetch: true */ '@/pages/LandingPage'));
+const AccountNotFoundPage = lazy(() => import('@/pages/AccountNotFoundPage'));
 const ProfilePage = lazy(() => import(/* webpackPrefetch: true */ '@/pages/ProfilePage'));
 const NotificationPage = lazy(() => import(/* webpackPrefetch: true */ '@/pages/NotificationPage'));
 const NotificationSettingsPage = lazy(() => import(/* webpackPrefetch: true */ '@/pages/NotificationSettingsPage'));
@@ -39,34 +35,6 @@ const MemoizedPageTransition = memo(({ children }) => (
     <PageTransition>{children}</PageTransition>
 ));
 MemoizedPageTransition.displayName = 'MemoizedPageTransition';
-
-const AdminProtectedRoute = memo(({ children }) => {
-    const { user } = useSelector((state) => state.auth);
-
-    const hasAdminAccess = user && (
-        user.role === 'directorate' ||
-        user.role === 'superadmin' ||
-        user.role === 'admin'
-    );
-
-    if (!hasAdminAccess) {
-        return (
-            <MemoizedPageTransition>
-                <div className="min-h-screen flex items-center justify-center">
-                    <div className="glass glass-card p-8 text-center">
-                        <h2 className="text-2xl font-bold text-destructive mb-4">Access Denied</h2>
-                        <p className="text-muted-foreground">
-                            You don't have permission to access this page.
-                        </p>
-                    </div>
-                </div>
-            </MemoizedPageTransition>
-        );
-    }
-
-    return <MemoizedPageTransition>{children}</MemoizedPageTransition>;
-});
-AdminProtectedRoute.displayName = 'AdminProtectedRoute';
 
 const MtssPreviewGate = memo(({ children }) => {
     const { user, loading } = useSelector((state) => state.auth);
@@ -96,26 +64,26 @@ const MtssPreviewGate = memo(({ children }) => {
 MtssPreviewGate.displayName = "MtssPreviewGate";
 
 const publicRoutes = [
-    <Route key="landing" path="/mtss" element={<MemoizedPageTransition><LandingPage /></MemoizedPageTransition>} />,
-    <Route key="auth-callback" path="/mtss/auth/callback" element={<MemoizedPageTransition><AuthCallback /></MemoizedPageTransition>} />,
-    <Route key="home" path="/mtss/home" element={<ProtectedRoute allowedRoles={['staff', 'support_staff', 'nurse', 'counselor', 'teacher', 'se_teacher', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin']}><MemoizedPageTransition><RoleSelectionPage /></MemoizedPageTransition></ProtectedRoute>} />,
+    <Route key="landing" path="/mtss" element={<RootRedirect />} />,
+    <Route key="account-not-found" path="/mtss/account-not-found" element={<MemoizedPageTransition><AccountNotFoundPage /></MemoizedPageTransition>} />,
+    <Route key="home" path="/mtss/home" element={<ProtectedRoute personType={PERSON_TYPE.EMPLOYEE}><MemoizedPageTransition><RoleSelectionPage /></MemoizedPageTransition></ProtectedRoute>} />,
     <Route key="profile" path="/mtss/profile" element={<ProtectedRoute><MemoizedPageTransition><ProfilePage /></MemoizedPageTransition></ProtectedRoute>} />,
     <Route key="notifications" path="/mtss/notifications" element={<ProtectedRoute><MemoizedPageTransition><NotificationPage /></MemoizedPageTransition></ProtectedRoute>} />,
     <Route key="notifications-settings" path="/mtss/notifications/settings" element={<ProtectedRoute><MemoizedPageTransition><NotificationSettingsPage /></MemoizedPageTransition></ProtectedRoute>} />,
-    <Route key="user-management" path="/mtss/user-management" element={<AdminProtectedRoute><UserManagementDashboard /></AdminProtectedRoute>} />,
-    <Route key="support-hub" path="/mtss/support-hub" element={<ProtectedRoute allowedRoles={['teacher', 'se_teacher', 'head_unit', 'directorate', 'admin', 'superadmin']}><MtssPreviewGate><MemoizedPageTransition><SupportModeSelectionPage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
-    <Route key="mtss-teacher" path="/mtss/teacher" element={<ProtectedRoute><MtssPreviewGate><MemoizedPageTransition><MTSSTeacherDashboard /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
-    <Route key="mtss-admin" path="/mtss/admin" element={<ProtectedRoute><MtssPreviewGate><MemoizedPageTransition><MTSSAdminDashboard /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
-    <Route key="mtss-observer" path="/mtss/observer" element={<ProtectedRoute><MtssPreviewGate><MemoizedPageTransition><MTSSObserverDashboard /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
-    <Route key="mtss-pilot-testing" path="/mtss/pilot-testing" element={<ProtectedRoute allowedRoles={['teacher', 'se_teacher', 'head_unit', 'directorate', 'admin', 'superadmin']}><MtssPreviewGate><MemoizedPageTransition><MTSSPilotTestingHubPage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
-    <Route key="mtss-admin-assign" path="/mtss/admin/assign/:mentorId" element={<ProtectedRoute><MtssPreviewGate><MemoizedPageTransition><MTSSAdminAssignPage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
-    <Route key="mtss-student-portal" path="/mtss/student-portal" element={<ProtectedRoute><MtssPreviewGate><MemoizedPageTransition><MTSSStudentPortalPage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
-    <Route key="mtss-student-profile" path="/mtss/student/:slug" element={<ProtectedRoute><MtssPreviewGate><MemoizedPageTransition><MTSSStudentProfilePage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
-    <Route key="ai-assistant" path="/mtss/ai-assistant" element={<ProtectedRoute allowedRoles={['staff', 'support_staff', 'nurse', 'counselor', 'teacher', 'se_teacher', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin']}><MemoizedPageTransition><StudentAIChatPage /></MemoizedPageTransition></ProtectedRoute>} />,
-    <Route key="teacher-ai-insights" path="/mtss/teacher/ai-insights" element={<ProtectedRoute allowedRoles={['teacher', 'se_teacher', 'counselor', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin']}><MemoizedPageTransition><TeacherAIInsightsPage /></MemoizedPageTransition></ProtectedRoute>} />,
-    <Route key="student-support-hub" path="/mtss/student/support-hub" element={<ProtectedRoute allowedRoles={['student']}><MemoizedPageTransition><StudentSupportHubPage /></MemoizedPageTransition></ProtectedRoute>} />,
-    <Route key="student-ai-chat" path="/mtss/student/ai-chat" element={<ProtectedRoute allowedRoles={['student']}><MemoizedPageTransition><StudentAIChatPage /></MemoizedPageTransition></ProtectedRoute>} />,
-    <Route key="ai-network-topology" path="/mtss/dev/ai-topology" element={<ProtectedRoute allowedRoles={['admin', 'superadmin', 'directorate', 'head_unit']} allowedDepartments={['MAD Lab']} accessMatch="any"><AINetworkTopologyPage /></ProtectedRoute>} />,
+    <Route key="user-management" path="/mtss/user-management" element={<ProtectedRoute anyPermission={[PERMISSIONS.USERS_READ]}><MemoizedPageTransition><UserManagementDashboard /></MemoizedPageTransition></ProtectedRoute>} />,
+    <Route key="support-hub" path="/mtss/support-hub" element={<ProtectedRoute anyPermission={[PERMISSIONS.MTSS_READ]}><MtssPreviewGate><MemoizedPageTransition><SupportModeSelectionPage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
+    <Route key="mtss-teacher" path="/mtss/teacher" element={<ProtectedRoute anyPermission={[PERMISSIONS.MTSS_READ]}><MtssPreviewGate><MemoizedPageTransition><MTSSTeacherDashboard /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
+    <Route key="mtss-admin" path="/mtss/admin" element={<ProtectedRoute anyPermission={[PERMISSIONS.MTSS_ADMIN]}><MtssPreviewGate><MemoizedPageTransition><MTSSAdminDashboard /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
+    <Route key="mtss-observer" path="/mtss/observer" element={<ProtectedRoute anyPermission={[PERMISSIONS.MTSS_READ]}><MtssPreviewGate><MemoizedPageTransition><MTSSObserverDashboard /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
+    <Route key="mtss-pilot-testing" path="/mtss/pilot-testing" element={<ProtectedRoute anyPermission={[PERMISSIONS.MTSS_READ]}><MtssPreviewGate><MemoizedPageTransition><MTSSPilotTestingHubPage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
+    <Route key="mtss-admin-assign" path="/mtss/admin/assign/:mentorId" element={<ProtectedRoute anyPermission={[PERMISSIONS.MTSS_ADMIN]}><MtssPreviewGate><MemoizedPageTransition><MTSSAdminAssignPage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
+    <Route key="mtss-student-portal" path="/mtss/student-portal" element={<ProtectedRoute anyPermission={[PERMISSIONS.MTSS_READ]}><MtssPreviewGate><MemoizedPageTransition><MTSSStudentPortalPage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
+    <Route key="mtss-student-profile" path="/mtss/student/:slug" element={<ProtectedRoute anyPermission={[PERMISSIONS.MTSS_READ]}><MtssPreviewGate><MemoizedPageTransition><MTSSStudentProfilePage /></MemoizedPageTransition></MtssPreviewGate></ProtectedRoute>} />,
+    <Route key="ai-assistant" path="/mtss/ai-assistant" element={<ProtectedRoute personType={PERSON_TYPE.EMPLOYEE} anyPermission={[PERMISSIONS.AI_CHAT_USE]}><MemoizedPageTransition><StudentAIChatPage /></MemoizedPageTransition></ProtectedRoute>} />,
+    <Route key="teacher-ai-insights" path="/mtss/teacher/ai-insights" element={<ProtectedRoute anyPermission={[PERMISSIONS.AI_INSIGHTS_READ]}><MemoizedPageTransition><TeacherAIInsightsPage /></MemoizedPageTransition></ProtectedRoute>} />,
+    <Route key="student-support-hub" path="/mtss/student/support-hub" element={<ProtectedRoute personType={PERSON_TYPE.STUDENT}><MemoizedPageTransition><StudentSupportHubPage /></MemoizedPageTransition></ProtectedRoute>} />,
+    <Route key="student-ai-chat" path="/mtss/student/ai-chat" element={<ProtectedRoute personType={PERSON_TYPE.STUDENT} anyPermission={[PERMISSIONS.AI_CHAT_USE]}><MemoizedPageTransition><StudentAIChatPage /></MemoizedPageTransition></ProtectedRoute>} />,
+    <Route key="ai-network-topology" path="/mtss/dev/ai-topology" element={<ProtectedRoute anyPermission={[PERMISSIONS.DEV_TOPOLOGY_READ]}><AINetworkTopologyPage /></ProtectedRoute>} />,
 ];
 
 const RouteConfig = memo(() => (

@@ -8,33 +8,25 @@ import '@/index.css';
 import { Toaster } from '@/components/ui/toaster';
 import { syncInitialTheme } from '@/lib/theme';
 import { fetchCurrentUser } from '@/store/slices/authSlice';
-import { clearStoredAuthSession, getStoredAuthToken, getStoredAuthUserRaw } from '@/utils/authStorage';
+import { clearStoredAuthSession, getStoredAuthUserRaw } from '@/utils/authStorage';
+import { stripRestoredMarker } from '@/utils/hubSession';
 
 syncInitialTheme();
 
-// Optimistically seed auth state from the cached user profile so protected
-// pages don't flash a login screen while fetchCurrentUser() below confirms
-// the real session - which lives in an httpOnly cookie now, not here.
-// hasSessionMarker is a non-sensitive marker (see utils/authStorage.js),
-// not a credential.
-const hasSessionMarker = getStoredAuthToken();
-const user = getStoredAuthUserRaw();
-
-if (hasSessionMarker && user) {
+// The session is the Hub's cookie, which this code cannot read, so the backend is asked who is signed in. A cached
+// copy of the person keeps protected pages from flashing a loading screen while it answers.
+const cachedUser = getStoredAuthUserRaw();
+if (cachedUser) {
     try {
-        const userData = JSON.parse(user);
-        store.dispatch({
-            type: 'auth/setUser',
-            payload: { user: userData }
-        });
-        // Validate against the actual cookie-backed session before
-        // rendering protected pages.
-        store.dispatch(fetchCurrentUser());
+        store.dispatch({ type: 'auth/setUser', payload: { user: JSON.parse(cachedUser) } });
     } catch (error) {
         console.error('Error parsing stored user data:', error);
         clearStoredAuthSession();
     }
 }
+store.dispatch(fetchCurrentUser()).then((action) => {
+    if (fetchCurrentUser.fulfilled.match(action)) stripRestoredMarker();
+});
 
 // Service worker registration is handled by Vite PWA plugin
 if ('serviceWorker' in navigator) {

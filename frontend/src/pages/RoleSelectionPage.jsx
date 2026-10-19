@@ -2,8 +2,9 @@ import { memo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Heart, Sparkles, ArrowRight, BarChart3 } from "lucide-react";
 import { useSelector } from "react-redux";
-import { getDefaultMtssRoute } from "@/utils/mtssAccess";
-import { hasSupportHubAccess as computeHasSupportHubAccess } from "@/utils/hubConfig";
+import { getDefaultMtssRoute, hasMtssAccess } from "@/utils/mtssAccess";
+import { hasPermission } from "@/utils/accessControl";
+import { PERMISSIONS } from "@/constants/permissions";
 import gsap from "gsap";
 import "@/pages/styles/role-selection-humanistic.css";
 
@@ -415,11 +416,11 @@ const RoleSelection = memo(() => {
     };
   }, []);
 
-  // Same role list RouteConfig.jsx gates /mtss/pilot-testing with - reused
-  // here for both the Pilot Testing card below and hasNoMtssAccess. The
+  // Same access RouteConfig.jsx gates /mtss/pilot-testing with, used for
+  // both the Pilot Testing card below and hasNoMtssAccess. The
   // Support Hub button itself now lives in QuickLogoutButton.jsx's floating
   // menu (top-left corner), not on this page.
-  const hasSupportHubAccess = computeHasSupportHubAccess(user?.role);
+  const hasSupportHubAccess = hasMtssAccess(user);
   const hasNoMtssAccess = user && !mtssDashboardRoute && !hasSupportHubAccess;
 
   return (
@@ -464,10 +465,10 @@ const RoleSelection = memo(() => {
                 isPremium={true} onClick={() => navigate('/mtss/pilot-testing')} delay={0.45} />
             )}
 
-            {(user && ['directorate', 'admin', 'superadmin'].includes(user.role)) && (
+            {hasPermission(user, PERMISSIONS.USERS_READ) && (
               <MethodCard icon={BarChart3} title="User Management"
-                desc="Manage users, roles, and organizational structure"
-                features={["User account management", "Role and permission settings", "Organizational hierarchy", "Advanced user analytics"]}
+                desc="See the people Central lists for MTSS and the roles they hold."
+                features={["People from Central", "Roles held in MTSS", "Sync status with Central", "Headcount by department"]}
                 isPremium={false} onClick={() => navigate('/mtss/user-management')} delay={0.55} />
             )}
 
