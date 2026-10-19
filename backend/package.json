@@ -16,6 +16,7 @@
     "seed:mtss": "node src/scripts/seedMtssData.js",
     "reset:mtss:tier1:dry-run": "node src/scripts/resetInterventionsToTier1.js",
     "reset:mtss:tier1:apply": "node src/scripts/resetInterventionsToTier1.js --apply",
+    "migrate:people": "node src/scripts/migratePeople.js",
     "predev": "node src/scripts/syncPermissions.js --soft",
     "permissions:sync": "node src/scripts/syncPermissions.js",
     "permissions:check": "node src/scripts/syncPermissions.js --check"
