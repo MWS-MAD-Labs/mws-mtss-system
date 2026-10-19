@@ -1,10 +1,9 @@
 const { lookupEmployeeByEmail } = require('../services/mwsDataCenterClient');
 
-async function syncEmployeeFromCentral(email) {
-    const centralEmployee = await lookupEmployeeByEmail(email);
-    if (!centralEmployee) return null;
-
+// What MTSS keeps about an employee, from the record Central has.
+function mapCentralEmployee(centralEmployee) {
     const fields = {
+        centralPersonId: centralEmployee.person_id,
         name: centralEmployee.full_name,
         gender: centralEmployee.gender,
         employeeId: centralEmployee.employee_id,
@@ -22,4 +21,10 @@ async function syncEmployeeFromCentral(email) {
     return fields;
 }
 
-module.exports = { syncEmployeeFromCentral };
+async function syncEmployeeFromCentral(email) {
+    const centralEmployee = await lookupEmployeeByEmail(email);
+    if (!centralEmployee) return null;
+    return mapCentralEmployee(centralEmployee);
+}
+
+module.exports = { syncEmployeeFromCentral, mapCentralEmployee };

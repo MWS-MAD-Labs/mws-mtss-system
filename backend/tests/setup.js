@@ -3,7 +3,8 @@ require('dotenv').config({ path: '.env' });
 
 // Set test environment
 process.env.NODE_ENV = 'test';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/integra-learn-test';
+// TEST_MONGODB_URI lets a run use a throwaway Mongo instead of the one on this port.
+process.env.MONGODB_URI = process.env.TEST_MONGODB_URI || 'mongodb://localhost:27017/integra-learn-test';
 
 // Mock Google AI for testing
 jest.mock('../src/config/googleAI', () => ({

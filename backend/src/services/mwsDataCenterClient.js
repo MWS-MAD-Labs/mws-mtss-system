@@ -1,4 +1,6 @@
 const axios = require("axios");
+const { centralHeaders } = require("../utils/centralHeaders");
+const { APP_ID } = require("../utils/centralEntitlement");
 
 function buildCentralLookupError(message) {
   const error = new Error(message);
@@ -7,10 +9,12 @@ function buildCentralLookupError(message) {
 }
 
 function getCentralClient() {
+  // The names Central writes in its block come first. The older MWS_DATA_CENTER_API_* names are read only when
+  // those are empty, so an old value in an environment can no longer hide a new token.
   const baseUrl =
-    process.env.MWS_DATA_CENTER_API_URL || process.env.CENTRAL_API_BASE_URL;
+    process.env.CENTRAL_API_BASE_URL || process.env.MWS_DATA_CENTER_API_URL;
   const apiToken =
-    process.env.MWS_DATA_CENTER_API_TOKEN || process.env.CENTRAL_API_TOKEN;
+    process.env.CENTRAL_API_TOKEN || process.env.MWS_DATA_CENTER_API_TOKEN;
 
   if (!baseUrl) {
     throw buildCentralLookupError(
@@ -37,7 +41,7 @@ function getCentralClient() {
 
   return axios.create({
     baseURL: baseUrl.replace(/\/+$/, ""),
-    headers: { Authorization: `Bearer ${apiToken}` },
+    headers: centralHeaders(apiToken),
     timeout: 5000,
   });
 }
@@ -50,6 +54,18 @@ async function lookupEmployeeByEmail(email) {
     return data.data;
   } catch (error) {
     if (error.response?.status === 404) return null;
+    throw error;
+  }
+}
+
+async function lookupEmployeeByPersonId(personId) {
+  try {
+    const { data } = await getCentralClient().get("/employees/lookup", {
+      params: { person_id: personId },
+    });
+    return data.data;
+  } catch (error) {
+    if (error.response?.status === 404 || error.response?.status === 400) return null;
     throw error;
   }
 }
@@ -155,7 +171,59 @@ async function listStudentSupportAssignments() {
   return assignments;
 }
 
+const ENTITLEMENT_PAGE_SIZE = 100;
+
+// What Central says this person may do in MTSS (role, permissions, whether it is active), or null when it has
+// nothing for them. A retired application gives nobody access.
+async function lookupApplicationEntitlement(personId) {
+  try {
+    const { data } = await getCentralClient().get("/application-entitlements/lookup", {
+      params: { person_id: personId, application_id: APP_ID },
+    });
+    return data.data ?? null;
+  } catch (error) {
+    if (error.response?.status === 403 && error.response?.data?.code === "application_retired") return null;
+    throw error;
+  }
+}
+
+// A short key that changes only when something MTSS keeps about a person's access changes (name, email, role,
+// permissions or who is a member). Asking for it is one small call, so it can be asked every minute.
+async function getApplicationEntitlementKey(applicationId = APP_ID) {
+  const { data } = await getCentralClient().get("/application-entitlements/version", {
+    params: { application_id: applicationId },
+  });
+  return data.data?.key ?? null;
+}
+
+// Everybody Central lists for this application, with the key of the moment they were read. Throws on any page
+// failure instead of returning a partial list: callers revoke whoever is missing.
+async function listApplicationEntitlements(applicationId = APP_ID) {
+  const client = getCentralClient();
+  const rows = [];
+  let key = null;
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const { data } = await client.get("/application-entitlements", {
+      params: { application_id: applicationId, page, size: ENTITLEMENT_PAGE_SIZE },
+    });
+    rows.push(...data.data);
+    // A change between two pages gives a different key; the last one is the one to keep.
+    key = data.key ?? key;
+    totalPages = data.paging.total_page;
+    page += 1;
+  } while (page <= totalPages);
+
+  return { rows, key };
+}
+
 module.exports = {
+  getApplicationEntitlementKey,
+  listApplicationEntitlements,
+  lookupApplicationEntitlement,
+  lookupEmployeeByPersonId,
   lookupEmployeeByEmail,
   lookupStudentByEmail,
   listStudentsByStatus,
