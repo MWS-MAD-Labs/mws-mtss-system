@@ -11,7 +11,8 @@ const { applyViewerScope } = require('../../src/controllers/mtssStudentControlle
 describe('applyViewerScope - non-teaching viewer with no derivable grade/unit scope', () => {
     test('denies all students instead of silently returning everyone', () => {
         const viewer = {
-            role: 'teacher',
+            permissions: ['mtss.read'],
+            mtssScope: { mode: 'assigned' },
             unit: 'MAD Lab',
             jobPosition: 'Junior Full Stack Web Developer',
             classes: [],
@@ -28,7 +29,8 @@ describe('applyViewerScope - non-teaching viewer with no derivable grade/unit sc
 
     test('a real teacher with a legitimate unit still gets scoped, not denied', () => {
         const viewer = {
-            role: 'teacher',
+            permissions: ['mtss.read'],
+            mtssScope: { mode: 'assigned' },
             unit: 'Junior High',
             jobPosition: 'Coding Teacher',
             classes: [{ grade: 'Junior High', className: 'Junior High - Coding' }],

@@ -1,7 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
-const { authenticate, authenticateServiceRelay } = require('../middleware/auth');
+const { authenticate, authenticateServiceRelay, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const aiChatController = require('../controllers/aiChatController');
 const devTopologyTelemetryService = require('../services/devTopologyTelemetryService');
 
@@ -33,6 +34,9 @@ router.use((req, res, next) => {
 
     return authenticate(req, res, next);
 });
+
+// Using the assistant is its own permission, for the people who sign in and for the Daily relay alike.
+router.use(requirePermission(PERMISSIONS.AI_CHAT_USE));
 
 /**
  * @route   POST /api/v1/ai-chat/message

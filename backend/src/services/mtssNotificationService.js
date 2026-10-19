@@ -1,4 +1,4 @@
-const UserStudent = require('../models/UserStudent');
+const Person = require('../models/Person');
 const MTSSStudent = require('../models/MTSSStudent');
 const notificationService = require('./notificationService');
 const studentNotifierService = require('./studentNotifierService');
@@ -9,7 +9,7 @@ const escapeRegExp = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g
 const resolveStudentUserId = async (student = {}) => {
     const email = String(student.email || '').trim().toLowerCase();
     if (email) {
-        const account = await UserStudent.findOne({ email, isActive: true }).select('_id').lean();
+        const account = await Person.findOne({ personType: 'student', email, isActive: true }).select('_id').lean();
         if (account?._id) return String(account._id);
     }
 

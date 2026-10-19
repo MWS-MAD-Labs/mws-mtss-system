@@ -17,12 +17,12 @@ const organizationSchema = new mongoose.Schema({
     },
     headId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     },
     members: [{
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
+            ref: 'Person'
         },
         role: String,
         joinedAt: {

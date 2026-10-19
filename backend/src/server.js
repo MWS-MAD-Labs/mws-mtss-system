@@ -5,8 +5,7 @@ require('dotenv').config();
 // Import app and initialization
 const { app, initializeApp } = require('./app');
 const { initSocket } = require('./config/socket');
-const employeeDeactivationSync = require('./jobs/employeeDeactivationSync');
-const studentDeactivationSync = require('./jobs/studentDeactivationSync');
+const centralSync = require('./jobs/centralSync');
 
 // Configure Winston logger
 winston.configure({
@@ -75,8 +74,7 @@ const startServer = async () => {
         // Graceful shutdown handling
         process.on('SIGTERM', () => {
             winston.info('SIGTERM received, shutting down gracefully');
-            employeeDeactivationSync.stop();
-            studentDeactivationSync.stop();
+            centralSync.stop();
             server.close(() => {
                 winston.info('Process terminated');
                 process.exit(0);
@@ -85,8 +83,7 @@ const startServer = async () => {
 
         process.on('SIGINT', () => {
             winston.info('SIGINT received, shutting down gracefully');
-            employeeDeactivationSync.stop();
-            studentDeactivationSync.stop();
+            centralSync.stop();
             server.close(() => {
                 winston.info('Process terminated');
                 process.exit(0);

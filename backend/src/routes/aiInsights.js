@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const aiInsightController = require('../controllers/aiInsightController');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const devTopologyTelemetryService = require('../services/devTopologyTelemetryService');
 
 /**
@@ -13,7 +14,7 @@ const devTopologyTelemetryService = require('../services/devTopologyTelemetrySer
 router.get(
     '/students/:studentId/insights',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin', 'principal']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_READ),
     devTopologyTelemetryService.instrumentedHandler('ai_insights_student_insights', aiInsightController.getStudentInsights)
 );
 
@@ -21,7 +22,7 @@ router.get(
 router.post(
     '/students/:studentId/generate-alerts',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_WRITE),
     devTopologyTelemetryService.instrumentedHandler('ai_insights_generate_alerts', aiInsightController.generateAlertsForStudent)
 );
 
@@ -29,7 +30,7 @@ router.post(
 router.get(
     '/alerts',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin', 'principal']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_READ),
     devTopologyTelemetryService.instrumentedHandler('ai_insights_alert_list', aiInsightController.getMyAlerts)
 );
 
@@ -37,7 +38,7 @@ router.get(
 router.get(
     '/alerts/student/:studentId',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin', 'principal']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_READ),
     aiInsightController.getStudentAlerts
 );
 
@@ -45,7 +46,7 @@ router.get(
 router.patch(
     '/alerts/:alertId/read',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin', 'principal']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_WRITE),
     aiInsightController.markAlertAsRead
 );
 
@@ -53,7 +54,7 @@ router.patch(
 router.post(
     '/alerts/:alertId/actions',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin', 'principal']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_WRITE),
     aiInsightController.addAlertAction
 );
 
@@ -61,7 +62,7 @@ router.post(
 router.patch(
     '/alerts/:alertId/resolve',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin', 'principal']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_WRITE),
     aiInsightController.resolveAlert
 );
 
@@ -69,7 +70,7 @@ router.patch(
 router.patch(
     '/alerts/:alertId/dismiss',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin', 'principal']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_WRITE),
     aiInsightController.dismissAlert
 );
 
@@ -77,7 +78,7 @@ router.patch(
 router.get(
     '/alerts/statistics',
     authenticate,
-    authorize(['teacher', 'mentor', 'admin', 'principal']),
+    requirePermission(PERMISSIONS.AI_INSIGHTS_READ),
     devTopologyTelemetryService.instrumentedHandler('ai_insights_alert_statistics', aiInsightController.getAlertStatistics)
 );
 
@@ -85,7 +86,7 @@ router.get(
 router.post(
     '/batch-generate-alerts',
     authenticate,
-    authorize(['admin']),
+    requirePermission(PERMISSIONS.MTSS_ADMIN),
     aiInsightController.batchGenerateAlerts
 );
 

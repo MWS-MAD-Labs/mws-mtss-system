@@ -13,7 +13,7 @@ const mtssTierReviewRequestSchema = new mongoose.Schema({
     }],
     requestedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: true
     },
     requestedByRole: {
@@ -68,7 +68,7 @@ const mtssTierReviewRequestSchema = new mongoose.Schema({
     },
     reviewedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     },
     reviewedAt: {
         type: Date

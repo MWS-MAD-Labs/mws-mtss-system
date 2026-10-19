@@ -40,7 +40,7 @@ const strategySchema = new mongoose.Schema({
     },
     curatedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         default: null
     },
     isActive: {

@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const devTopologyController = require('../controllers/devTopologyController');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 
 router.use(authenticate);
-router.use(authorize('admin', 'superadmin', 'directorate', 'head_unit'));
+router.use(requirePermission(PERMISSIONS.DEV_TOPOLOGY_READ));
 
 router.get('/snapshot', devTopologyController.getSnapshot);
 router.get('/health', devTopologyController.getHealth);

@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { getSyncStatus, triggerSync } = require('../controllers/syncController');
-const { authenticate } = require('../middleware/auth');
+const { getSyncStatus } = require('../controllers/syncController');
+const { authenticate, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 
-// Any logged-in user can view status or trigger a sync - not admin-gated.
-// The shared cooldown (syncController.js) is what actually prevents spam.
+// MTSS syncs with Central by itself (jobs/centralSync.js). There is nothing to trigger, only to look at.
 router.use(authenticate);
 
-router.get('/status', getSyncStatus);
-router.post('/trigger', triggerSync);
+router.get('/status', requirePermission(PERMISSIONS.SYNC_READ), getSyncStatus);
 
 module.exports = router;

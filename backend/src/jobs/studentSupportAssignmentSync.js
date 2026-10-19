@@ -1,9 +1,9 @@
 const winston = require('winston');
-const User = require('../models/User');
+const Person = require('../models/Person');
 const MTSSStudent = require('../models/MTSSStudent');
 const { listStudentSupportAssignments } = require('../services/mwsDataCenterClient');
 
-// Keeps User.supportedStudentIds in sync with Central's real
+// Keeps Person.supportedStudentIds in sync with Central's real
 // StudentSupportAssignment data, so an SE teacher's "My Students" roster
 // (mtssStudentController.js's applyViewerScope) is exactly who Central
 // says they support - not a class or grade, since an SE teacher's
@@ -58,7 +58,7 @@ async function syncStudentSupportAssignments() {
         : [];
     const studentIdByEmail = new Map(students.map((student) => [normalizeEmail(student.email), student._id]));
 
-    const users = await User.find({ email: { $exists: true, $ne: '' } }).select('email supportedStudentIds');
+    const users = await Person.find({ personType: 'employee', isActive: true, email: { $exists: true, $ne: '' } }).select('email supportedStudentIds');
 
     let updated = 0;
     for (const user of users) {
@@ -71,7 +71,7 @@ async function syncStudentSupportAssignments() {
 
         if (sameIds(user.supportedStudentIds || [], nextIds)) continue;
 
-        await User.findByIdAndUpdate(user._id, { supportedStudentIds: nextIds }, { runValidators: true });
+        await Person.findByIdAndUpdate(user._id, { supportedStudentIds: nextIds }, { runValidators: true });
         updated += 1;
         winston.info(`studentSupportAssignmentSync: updated ${user.email} - ${nextIds.length} student(s)`);
     }

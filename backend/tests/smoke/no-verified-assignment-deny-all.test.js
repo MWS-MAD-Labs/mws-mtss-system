@@ -15,7 +15,8 @@ const { applyViewerScope } = require('../../src/controllers/mtssStudentControlle
 describe('applyViewerScope - known teaching unit but no verified Central assignment', () => {
     test('a Junior High "teacher" with no classes gets denied, not the whole unit', () => {
         const viewer = {
-            role: 'teacher',
+            permissions: ['mtss.read'],
+            mtssScope: { mode: 'assigned' },
             unit: 'Junior High',
             jobPosition: 'Homeroom Teacher',
             classes: [],
@@ -30,7 +31,8 @@ describe('applyViewerScope - known teaching unit but no verified Central assignm
 
     test('an Elementary "teacher" with no classes gets denied too', () => {
         const viewer = {
-            role: 'teacher',
+            permissions: ['mtss.read'],
+            mtssScope: { mode: 'assigned' },
             unit: 'Elementary',
             jobPosition: 'Homeroom Teacher',
             classes: [],
@@ -44,7 +46,8 @@ describe('applyViewerScope - known teaching unit but no verified Central assignm
 
     test('the same Junior High teacher, once Central sync populates a real class, gets scoped normally', () => {
         const viewer = {
-            role: 'teacher',
+            permissions: ['mtss.read'],
+            mtssScope: { mode: 'assigned' },
             unit: 'Junior High',
             jobPosition: 'Homeroom Teacher',
             classes: [{ grade: 'Grade 7', className: 'Grade 7 - Huangshan' }],

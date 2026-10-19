@@ -1,8 +1,8 @@
 const winston = require('winston');
-const User = require('../models/User');
+const Person = require('../models/Person');
 const { listClassTeacherAssignments } = require('../services/mwsDataCenterClient');
 
-// Keeps User.classes in sync with Central's real ClassTeacherAssignment
+// Keeps Person.classes in sync with Central's real ClassTeacherAssignment
 // data, so the teacher dashboard's roster scoping (see
 // frontend teacherSegmentUtils.js) filters by real class names Central
 // actually uses (e.g. "K1") instead of drifting/fictional ones. Central is
@@ -67,14 +67,14 @@ async function syncTeacherClassAssignments() {
         });
     });
 
-    const users = await User.find({ email: { $exists: true, $ne: '' } }).select('email classes');
+    const users = await Person.find({ personType: 'employee', isActive: true, email: { $exists: true, $ne: '' } }).select('email classes');
 
     let updated = 0;
     for (const user of users) {
         const nextClasses = classesByEmail.get(normalizeEmail(user.email)) || [];
         if (sameClasses(user.classes || [], nextClasses)) continue;
 
-        await User.findByIdAndUpdate(user._id, { classes: nextClasses }, { runValidators: true });
+        await Person.findByIdAndUpdate(user._id, { classes: nextClasses }, { runValidators: true });
         updated += 1;
         winston.info(`teacherClassAssignmentSync: updated ${user.email} - ${nextClasses.length} class(es)`);
     }

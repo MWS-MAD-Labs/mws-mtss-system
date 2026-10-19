@@ -28,7 +28,7 @@ const interventionHistorySchema = new mongoose.Schema({
     },
     assignedMentor: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     },
     strategies: [{
         type: String,
@@ -40,7 +40,7 @@ const interventionHistorySchema = new mongoose.Schema({
     },
     updatedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     }
 }, { _id: false });
 
@@ -70,7 +70,7 @@ const interventionSchema = new mongoose.Schema({
     },
     assignedMentor: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     },
     updatedAt: {
         type: Date,
@@ -78,7 +78,7 @@ const interventionSchema = new mongoose.Schema({
     },
     updatedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     },
     history: [interventionHistorySchema]
 }, { _id: false });
@@ -113,7 +113,7 @@ const kindergartenMoodCheckInSchema = new mongoose.Schema({
     },
     submittedByUserId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     }
 }, { _id: true });
 
@@ -139,7 +139,7 @@ const kindergartenHomeObservationSchema = new mongoose.Schema({
     },
     submittedByUserId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     }
 }, { _id: true });
 

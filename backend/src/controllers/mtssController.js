@@ -2,7 +2,7 @@ const MTSSTier = require('../models/MTSSTier');
 const MTSSStrategy = require('../models/MTSSStrategy');
 const { sendSuccess, sendError } = require('../utils/response');
 const MentorAssignment = require('../models/MentorAssignment');
-const User = require('../models/User');
+const Person = require('../models/Person');
 const MTSSStudent = require('../models/MTSSStudent');
 const mongoose = require('mongoose');
 const openRouterChat = require('../config/openRouterChat');
@@ -28,7 +28,9 @@ const {
     buildMentorSubjectCoverageRows,
     getMentorAssignmentFocusLabels
 } = require('../utils/mentorAssignmentPairingUtils');
-const { MTSS_NATIVE_TEACHER_ROLES } = require('../utils/accessControl');
+const { PERMISSIONS } = require('../constants/permissions');
+const { SCOPE_MODE, has, resolveMtssScope } = require('../utils/accessScope');
+const { mentorFilter, canBeMentor } = require('../utils/mentorEligibility');
 
 const TIER_ORDER = {
     tier1: 1,
@@ -44,13 +46,6 @@ const TYPE_ALIAS_MAP = {
     indonesian: ['indonesian', 'bahasa indonesia', 'bahasa', 'bi', 'indonesian language'],
     universal: ['universal', 'all', 'whole school', 'schoolwide']
 };
-// Derived from accessControl.js's canonical MTSS_NATIVE_TEACHER_ROLES
-// (teacher, se_teacher, staff, support_staff, counselor) plus the
-// leadership roles who can also mentor - a hand-duplicated list here had
-// drifted and silently excluded se_teacher/counselor, so a role that
-// legitimately has MTSS access still got "Selected mentor is not eligible
-// for assignments" trying to assign themselves as a mentor.
-const MTSS_MENTOR_ROLES = [...MTSS_NATIVE_TEACHER_ROLES, 'head_unit', 'admin', 'directorate'];
 const DUPLICATE_BLOCKING_STATUSES = ['active', 'paused'];
 const PROGRESSABLE_ASSIGNMENT_STATUSES = new Set(['active', 'paused']);
 const PLAN_EDITABLE_FIELDS = new Set([
@@ -300,13 +295,21 @@ const isAssignmentInViewerTeachingScope = ({ viewer = {}, assignment = {}, stude
     });
 };
 
+const isMTSSAdmin = (viewer) => has(viewer, PERMISSIONS.MTSS_ADMIN);
+
+// A mentor loaded from the database, shaped like a request user so the same scope rules apply.
+const asScopedPerson = (person = {}) => {
+    const permissions = person.centralEntitlementPermissions || person.permissions || [];
+    const withPermissions = { ...person, permissions };
+    return { ...withPermissions, mtssScope: resolveMtssScope(withPermissions) };
+};
+
 // The only people who can actually change an intervention: whoever
-// created it, the mentor it's assigned to, or an MTSS admin role
-// (admin/superadmin/directorate/head_unit). No one else - not a
+// created it, the mentor it's assigned to, or someone holding mtss.admin. No one else - not a
 // same-class homeroom teacher, not another subject teacher - regardless
 // of whether they can see it on their own dashboard.
 const isAssignmentOwnerOrAdmin = ({ viewer = {}, assignment = {} }) => {
-    if (isMTSSAdminRole(viewer?.role)) return true;
+    if (isMTSSAdmin(viewer)) return true;
     const viewerId = resolveActorId(viewer?.id || viewer?._id || viewer);
     if (!viewerId) return false;
 
@@ -319,7 +322,7 @@ const isAssignmentOwnerOrAdmin = ({ viewer = {}, assignment = {} }) => {
 };
 
 const canViewerSeeAssignment = ({ viewer = {}, assignment = {}, students = [] }) => {
-    if (isMTSSAdminRole(viewer?.role)) return true;
+    if (isMTSSAdmin(viewer)) return true;
     const viewerId = resolveActorId(viewer?.id || viewer?._id || viewer);
     const mentorId = resolveActorId(assignment?.mentorId);
     const creatorId = resolveActorId(assignment?.createdBy);
@@ -369,10 +372,9 @@ const buildKindergartenAnalyticsScope = (req = {}) => {
     let gradeFilters = Array.from(new Set([...queryGrades, ...unitGrades].map((entry) => normalizeGradeLabel(entry)).filter(Boolean)));
     let classFilters = Array.from(new Set(queryClasses.map((entry) => normalizeClassLabel(entry)).filter(Boolean)));
 
-    // Scoped leaders (head_unit) inherit their grade/class scope when filters are absent.
-    if (req.user?.role === 'head_unit' && !gradeFilters.length && !classFilters.length) {
-        gradeFilters = deriveAllowedGradesForUser(req.user);
-        classFilters = deriveAllowedClassNamesForUser(req.user);
+    // Unit-scoped viewers inherit their unit's grades when filters are absent.
+    if (req.user?.mtssScope?.mode === SCOPE_MODE.UNIT && !gradeFilters.length && !classFilters.length) {
+        gradeFilters = deriveGradesForUnit(req.user.mtssScope.unit);
     }
 
     const gradeClauses = buildGradeFilterClauses(gradeFilters);
@@ -592,7 +594,7 @@ const hydrateAssignmentStudents = async (assignmentList = []) => {
 
     const missingIds = ids.filter((id) => !studentMap.has(id));
     if (missingIds.length) {
-        const legacyUsers = await User.find({ _id: { $in: missingIds } })
+        const legacyUsers = await Person.find({ _id: { $in: missingIds } })
             .select('name email unit classes username gender isActive')
             .lean();
         legacyUsers.forEach((user) => {
@@ -852,18 +854,18 @@ const deleteStrategy = async (req, res) => {
 };
 
 const ensureMentorEligibility = async (mentorId) => {
-    const mentor = await User.findById(mentorId).select('role name isActive');
+    const mentor = await Person.findById(mentorId).select('name personType isActive centralStatus centralEntitlementPermissions');
 
     if (!mentor) {
         throw new Error('Mentor not found');
     }
 
-    if (!MTSS_MENTOR_ROLES.includes(mentor.role)) {
-        throw new Error('Selected mentor is not eligible for assignments');
-    }
-
     if (!mentor.isActive) {
         throw new Error('Mentor is not active');
+    }
+
+    if (!canBeMentor(mentor)) {
+        throw new Error('Selected mentor is not eligible for assignments');
     }
 
     return mentor;
@@ -894,26 +896,32 @@ const ensureStudentsValid = async (studentIds) => {
 // comment in applyViewerScope for why grade/unit-wide scoping doesn't
 // belong here at all.
 const ensureStudentsWithinViewerScope = async (studentIds = [], viewer = {}) => {
-    if (!studentIds.length || isMTSSAdminRole(viewer?.role)) return;
+    const scope = viewer?.mtssScope || { mode: SCOPE_MODE.NONE };
+    if (!studentIds.length || scope.mode === SCOPE_MODE.ALL) return;
 
     const uniqueStudentIds = Array.from(new Set(studentIds.map((id) => id?.toString?.() || String(id)).filter(Boolean)));
 
     let scopeFilter;
-    if (viewer.role === 'se_teacher') {
+    if (scope.mode === SCOPE_MODE.UNIT) {
+        const gradeClauses = buildGradeFilterClauses(deriveGradesForUnit(scope.unit));
+        if (!gradeClauses.length) {
+            throw new Error('Your account has no MTSS unit access configured.');
+        }
+        scopeFilter = { _id: { $in: uniqueStudentIds }, $and: [{ $or: gradeClauses }] };
+    } else if (scope.mode === SCOPE_MODE.ASSIGNED) {
         const supportedIds = Array.isArray(viewer.supportedStudentIds)
             ? viewer.supportedStudentIds.filter(Boolean)
             : [];
-        if (!supportedIds.length) {
+        const classClauses = buildClassFilterClauses(deriveAllowedClassNamesForUser(viewer));
+        const alternatives = [];
+        if (supportedIds.length) alternatives.push({ _id: { $in: supportedIds } });
+        if (classClauses.length) alternatives.push({ $or: classClauses });
+        if (!alternatives.length) {
             throw new Error('Your account has no MTSS student access configured.');
         }
-        scopeFilter = { _id: { $in: uniqueStudentIds }, $and: [{ _id: { $in: supportedIds } }] };
+        scopeFilter = { _id: { $in: uniqueStudentIds }, $and: [{ $or: alternatives }] };
     } else {
-        const allowedClasses = deriveAllowedClassNamesForUser(viewer);
-        const classClauses = buildClassFilterClauses(allowedClasses);
-        if (!classClauses.length) {
-            throw new Error('Your account has no MTSS class access configured.');
-        }
-        scopeFilter = { _id: { $in: uniqueStudentIds }, $and: [{ $or: classClauses }] };
+        throw new Error('Your account has no MTSS student access configured.');
     }
 
     const accessibleCount = await MTSSStudent.countDocuments(scopeFilter);
@@ -1256,7 +1264,7 @@ const createMentorAssignment = async (req, res) => {
         }
 
         // Check if user is admin or assigning themselves
-        const isAdmin = isMTSSAdminRole(req.user?.role);
+        const isAdmin = isMTSSAdmin(req.user);
         const viewerId = req.user?.id?.toString?.() || req.user?._id?.toString?.();
         const requestedMentorId = mentorId?.toString?.();
 
@@ -1363,13 +1371,12 @@ const createMentorAssignment = async (req, res) => {
     }
 };
 
-const isMTSSAdminRole = (role) => ['admin', 'superadmin', 'directorate', 'head_unit'].includes(role);
 
 const getMentorAssignments = async (req, res) => {
     try {
         const { mentorId, studentId, status, tier } = req.query;
         const filter = {};
-        const isAdmin = isMTSSAdminRole(req.user.role);
+        const isAdmin = isMTSSAdmin(req.user);
         if (mentorId) filter.mentorId = mentorId;
         if (studentId) filter.studentIds = studentId;
         if (status) filter.status = status;
@@ -1409,17 +1416,21 @@ const getMentorAssignments = async (req, res) => {
 // caller below treats them differently (never flag the former, that's just
 // noise).
 const mentorScopeCoversStudents = (mentor = {}, students = []) => {
-    if (mentor.role === 'se_teacher') {
-        const supportedIds = Array.isArray(mentor.supportedStudentIds)
-            ? mentor.supportedStudentIds.map(String)
-            : [];
-        if (!supportedIds.length) return null;
-        return students.every((student) => supportedIds.includes(String(student._id)));
+    const scoped = asScopedPerson(mentor);
+    const mode = scoped.mtssScope.mode;
+    if (mode === SCOPE_MODE.ALL) return null;
+    if (mode === SCOPE_MODE.UNIT) {
+        const unitGrades = deriveGradesForUnit(scoped.mtssScope.unit);
+        if (!unitGrades.length) return null;
+        return students.every((student) =>
+            unitGrades.map(normalizeGradeLabel).includes(normalizeGradeLabel(student.currentGrade || student.grade || '')));
     }
+    const supportedIds = Array.isArray(mentor.supportedStudentIds) ? mentor.supportedStudentIds.map(String) : [];
     const allowedClasses = deriveAllowedClassNamesForUser(mentor);
-    if (!allowedClasses.length) return null;
+    if (!supportedIds.length && !allowedClasses.length) return null;
     return students.every((student) =>
-        classNameMatchesAllowed(student.className || student.class || '', allowedClasses));
+        supportedIds.includes(String(student._id))
+        || classNameMatchesAllowed(student.className || student.class || '', allowedClasses));
 };
 
 // Admin-only: every active/paused assignment whose mentor's CURRENT
@@ -1440,10 +1451,8 @@ const getAssignmentsNeedingReassignment = async (req, res) => {
         // Candidate pool for the "reassign to" suggestions below - every
         // active mentor-eligible user, not just the ones already carrying
         // an assignment.
-        const candidateMentors = await User.find({
-            role: { $in: MTSS_MENTOR_ROLES },
-            isActive: true,
-        }).select('name role unit jobPosition classes supportedStudentIds').lean();
+        const candidateMentors = await Person.find(mentorFilter())
+            .select('name unit jobPosition classes supportedStudentIds centralEntitlementPermissions').lean();
 
         const flagged = hydrated
             .filter((assignment) => assignment.mentorId?._id)
@@ -1550,7 +1559,7 @@ const updateMentorAssignment = async (req, res) => {
             return sendError(res, 'Mentor assignment not found', 404);
         }
 
-        const isAdmin = isMTSSAdminRole(req.user.role);
+        const isAdmin = isMTSSAdmin(req.user);
         const viewerId = req.user.id?.toString?.();
         const isAssignedMentor = assignment.mentorId?.toString() === viewerId;
         const isCreator = assignment.createdBy?.toString?.() === viewerId;
@@ -1659,7 +1668,7 @@ const updateMentorAssignment = async (req, res) => {
                 return sendError(res, 'Only an MTSS admin can reassign this intervention to a different mentor', 403);
             }
             const [oldMentor, newMentor] = await Promise.all([
-                User.findById(assignment.mentorId).select('name'),
+                Person.findById(assignment.mentorId).select('name'),
                 ensureMentorEligibility(req.body.mentorId),
             ]);
             logChange('mentorId', 'Mentor', oldMentor?.name || 'Unassigned', newMentor.name);
@@ -1841,10 +1850,7 @@ const listMentors = async (req, res) => {
     try {
         const { search, unit } = req.query;
         const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
-        const filter = {
-            role: { $in: MTSS_MENTOR_ROLES },
-            isActive: true
-        };
+        const filter = mentorFilter();
 
         if (search) {
             const regex = new RegExp(search.trim(), 'i');
@@ -1860,13 +1866,13 @@ const listMentors = async (req, res) => {
             filter.unit = unit;
         }
 
-        let mentors = await User.find(filter)
-            .select('name email username role jobPosition unit gender classes')
+        let mentors = await Person.find(filter)
+            .select('name email username jobPosition unit gender classes supportedStudentIds centralEntitlementPermissions')
             .sort({ name: 1 })
             .limit(limit)
             .lean();
 
-        const viewerIsScopedLeader = ['head_unit', 'teacher', 'se_teacher'].includes(req.user?.role);
+        const viewerIsScopedLeader = req.user?.mtssScope?.mode === SCOPE_MODE.UNIT || req.user?.mtssScope?.mode === SCOPE_MODE.ASSIGNED;
         if (viewerIsScopedLeader && !unit) {
             const allowedGrades = deriveAllowedGradesForUser(req.user);
             const allowedClasses = deriveAllowedClassNamesForUser(req.user);

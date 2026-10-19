@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 const MTSSStudent = require('../models/MTSSStudent');
 const MentorAssignment = require('../models/MentorAssignment');
 const { calculateDirectionalProgress } = require('../utils/mtssIntervention');
-const User = require('../models/User');
+const Person = require('../models/Person');
+const { SCOPE_MODE, isStudent } = require('../utils/accessScope');
+const { mentorFilter } = require('../utils/mentorEligibility');
 const { sendSuccess, sendError } = require('../utils/response');
 const {
     summarizeAssignmentsForStudents,
@@ -61,8 +63,6 @@ const normalizeGender = (gender) => {
 
 const TIER_CODES = ['tier1', 'tier2', 'tier3'];
 const STATUS_SET = new Set(INTERVENTION_STATUSES);
-const PRIVILEGED_ROLES = new Set(['admin', 'superadmin', 'directorate']);
-const UNIT_LEVEL_ROLES = new Set(['head_unit']); // Principals who see all students in their unit
 const INTERVENTION_TYPE_META = new Map(INTERVENTION_TYPES.map((entry) => [entry.key, entry]));
 const FOCUS_TYPE_MATCHERS = [
     { key: 'ATTENDANCE', pattern: /attendance|absen|present|presence/i },
@@ -239,14 +239,18 @@ const sanitizeStudentPayload = (payload = {}) => {
     return sanitized;
 };
 
+// Which students one viewer may see. The permission to read MTSS gates the route, the scope permissions decide how
+// many students are in view (see utils/accessScope.js): everybody, their unit, or only the students Central
+// assigned to them (the classes they teach and the students they support). A viewer without a verified assignment
+// gets zero students, never a fallback to something broader.
 const applyViewerScope = (filter = {}, viewer = {}) => {
-    // Directorate, admin, superadmin see all students
-    if (!viewer || PRIVILEGED_ROLES.has(viewer.role)) {
+    // A call with nobody behind it is the system itself.
+    if (!viewer) {
         return filter;
     }
 
     // Students can only access their own MTSS student record by identity fields.
-    if (viewer.role === 'student') {
+    if (isStudent(viewer)) {
         const clauses = [];
         if (viewer.email) clauses.push({ email: toExactRegex(viewer.email) });
         if (viewer.username) clauses.push({ username: toExactRegex(viewer.username) });
@@ -263,80 +267,52 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
         return filter;
     }
 
-    // Head Unit / Principal see all students in their unit
-    if (UNIT_LEVEL_ROLES.has(viewer.role)) {
-        const unitGrades = deriveGradesForUnit(viewer.unit || '');
-        if (unitGrades.length) {
-            const gradeClauses = buildGradeFilterClauses(unitGrades);
-            if (gradeClauses.length) {
-                filter.$and = filter.$and || [];
-                filter.$and.push({ $or: gradeClauses });
-            }
+    const scope = viewer.mtssScope || { mode: SCOPE_MODE.NONE };
+    filter.$and = filter.$and || [];
+
+    if (scope.mode === SCOPE_MODE.ALL) {
+        return filter;
+    }
+
+    // Everyone in their unit.
+    if (scope.mode === SCOPE_MODE.UNIT) {
+        const unitGrades = deriveGradesForUnit(scope.unit || viewer.unit || '');
+        const gradeClauses = unitGrades.length ? buildGradeFilterClauses(unitGrades) : [];
+        if (gradeClauses.length) {
+            filter.$and.push({ $or: gradeClauses });
+        } else {
+            // A unit that matches no grade shows nobody, not the whole school.
+            filter.$and.push({ _id: null });
         }
         return filter;
     }
 
-    // SE teachers relate to students directly (StudentSupportAssignment in
-    // Central), not through a class roster - studentSupportAssignmentSync.js
-    // keeps supportedStudentIds authoritatively in sync with Central every
-    // 15 minutes, same cadence/posture as teacherClassAssignmentSync.js for
-    // classes[] below. No verified assignment at all means zero students,
-    // not a fallback to anything broader.
-    if (viewer.role === 'se_teacher') {
+    if (scope.mode === SCOPE_MODE.ASSIGNED) {
+        // Students supported directly (StudentSupportAssignment in Central, kept in supportedStudentIds by
+        // studentSupportAssignmentSync.js) and the classes taught (ClassTeacherAssignment, kept in classes[] by
+        // teacherClassAssignmentSync.js, matched by real class name and never widened to a grade or unit).
         const supportedIds = Array.isArray(viewer.supportedStudentIds)
             ? viewer.supportedStudentIds.filter(Boolean)
             : [];
-        filter.$and = filter.$and || [];
+        const classClauses = buildClassFilterClauses(deriveAllowedClassNamesForUser(viewer));
+        const alternatives = [];
         if (supportedIds.length) {
-            filter.$and.push({ _id: { $in: supportedIds } });
+            alternatives.push({ _id: { $in: supportedIds } });
+        }
+        if (classClauses.length) {
+            // A student with no current class assigned yet in Central isn't on anyone's class roster.
+            alternatives.push({ $and: [{ $or: classClauses }, { className: { $exists: true, $nin: [null, ''] } }] });
+        }
+        if (alternatives.length) {
+            filter.$and.push({ $or: alternatives });
         } else {
             filter.$and.push({ _id: null });
         }
         return filter;
     }
 
-    // Homeroom, supporting homeroom, and subject teachers all get exactly
-    // the classes Central's own ClassTeacherAssignment says they teach -
-    // matched by real class name, not expanded to a whole grade or unit.
-    // This is deliberately uniform across every unit (Junior High included)
-    // - Central is the single source of truth for "who teaches what", so
-    // MTSS doesn't get to widen that on its own. A mixed-age room (see
-    // ClassAdditionalGrade, scoped to Kindergarten today) still works here
-    // with no separate grade handling: teacherClassAssignmentSync.js pushes
-    // one classes[] entry per grade the room holds, all sharing the same
-    // className, so matching by className alone already covers every grade
-    // physically in that room.
-    //
-    // deriveAllowedClassNamesForUser reads classes[], which
-    // teacherClassAssignmentSync.js keeps authoritatively in sync with
-    // Central every 15 minutes (always overwritten, including back to []
-    // for a teacher Central no longer shows any active assignment for) - a
-    // viewer with no verified assignment at all gets zero students, the
-    // same deny-all as the "can't identify this viewer" case above, not a
-    // fallback to their whole unit.
-    const allowedClasses = deriveAllowedClassNamesForUser(viewer);
-    const classClauses = buildClassFilterClauses(allowedClasses);
-
-    filter.$and = filter.$and || [];
-    if (classClauses.length) {
-        filter.$and.push({ $or: classClauses });
-        // A student with no current class assigned yet in Central isn't
-        // really "on anyone's roster" - excluding them here (rather than
-        // in the base filter, which head_unit/student/SE branches above
-        // don't need) keeps them out of every homeroom/subject-teacher
-        // view without hiding them from an admin/directorate-facing "all
-        // students" surface that might want exactly that population.
-        filter.$and.push({ className: { $exists: true, $nin: [null, ''] } });
-    } else {
-        // No derivable class scope for this viewer (e.g. a non-teaching
-        // employee whose account somehow reached the teacher dashboard, or
-        // a genuine teacher Central shows no active assignment for at
-        // all). Explicit deny-all, same fallback as the student branch
-        // above, instead of silently skipping the filter and returning
-        // every student in the system.
-        filter.$and.push({ _id: null });
-    }
-
+    // No scope at all (not allowed to read MTSS): deny.
+    filter.$and.push({ _id: null });
     return filter;
 };
 
@@ -468,7 +444,7 @@ const deriveUnitFromGrade = (grade = '') => {
     return undefined;
 };
 
-const mentorRoleFilter = { role: { $in: ['teacher', 'se_teacher', 'head_unit'] }, isActive: true };
+const mentorRoleFilter = mentorFilter();
 const SUBJECT_EXCLUSION_PATTERNS = [/math/i, /mathematics/i, /english/i];
 
 const shouldExcludeMentor = (mentor = {}) => {
@@ -486,7 +462,7 @@ const loadMentorsByGrade = async (grades = []) => {
             if (!grade) return null;
             // Only find mentors who are specifically assigned to this grade
             // Don't include all teachers from the same unit
-            const mentors = await User.find({
+            const mentors = await Person.find({
                 ...mentorRoleFilter,
                 $or: [
                     { 'classes.grade': grade },
@@ -531,7 +507,7 @@ const loadMentorsByGradeAndClass = async (grade = '', className = '') => {
         ? className.split('-').pop().trim()
         : className;
 
-    const mentors = await User.find({
+    const mentors = await Person.find({
         ...mentorRoleFilter
     })
         .select('name email username gender jobPosition unit classes')
@@ -570,7 +546,7 @@ const loadMentorsByClassKeys = async (classKeys = []) => {
     if (!classKeys.length) return cache;
 
     // Fetch all potential mentors once
-    const allMentors = await User.find({
+    const allMentors = await Person.find({
         ...mentorRoleFilter
     })
         .select('name email username gender jobPosition unit classes')
@@ -821,7 +797,7 @@ const listStudents = async (req, res) => {
         const skip = (page - 1) * limit;
 
         // Determine if user is privileged (can use query params for grade/class filtering)
-        const isPrivileged = !req.user || PRIVILEGED_ROLES.has(req.user.role);
+        const isPrivileged = !req.user || req.user.mtssScope?.mode === SCOPE_MODE.ALL;
         const skipGradeClassFilter = !isPrivileged;
 
         // Build base filter (privileged users can filter by grade/class from query params)
@@ -1159,7 +1135,7 @@ const submitKindergartenMoodCheckin = async (req, res) => {
             return sendError(res, 'Mood check-in is only available for Kindergarten records', 400);
         }
 
-        const fallbackSource = req.user?.role === 'student' ? 'student' : 'parent_proxy';
+        const fallbackSource = isStudent(req.user) ? 'student' : 'parent_proxy';
         const resolvedSource = sanitizeSubmissionSource(source, fallbackSource);
         const now = new Date();
         const todayKey = toDateKey(now);
@@ -1248,7 +1224,7 @@ const submitKindergartenHomeObservation = async (req, res) => {
             return sendError(res, 'Observation note is required', 400);
         }
 
-        const fallbackSource = req.user?.role === 'student' ? 'student' : 'parent_proxy';
+        const fallbackSource = isStudent(req.user) ? 'student' : 'parent_proxy';
         const resolvedSource = sanitizeSubmissionSource(source, fallbackSource);
         const observations = toSafeArray(student.kindergartenHomeObservations);
         observations.push({

@@ -10,6 +10,7 @@ const aiChatRoutes = require('./aiChat');
 const aiInsightRoutes = require('./aiInsights');
 const devTopologyRoutes = require('./devTopology');
 const syncRoutes = require('./sync');
+const configRoutes = require('./config');
 
 // Feature 2 (Slack support-request confirmation) disabled 2026-09-07: the
 // only action_id this route ever handled was 'mark_handled', which reads
@@ -174,6 +175,7 @@ router.use('/v1/ai-chat', aiChatRoutes);
 router.use('/v1/ai-insights', aiInsightRoutes);
 router.use('/v1/dev/topology', devTopologyRoutes);
 router.use('/v1/sync', syncRoutes);
+router.use('/v1/config', configRoutes);
 
 // OAuth routes are now mounted directly in app.js
 // router.use('/auth', authRoutes);

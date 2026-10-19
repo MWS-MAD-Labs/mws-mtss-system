@@ -30,7 +30,7 @@ const messageSchema = new mongoose.Schema({
 const aiConversationSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: true,
         index: true
     },

@@ -1,7 +1,8 @@
 const MTSSPilotFeedbackSession = require('../models/MTSSPilotFeedbackSession');
 const { sendSuccess, sendError } = require('../utils/response');
 const { emitPilotFeedbackSessionUpdated } = require('../services/mtssRealtimeService');
-const { isPilotFeedbackAdmin } = require('../utils/pilotFeedbackAccess');
+const { PERMISSIONS } = require('../constants/permissions');
+const { has } = require('../utils/accessScope');
 
 const COMPLETION_STATUSES = new Set(['yes', 'partial', 'no']);
 const BUG_SEVERITIES = new Set(['low', 'medium', 'high']);
@@ -206,7 +207,7 @@ const buildSessionStats = (sessions = []) => {
     };
 };
 
-const isPilotFeedbackAdminUser = (user = {}) => isPilotFeedbackAdmin(user?.email);
+const isPilotFeedbackAdminUser = (user = {}) => has(user, PERMISSIONS.MTSS_ADMIN);
 
 const buildDerivedMetrics = ({ stepFeedback = [], completedSteps = {}, finalFeedbackSavedAt = null }) => {
     const stepCount = stepFeedback.length;

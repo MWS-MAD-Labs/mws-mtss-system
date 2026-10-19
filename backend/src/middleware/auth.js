@@ -1,127 +1,85 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const UserStudent = require('../models/UserStudent');
+const Person = require('../models/Person');
 const { sendError } = require('../utils/response');
-const { COOKIE_NAME } = require('../utils/authCookie');
-const {
-    buildDashboardAccessProfile,
-    buildMtssAccessProfile,
-    hasMtssAccess,
-    hasMtssAdminAccess,
-    hasMtssWriteAccess
-} = require('../utils/accessControl');
+const { hubSession } = require('../utils/hubSession');
+const { resolveSessionUser } = require('../utils/hubSessionUser');
+const { resolveMtssScope } = require('../utils/accessScope');
+const { actorKind } = require('../utils/actorKind');
+const { PERMISSIONS } = require('../constants/permissions');
+const { CENTRAL_STATUS } = require('../constants/person');
+const { requirePermission, requireAnyPermission } = require('./permissionGuard');
 
-const buildRequestUser = (user) => {
-    const dashboardAccess = buildDashboardAccessProfile(user);
-    const mtssAccess = buildMtssAccessProfile(user);
-
-    return {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        username: user.username,
-        department: user.department,
-        jobLevel: user.jobLevel,
-        unit: user.unit,
-        jobPosition: user.jobPosition,
-        googleId: user.googleId,
-        classes: user.classes || [],
-        // Read by applyViewerScope/ensureStudentsWithinViewerScope for
-        // se_teacher's per-student scoping (see mtssAccess.js) - without
-        // this, every request saw an empty array here regardless of what
-        // studentSupportAssignmentSync.js had actually synced onto the
-        // stored User document, and se_teacher's roster/write-guard denied
-        // everyone.
-        supportedStudentIds: user.supportedStudentIds || [],
-        currentGrade: user.currentGrade,
-        className: user.className,
-        nickname: user.nickname,
-        gender: user.gender || '',
-        joinAcademicYear: user.joinAcademicYear,
-        reportsTo: user.reportsTo,
-        subordinates: user.subordinates || [],
-        dashboardRole: dashboardAccess.effectiveRole,
-        dashboardAccess,
-        mtssRole: mtssAccess.effectiveRole,
-        mtssAccess
+// What the rest of the code sees of the person behind a request. `permissions` is what Central allows here and is
+// the only thing a route or a data scope asks. `role` is a label (see utils/actorKind.js) for screens and the
+// assistant, never an access check.
+const buildRequestUser = (person) => {
+    const user = {
+        id: person._id,
+        centralPersonId: person.centralPersonId,
+        personType: person.personType,
+        email: person.email,
+        name: person.name,
+        username: person.username,
+        nickname: person.nickname,
+        gender: person.gender || '',
+        employeeId: person.employeeId,
+        department: person.department,
+        unit: person.unit,
+        jobLevel: person.jobLevel,
+        jobPosition: person.jobPosition,
+        isTeachingRole: Boolean(person.isTeachingRole),
+        classes: person.classes || [],
+        // Read by applyViewerScope for the students a special education teacher supports.
+        supportedStudentIds: person.supportedStudentIds || [],
+        currentGrade: person.currentGrade,
+        className: person.className,
+        joinAcademicYear: person.joinAcademicYear,
+        reportsTo: person.reportsTo,
+        subordinates: person.subordinates || [],
+        permissions: person.centralEntitlementPermissions || [],
+        entitlementRole: person.centralEntitlementRole || null,
+        entitlementId: person.centralEntitlementId || null,
+        entitlementVersion: person.centralEntitlementVersion ?? null,
+        entitlementOrganizationId: person.centralEntitlementOrganizationId || null,
     };
-};
-
-const resolveUserByRoleAndId = async (role, userId) => {
-    let user = null;
-    if (role === 'student') {
-        user = await UserStudent.findById(userId);
-    }
-    if (!user) {
-        user = await User.findById(userId);
-    }
+    user.role = actorKind(user);
+    user.mtssScope = resolveMtssScope(user);
     return user;
 };
 
-// JWT Authentication Middleware
+// Who is making the request: the Hub's access token (a cookie on the parent domain) says who they are, and Central
+// says what they may do in this app. See utils/hubSession.js and utils/hubSessionUser.js.
 const authenticate = async (req, res, next) => {
     try {
-        // Cookie first - the browser's own session, now that the token
-        // lives in an httpOnly cookie instead of localStorage (see
-        // utils/authCookie.js). The Authorization header stays supported
-        // for non-browser callers, like the daily-checkin AI-chat proxy's
-        // own outbound service token.
-        const authHeader = req.headers.authorization;
-        const cookieToken = req.cookies?.[COOKIE_NAME];
-
-        let token;
-        if (cookieToken) {
-            token = cookieToken;
-        } else if (authHeader && authHeader.startsWith('Bearer ')) {
-            token = authHeader.substring(7);
-        } else {
-            return sendError(res, 'Access token required', 401);
+        const claims = await hubSession().fromCookieHeader(req.headers.cookie);
+        if (!claims) {
+            return sendError(res, 'Authentication required', 401);
         }
 
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-        // Check if user exists and is active
-        const user = await resolveUserByRoleAndId(decoded.role, decoded.userId);
-        if (!user || !user.isActive) {
-            return sendError(res, 'User not found or inactive', 401);
+        const person = await resolveSessionUser(claims);
+        if (!person) {
+            return sendError(res, 'No access to MTSS', 403);
+        }
+        if (!person.isActive) {
+            return sendError(res, 'Account is deactivated', 403);
         }
 
-        // A token minted before this field existed has no sessionVersion
-        // claim at all - treat that as 0 rather than rejecting every
-        // already-issued session the moment this deploys. Mismatch means
-        // Hub's back-channel logout (routes/auth.js's /auth/revoke-session)
-        // bumped the stored value since this token was signed.
-        if ((decoded.sessionVersion || 0) !== (user.sessionVersion || 0)) {
-            return sendError(res, 'Session has been revoked', 401);
-        }
-
-        // Attach user to request object
-        req.user = buildRequestUser(user);
-
+        req.user = buildRequestUser(person);
+        req.hubClaims = claims;
         next();
     } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return sendError(res, 'Token expired', 401);
-        } else if (error.name === 'JsonWebTokenError') {
-            return sendError(res, 'Invalid token', 401);
-        }
-
-        console.error('Auth middleware error:', error);
-        return sendError(res, 'Authentication failed', 500);
+        console.error('Authentication error:', error.message);
+        return sendError(res, 'Could not verify your access. Try again shortly.', 503);
     }
 };
 
 // Service-to-service authentication for the daily-checkin AI-chat proxy.
 // daily-checkin and MTSS have separate MongoDBs (split 2026-09-08), so a
-// user's ObjectId in one is meaningless in the other - the regular
-// authenticate() above (User.findById(decoded.userId)) can't be reused for
-// a request forwarded from daily-checkin's backend. This verifies a
-// short-lived token signed with a dedicated shared secret (never the
-// user-facing JWT_SECRET) carrying only an email claim, and resolves the
-// real MTSS user by email instead - the one identifier that's guaranteed
-// to mean the same person in both databases.
+// person's ObjectId in one is meaningless in the other. This verifies a
+// short-lived token signed with a dedicated shared secret (never a user
+// session) carrying only an email claim, and resolves the real MTSS person by
+// email instead - the one identifier that means the same person in both
+// databases. The person still needs the access Central gave them here.
 const authenticateServiceRelay = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -142,12 +100,12 @@ const authenticateServiceRelay = async (req, res, next) => {
             return sendError(res, 'Invalid service token', 401);
         }
 
-        const user = await User.findOne({ email: decoded.email });
-        if (!user || !user.isActive) {
+        const person = await Person.findOne({ email: String(decoded.email).trim().toLowerCase() });
+        if (!person || !person.isActive || person.centralStatus !== CENTRAL_STATUS.ACTIVE) {
             return sendError(res, 'User not found or inactive', 401);
         }
 
-        req.user = buildRequestUser(user);
+        req.user = buildRequestUser(person);
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
@@ -161,81 +119,18 @@ const authenticateServiceRelay = async (req, res, next) => {
     }
 };
 
-// Role-based authorization middleware
-const authorize = (...roles) => {
-    return (req, res, next) => {
-        if (!req.user) {
-            return sendError(res, 'Authentication required', 401);
-        }
-
-        if (!roles.includes(req.user.role)) {
-            return sendError(res, 'Insufficient permissions', 403);
-        }
-
-        next();
-    };
-};
-
-// Admin and above roles
-const requireAdmin = authorize('admin', 'superadmin', 'directorate');
-const requireMTSSAdmin = authorize('admin', 'superadmin', 'directorate', 'head_unit');
-const requireMTSSAccess = (req, res, next) => {
-    if (!req.user) {
-        return sendError(res, 'Authentication required', 401);
-    }
-    if (!hasMtssAccess(req.user)) {
-        return sendError(res, 'You do not have access to MTSS.', 403);
-    }
-    next();
-};
-
-const requireMTSSWriteAccess = (req, res, next) => {
-    if (!req.user) {
-        return sendError(res, 'Authentication required', 401);
-    }
-    if (!hasMtssWriteAccess(req.user)) {
-        return sendError(res, 'You do not have write access to MTSS.', 403);
-    }
-    next();
-};
-
-const requireScopedMTSSAdmin = (req, res, next) => {
-    if (!req.user) {
-        return sendError(res, 'Authentication required', 401);
-    }
-    if (!hasMtssAdminAccess(req.user)) {
-        return sendError(res, 'You do not have admin access to MTSS.', 403);
-    }
-    next();
-};
-
-// Super admin and directorate only
-const requireSuperAdmin = authorize('superadmin', 'directorate');
-
-// Staff and teacher access (for their own data) - now includes student for Google OAuth users
-const requireStaffOrTeacher = authorize('staff', 'teacher', 'admin', 'superadmin', 'directorate', 'student', 'support_staff', 'se_teacher', 'head_unit', 'counselor');
-const requireTeacherAccess = authorize('teacher', 'se_teacher');
-
-// Any authenticated user
-const requireAuthenticated = (req, res, next) => {
-    if (!req.user) {
-        return sendError(res, 'Authentication required', 401);
-    }
-    next();
-};
+// MTSS is read, written and administered through three permissions that build on each other.
+const requireMtssRead = requirePermission(PERMISSIONS.MTSS_READ);
+const requireMtssWrite = requirePermission(PERMISSIONS.MTSS_WRITE);
+const requireMtssAdmin = requirePermission(PERMISSIONS.MTSS_ADMIN);
 
 module.exports = {
     authenticate,
     authenticateServiceRelay,
-    authorize,
-    requireAdmin,
-    requireMTSSAdmin,
-    requireMTSSAccess,
-    requireMTSSWriteAccess,
-    requireScopedMTSSAdmin,
-    requireSuperAdmin,
-    requireStaffOrTeacher,
-    requireTeacherAccess,
-    requireAuthenticated,
-    buildRequestUser
+    buildRequestUser,
+    requirePermission,
+    requireAnyPermission,
+    requireMtssRead,
+    requireMtssWrite,
+    requireMtssAdmin,
 };

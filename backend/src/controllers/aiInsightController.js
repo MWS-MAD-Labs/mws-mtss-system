@@ -1,7 +1,8 @@
 const aiInsightService = require('../services/aiInsightService');
 const TeacherAlert = require('../models/TeacherAlert');
 const MentorAssignment = require('../models/MentorAssignment');
-const User = require('../models/User');
+const Person = require('../models/Person');
+const { SCOPE_MODE } = require('../utils/accessScope');
 const { sendSuccess, sendError } = require('../utils/response');
 
 const VALID_STATUSES = new Set(['new', 'acknowledged', 'in_progress', 'resolved', 'dismissed']);
@@ -18,14 +19,13 @@ const getStudentInsights = async (req, res) => {
         const { timeRange = 30 } = req.query;
 
         // Verify student exists
-        const student = await User.findById(studentId);
+        const student = await Person.findById(studentId);
         if (!student) {
             return sendError(res, 'Student not found', 404);
         }
 
         // AI-1: Verify teacher/mentor has an active assignment for this student
-        const userRole = req.user.role;
-        const isPrivileged = ['admin', 'superadmin', 'directorate', 'head_unit'].includes(userRole);
+        const isPrivileged = [SCOPE_MODE.ALL, SCOPE_MODE.UNIT].includes(req.user.mtssScope?.mode);
         if (!isPrivileged) {
             const hasAssignment = await MentorAssignment.exists({
                 mentorId: req.user._id,
@@ -66,7 +66,7 @@ const generateAlertsForStudent = async (req, res) => {
         const { studentId } = req.params;
 
         // Verify student exists
-        const student = await User.findById(studentId);
+        const student = await Person.findById(studentId);
         if (!student) {
             return sendError(res, 'Student not found', 404);
         }
@@ -180,8 +180,7 @@ const getStudentAlerts = async (req, res) => {
             return sendError(res, `Invalid status value: ${status}`, 400);
         }
 
-        const userRole = req.user.role;
-        const isPrivileged = ['admin', 'superadmin', 'directorate', 'head_unit'].includes(userRole);
+        const isPrivileged = [SCOPE_MODE.ALL, SCOPE_MODE.UNIT].includes(req.user.mtssScope?.mode);
         if (!isPrivileged) {
             const hasAssignment = await MentorAssignment.exists({
                 mentorId: req.user._id,
@@ -380,7 +379,7 @@ const getAlertStatistics = async (req, res) => {
 const batchGenerateAlerts = async (req, res) => {
     try {
         // Get all students who have had conversations
-        const students = await User.find({ role: 'student' }).select('_id name').lean();
+        const students = await Person.find({ personType: 'student', isActive: true }).select('_id name').lean();
 
         const results = {
             processed: 0,

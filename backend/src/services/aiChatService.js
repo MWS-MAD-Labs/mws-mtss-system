@@ -4,8 +4,10 @@ const MTSSStudent = require('../models/MTSSStudent');
 const MentorAssignment = require('../models/MentorAssignment');
 const StudentEmotionalCheckin = require('../models/StudentEmotionalCheckin');
 const EmotionalCheckin = require('../models/EmotionalCheckin');
-const User = require('../models/User');
-const UserStudent = require('../models/UserStudent');
+const Person = require('../models/Person');
+const { actorKind } = require('../utils/actorKind');
+const { canBeMentor } = require('../utils/mentorEligibility');
+const { PERMISSIONS } = require('../constants/permissions');
 const StudentAIAssistantProfile = require('../models/StudentAIAssistantProfile');
 const MTSSTierReviewRequest = require('../models/MTSSTierReviewRequest');
 const notificationService = require('./notificationService');
@@ -49,7 +51,6 @@ class AIChatService {
             'superadmin',
             'counselor'
         ]);
-        this.mtssMentorRoleSet = new Set(['staff', 'teacher', 'support_staff', 'head_unit', 'principal', 'admin', 'directorate']);
         this.mtssAutomationRoleSet = new Set(['teacher', 'se_teacher', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin']);
         this.maxBulkAutomationItems = 10;
         this.maxAutomationEvidenceFiles = EVIDENCE_MAX_FILES;
@@ -116,15 +117,11 @@ class AIChatService {
     }
 
     async resolveUserProfile(userId) {
-        // Student accounts are stored in UserStudent, while staff accounts are in User.
-        // AI chat should support both and always return a concrete profile.
-        let user = await User.findById(userId).lean();
-        if (user) return user;
-
-        user = await UserStudent.findById(userId).lean();
-        if (user) return user;
-
-        return null;
+        // Students and staff are both Person records. The role is only the label the assistant speaks to.
+        const person = await Person.findById(userId).lean();
+        if (!person) return null;
+        const permissions = person.centralEntitlementPermissions || [];
+        return { ...person, permissions, role: actorKind({ ...person, permissions }) };
     }
 
     normalizeRole(role = '') {
@@ -220,10 +217,6 @@ class AIChatService {
                     String(s.grade || s.currentGrade || '').toLowerCase().includes('kindergarten')
                 )
         );
-    }
-
-    isEligibleMtssMentorRole(role = '') {
-        return this.mtssMentorRoleSet.has(this.normalizeRole(role));
     }
 
     normalizeTierCode(tier = 'tier2') {
@@ -2262,7 +2255,7 @@ class AIChatService {
             .filter((mentor, index, all) => all.findIndex((item) => item.id === mentor.id) === index)
             .slice(0, 16);
 
-        if (actorId && actorRole && this.isEligibleMtssMentorRole(actorRole)) {
+        if (actorId && (actor.permissions || []).includes(PERMISSIONS.MTSS_WRITE)) {
             const actorExists = mentorOptions.some((mentor = {}) => String(mentor.id) === actorId);
             if (!actorExists) {
                 mentorOptions.unshift({
@@ -3800,7 +3793,8 @@ ${mentorLines}`;
             const unit = String(user.unit || user.department || '').trim();
             const department = String(user.department || user.unit || '').trim();
             const teacherQuery = {
-                role: { $in: ['teacher', 'se_teacher'] },
+                personType: 'employee',
+                isTeachingRole: true,
                 isActive: true
             };
 
@@ -3811,8 +3805,8 @@ ${mentorLines}`;
                 teacherQuery.$or = filters;
             }
 
-            const teacherCandidates = await User.find(teacherQuery)
-                .select('name username nickname gender email role jobPosition classes unit department')
+            const teacherCandidates = await Person.find(teacherQuery)
+                .select('name username nickname gender email jobPosition classes unit department')
                 .lean();
 
             const teacherMap = new Map();
@@ -4285,7 +4279,7 @@ ${teacherLines}`;
             if (isLeadershipRole) {
                 if (isPrincipalLike && user.unit) {
                     // First resolve which users belong to this unit, then query their assignments
-                    const unitUserDocs = await User.find({ unit: user.unit, isActive: { $ne: false } })
+                    const unitUserDocs = await Person.find({ unit: user.unit, isActive: { $ne: false } })
                         .select('_id').lean();
                     const unitMentorIds = unitUserDocs.map((u) => u._id);
                     leadershipAssignmentsPromise = unitMentorIds.length > 0
@@ -4392,6 +4386,7 @@ ${teacherLines}`;
                     kind: 'workforce',
                     role: normalizedRole,
                     roleLabel,
+                    permissions: user.permissions || [],
                     scope: 'workforce',
                     department: user.department || null,
                     unit: user.unit || null,
@@ -5705,11 +5700,12 @@ Critical language requirement:
             throw new Error('mentorId is required for this automation.');
         }
 
-        const mentorUser = await User.findById(parsedMentorId).select('_id role name isActive').lean();
+        const mentorUser = await Person.findById(parsedMentorId)
+            .select('_id name isActive personType centralStatus centralEntitlementPermissions').lean();
         if (!mentorUser) {
             throw new Error('Mentor account not found.');
         }
-        if (!this.isEligibleMtssMentorRole(mentorUser.role || '')) {
+        if (!canBeMentor(mentorUser)) {
             throw new Error('Selected mentor account is not eligible for MTSS automation.');
         }
         if (mentorUser.isActive === false) {
@@ -5740,7 +5736,7 @@ Critical language requirement:
 
     resolveAssignmentAccessFlags(assignment = {}, user = {}) {
         const viewerId = String(user?._id || user?.id || '').trim();
-        const isAdmin = this.isMtssAdminRole(user?.role || '');
+        const isAdmin = (user?.permissions || []).includes(PERMISSIONS.MTSS_ADMIN);
         const isAssignedMentor = String(assignment?.mentorId || '').trim() === viewerId;
         const isCreator = String(assignment?.createdBy || '').trim() === viewerId;
         return {
@@ -5882,12 +5878,12 @@ Critical language requirement:
 
         // Only notify direct supervisors: head_unit of same unit first, then principal/directorate.
         // Cap at 3 to avoid broadcasting to every admin in the system.
-        const leadershipRoles = ['head_unit', 'principal', 'directorate'];
-        const recipients = await User.find({
-            role: { $in: leadershipRoles },
-            isActive: { $ne: false }
+        const recipients = await Person.find({
+            personType: 'employee',
+            isActive: true,
+            centralEntitlementPermissions: PERMISSIONS.MTSS_ADMIN
         })
-            .select('_id role unit')
+            .select('_id unit')
             .lean();
 
         return (Array.isArray(recipients) ? recipients : [])
@@ -6033,7 +6029,7 @@ Critical language requirement:
         });
 
         if (byEmail.size > 0) {
-            const userStudents = await UserStudent.find({ email: { $in: Array.from(new Set(byEmail.values())) } })
+            const userStudents = await Person.find({ personType: 'student', email: { $in: Array.from(new Set(byEmail.values())) } })
                 .select('_id email')
                 .lean();
             const userByEmail = new Map(
@@ -6061,7 +6057,7 @@ Critical language requirement:
             if (!studentId || !studentName) continue;
 
             const nameRegex = new RegExp(`^${this.escapeRegExp(studentName)}$`, 'i');
-            const candidate = await UserStudent.findOne({ name: nameRegex })
+            const candidate = await Person.findOne({ personType: 'student', name: nameRegex })
                 .select('_id')
                 .lean();
             if (candidate?._id) {

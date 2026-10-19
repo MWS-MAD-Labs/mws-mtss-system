@@ -4,7 +4,7 @@ const { normalizeInterventionDuration } = require('../utils/mtssIntervention');
 const mentorAssignmentSchema = new mongoose.Schema({
     mentorId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: true
     },
     studentIds: [{
@@ -45,11 +45,11 @@ const mentorAssignmentSchema = new mongoose.Schema({
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     },
     lastPlanUpdatedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     },
     lastPlanUpdatedAt: {
         type: Date
@@ -127,7 +127,7 @@ const mentorAssignmentSchema = new mongoose.Schema({
         fromValue: { type: String },
         toValue: { type: String },
         changedAt: { type: Date, default: Date.now },
-        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Person' }
     }],
     checkIns: [{
         date: {

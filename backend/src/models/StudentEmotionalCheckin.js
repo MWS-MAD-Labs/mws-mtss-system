@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const studentEmotionalCheckinSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: true
     },
     date: {
@@ -42,15 +42,15 @@ const studentEmotionalCheckinSchema = new mongoose.Schema({
     },
     supportContactUserId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: false,
         validate: {
             validator: async function (v) {
                 if (!v) return true;
                 try {
-                    const User = mongoose.model('User');
-                    const user = await User.findById(v);
-                    return user && ['directorate', 'superadmin', 'admin', 'teacher', 'staff', 'support_staff', 'se_teacher', 'head_unit'].includes(user.role);
+                    const Person = mongoose.model('Person');
+                    const person = await Person.findById(v).select('personType isActive').lean();
+                    return Boolean(person && person.personType === 'employee' && person.isActive);
                 } catch (error) {
                     return false;
                 }
@@ -160,7 +160,7 @@ const studentEmotionalCheckinSchema = new mongoose.Schema({
         },
         contactId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
+            ref: 'Person'
         },
         respondedAt: {
             type: Date

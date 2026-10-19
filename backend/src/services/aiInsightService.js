@@ -2,7 +2,7 @@ const AIConversation = require('../models/AIConversation');
 const TeacherAlert = require('../models/TeacherAlert');
 const MTSSStudent = require('../models/MTSSStudent');
 const MentorAssignment = require('../models/MentorAssignment');
-const User = require('../models/User');
+const Person = require('../models/Person');
 const teacherNotifierService = require('./teacherNotifierService');
 
 /**
@@ -391,7 +391,7 @@ class AIInsightService {
     async generateTeacherAlerts(userId) {
         try {
             // Get user and MTSS profile
-            const user = await User.findById(userId).lean();
+            const user = await Person.findById(userId).lean();
             if (!user) throw new Error('User not found');
 
             const mtssStudent = await MTSSStudent.findOne({

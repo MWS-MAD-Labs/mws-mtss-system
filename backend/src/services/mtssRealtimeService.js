@@ -1,9 +1,9 @@
 const { getIO } = require('../config/socket');
 const MentorAssignment = require('../models/MentorAssignment');
 const MTSSStudent = require('../models/MTSSStudent');
-const User = require('../models/User');
+const Person = require('../models/Person');
+const { PERMISSIONS } = require('../constants/permissions');
 const { summarizeAssignmentsForStudents, formatRosterStudent } = require('../utils/mtssStudentHelpers');
-const { PILOT_FEEDBACK_ADMIN_EMAILS } = require('../utils/pilotFeedbackAccess');
 
 let cachedPilotFeedbackAdminIds = [];
 let cachedPilotFeedbackAdminFetchedAt = 0;
@@ -143,9 +143,9 @@ const getPilotFeedbackAdminIds = async () => {
         return cachedPilotFeedbackAdminIds;
     }
 
-    const admins = await User.find({
-        email: { $in: Array.from(PILOT_FEEDBACK_ADMIN_EMAILS) },
-        isActive: true
+    const admins = await Person.find({
+        isActive: true,
+        centralEntitlementPermissions: PERMISSIONS.MTSS_ADMIN
     })
         .select('_id')
         .lean();

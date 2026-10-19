@@ -1,5 +1,5 @@
 const winston = require('winston');
-const UserStudent = require('../models/UserStudent');
+const Person = require('../models/Person');
 const notificationService = require('./notificationService');
 const { buildFrontendUrl } = require('../utils/frontendUrl');
 
@@ -38,14 +38,14 @@ async function resolveStudentAccount(mtssStudent = {}) {
     const rawName  = String(mtssStudent.name  || '').trim();
 
     if (rawEmail) {
-        const found = await UserStudent.findOne({ email: rawEmail, isActive: true })
+        const found = await Person.findOne({ personType: 'student', email: rawEmail, isActive: true })
             .select('name email').lean();
         if (found?.email) return { name: found.name || rawName, email: found.email };
     }
 
     if (rawName) {
         const nameRegex = new RegExp(`^${rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-        const found = await UserStudent.findOne({ name: nameRegex, isActive: true })
+        const found = await Person.findOne({ personType: 'student', name: nameRegex, isActive: true })
             .select('name email').lean();
         if (found?.email) return { name: found.name, email: found.email };
     }
