@@ -8,7 +8,7 @@ Run this after every staging deploy of MTSS. Tick each line. Anything that fails
 - [ ] The backend log has a `centralSync: asking Central every N seconds` line and no `[access] Central lookup failed` or `Central said 4xx/5xx` lines.
 
 ## 2. Central knows this version
-- [ ] In Central, the application `mtss` lists the 13 permissions (`mtss.read` to `dev_topology.read`).
+- [ ] In Central, the application `mtss` lists the 14 permissions (`mtss.read` to `hub.support.access`).
 - [ ] From `backend`, with the staging Central values in the environment: `npm run permissions:check` prints `permissions match Central`.
 - [ ] A role in Central holds `mtss.read`. Without one, nobody gets in.
 

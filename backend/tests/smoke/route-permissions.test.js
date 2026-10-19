@@ -23,6 +23,7 @@ const SCREEN_ONLY = new Set([
     'mtss.scope.unit',
     'mtss.scope.all',
     'emotional_dashboard.read',
+    'hub.support.access',
 ]);
 
 function walk(stack, inherited, found) {

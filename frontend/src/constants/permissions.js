@@ -13,4 +13,5 @@ export const PERMISSIONS = Object.freeze({
     USERS_READ: 'users.read',
     SYNC_READ: 'sync.read',
     DEV_TOPOLOGY_READ: 'dev_topology.read',
+    HUB_SUPPORT_ACCESS: 'hub.support.access',
 });

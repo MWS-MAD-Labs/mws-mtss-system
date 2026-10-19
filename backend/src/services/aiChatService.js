@@ -6,6 +6,7 @@ const StudentEmotionalCheckin = require('../models/StudentEmotionalCheckin');
 const EmotionalCheckin = require('../models/EmotionalCheckin');
 const Person = require('../models/Person');
 const { actorKind } = require('../utils/actorKind');
+const { SCOPE_MODE, resolveMtssScope } = require('../utils/accessScope');
 const { canBeMentor } = require('../utils/mentorEligibility');
 const { PERMISSIONS } = require('../constants/permissions');
 const StudentAIAssistantProfile = require('../models/StudentAIAssistantProfile');
@@ -51,7 +52,6 @@ class AIChatService {
             'superadmin',
             'counselor'
         ]);
-        this.mtssAutomationRoleSet = new Set(['teacher', 'se_teacher', 'head_unit', 'principal', 'directorate', 'admin', 'superadmin']);
         this.maxBulkAutomationItems = 10;
         this.maxAutomationEvidenceFiles = EVIDENCE_MAX_FILES;
         this.maxAutomationEvidenceBytes = EVIDENCE_MAX_FILE_SIZE;
@@ -121,7 +121,8 @@ class AIChatService {
         const person = await Person.findById(userId).lean();
         if (!person) return null;
         const permissions = person.centralEntitlementPermissions || [];
-        return { ...person, permissions, role: actorKind({ ...person, permissions }) };
+        const withPermissions = { ...person, permissions };
+        return { ...withPermissions, role: actorKind(withPermissions), mtssScope: resolveMtssScope(withPermissions) };
     }
 
     normalizeRole(role = '') {
@@ -175,13 +176,14 @@ class AIChatService {
         return ['teacher', 'se_teacher', 'head_unit', 'principal', 'directorate'].includes(normalizedRole);
     }
 
-    isMtssAdminRole(role = '') {
-        const normalizedRole = this.normalizeRole(role);
-        return ['head_unit', 'principal', 'directorate', 'admin', 'superadmin'].includes(normalizedRole);
+    // What a person may do is only what Central gave them: these read the permissions on the user, never a role name.
+    isMtssAdminUser(user = {}) {
+        return (user?.permissions || []).includes(PERMISSIONS.MTSS_ADMIN);
     }
 
-    isMtssAutomationRole(role = '') {
-        return this.mtssAutomationRoleSet.has(this.normalizeRole(role));
+    canAutomateMtss(user = {}) {
+        const permissions = user?.permissions || [];
+        return permissions.includes(PERMISSIONS.MTSS_WRITE) || permissions.includes(PERMISSIONS.MTSS_ADMIN);
     }
 
     isTeacherLikeRole(role = '') {
@@ -2075,8 +2077,8 @@ class AIChatService {
         const assignmentList = Array.isArray(options?.assignments) ? options.assignments : [];
         const selectedAssignment = options?.assignment && typeof options.assignment === 'object' ? options.assignment : {};
         const role = this.normalizeRole(context?.actor?.role || '');
-        const isAdmin = this.isMtssAdminRole(role);
-        const canAutomate = this.isMtssAutomationRole(role);
+        const isAdmin = this.isMtssAdminUser(context?.actor);
+        const canAutomate = this.canAutomateMtss(context?.actor);
 
         const operationRows = [
             {
@@ -2222,9 +2224,9 @@ class AIChatService {
         const actorName = String(actor.name || actor.preferredName || '').trim() || 'Current User';
         const actorRole = this.normalizeRole(actor.role || '');
         const actorRoleLabel = actor.roleLabel || this.getWorkforceRoleLabel(actorRole);
-        const dashboardRoute = this.isMtssAdminRole(actorRole) ? '/mtss/admin' : '/mtss/teacher';
-        const dashboardIntent = this.isMtssAdminRole(actorRole) ? 'open_mtss_admin_dashboard' : 'open_mtss_teacher_dashboard';
-        const dashboardLabel = this.isMtssAdminRole(actorRole) ? 'MTSS Admin Dashboard' : 'MTSS Teacher Dashboard';
+        const dashboardRoute = this.isMtssAdminUser(actor) ? '/mtss/admin' : '/mtss/teacher';
+        const dashboardIntent = this.isMtssAdminUser(actor) ? 'open_mtss_admin_dashboard' : 'open_mtss_teacher_dashboard';
+        const dashboardLabel = this.isMtssAdminUser(actor) ? 'MTSS Admin Dashboard' : 'MTSS Teacher Dashboard';
         const assignmentOptions = assignmentList.slice(0, 10).map((assignment = {}) => ({
             id: assignment.id,
             studentName: Array.isArray(assignment.students)
@@ -4255,10 +4257,12 @@ ${teacherLines}`;
                 .select('date weatherType selectedMoods presenceLevel capacityLevel aiAnalysis')
                 .lean();
 
-            const isMentorRole = this.isMtssCapableWorkforceRole(normalizedRole);
-            const isLeadershipRole = this.isLeadershipRole(normalizedRole);
-            const isDirectorate = this.isDirectorateRole(normalizedRole);
-            const isPrincipalLike = this.isPrincipalLikeRole(normalizedRole);
+            // The data the assistant may read follows the same MTSS scope the dashboards use (from Central), not a role name.
+            const scopeMode = user.mtssScope?.mode;
+            const isMentorRole = (user.permissions || []).includes(PERMISSIONS.MTSS_READ);
+            const isLeadershipRole = scopeMode === SCOPE_MODE.ALL || scopeMode === SCOPE_MODE.UNIT;
+            const isDirectorate = scopeMode === SCOPE_MODE.ALL;
+            const isPrincipalLike = scopeMode === SCOPE_MODE.UNIT;
 
             const mentorAssignmentsPromise = isMentorRole
                 ? MentorAssignment.find({
@@ -6187,8 +6191,7 @@ Critical language requirement:
         const viewerId = String(user?._id || user?.id || '').trim();
         if (!viewerId) throw new Error('Authenticated user is required.');
 
-        const userRole = this.normalizeRole(user?.role || '');
-        const isAdmin = this.isMtssAdminRole(userRole);
+        const isAdmin = this.isMtssAdminUser(user);
         const requestedMentorId = String(payload.mentorId || '').trim();
         const mentorId = isAdmin && requestedMentorId ? requestedMentorId : viewerId;
 
@@ -6470,7 +6473,7 @@ Critical language requirement:
         if (!viewerId) throw new Error('Authenticated user is required.');
 
         const role = this.normalizeRole(user?.role || '');
-        const isAdmin = this.isMtssAdminRole(role);
+        const isAdmin = this.isMtssAdminUser(user);
         const requestedMentorId = String(payload.mentorId || '').trim();
         const mentorId = isAdmin && requestedMentorId ? requestedMentorId : viewerId;
 
@@ -6616,7 +6619,7 @@ Critical language requirement:
         if (!viewerId) throw new Error('Authenticated user is required.');
 
         const role = this.normalizeRole(user?.role || '');
-        const isAdmin = this.isMtssAdminRole(role);
+        const isAdmin = this.isMtssAdminUser(user);
         const requestedMentorId = String(payload.mentorId || '').trim();
         const mentorId = isAdmin && requestedMentorId ? requestedMentorId : viewerId;
 
@@ -6708,8 +6711,8 @@ Critical language requirement:
         if (!viewerId) throw new Error('Authenticated user is required.');
 
         const role = this.normalizeRole(user?.role || '');
-        if (!this.isMtssAdminRole(role)) {
-            throw new Error('Only MTSS admin/principal roles can reassign assignment mentor.');
+        if (!this.isMtssAdminUser(user)) {
+            throw new Error('Only someone with MTSS admin access can reassign an assignment mentor.');
         }
 
         const assignmentId = String(payload.assignmentId || '').trim();
@@ -6792,7 +6795,7 @@ Critical language requirement:
         if (!assignment) throw new Error('Mentor assignment not found.');
 
         const role = this.normalizeRole(user?.role || '');
-        const isAdmin = this.isMtssAdminRole(role);
+        const isAdmin = this.isMtssAdminUser(user);
         const isAssignedMentor = String(assignment.mentorId || '') === viewerId;
         if (!isAdmin && !isAssignedMentor) {
             throw new Error('Only the assigned mentor or MTSS admin can update assignment status.');
@@ -6883,7 +6886,7 @@ Critical language requirement:
         if (!assignment) throw new Error('Mentor assignment not found.');
 
         const role = this.normalizeRole(user?.role || '');
-        const isAdmin = this.isMtssAdminRole(role);
+        const isAdmin = this.isMtssAdminUser(user);
         const isAssignedMentor = String(assignment.mentorId || '') === viewerId;
         if (!isAdmin && !isAssignedMentor) {
             throw new Error('Only the assigned mentor or MTSS admin can update assignment goals.');
@@ -7344,7 +7347,7 @@ Critical language requirement:
         });
 
         const role = this.normalizeRole(user?.role || '');
-        const isAdmin = this.isMtssAdminRole(role);
+        const isAdmin = this.isMtssAdminUser(user);
         const requestedMentorId = String(payload.mentorId || '').trim();
         const mentorId = isAdmin && requestedMentorId ? requestedMentorId : viewerId;
         if (!isAdmin && requestedMentorId && requestedMentorId !== viewerId) {
@@ -7495,9 +7498,8 @@ Critical language requirement:
             throw new Error('User not found for assistant operation.');
         }
 
-        const role = this.normalizeRole(user.role || '');
-        if (!this.isMtssAutomationRole(role)) {
-            throw new Error('This automation is only available for teacher/principal MTSS roles.');
+        if (!this.canAutomateMtss(user)) {
+            throw new Error('This automation needs MTSS write access.');
         }
 
         const safeOperation = String(operation || '').trim().toLowerCase();

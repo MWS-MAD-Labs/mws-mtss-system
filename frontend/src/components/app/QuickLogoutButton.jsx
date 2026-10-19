@@ -12,7 +12,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { leaveToHub } from "@/store/slices/authSlice";
 import { applyThemePreference, emitThemeSpell, persistTheme } from "@/lib/theme";
 import { goToHubSupport } from "@/utils/hubConfig";
-import { hasMtssAccess } from "@/utils/mtssAccess";
+import { hasPermission } from "@/utils/accessControl";
+import { PERMISSIONS } from "@/constants/permissions";
 import gsap from "gsap";
 import { animate } from "animejs";
 import "./quick-menu.css";
@@ -24,9 +25,6 @@ const getIsDark = () => {
 };
 
 /* ── Nav items config (easily extendable) ──────────────── */
-// People with MTSS access come from the Hub launcher, so they get the way back to its Support Hub.
-const hasSupportHubAccess = hasMtssAccess;
-
 const NAV_ITEMS = [
     { id: "profile", label: "My Profile", icon: User, path: "/mtss/profile" },
 ];
@@ -246,7 +244,7 @@ const QuickMenu = memo(() => {
                             );
                         })}
 
-                        {hasSupportHubAccess(user) && (
+                        {hasPermission(user, PERMISSIONS.HUB_SUPPORT_ACCESS) && (
                             <button
                                 ref={(el) => (itemsRef.current[idx++] = el)}
                                 type="button"

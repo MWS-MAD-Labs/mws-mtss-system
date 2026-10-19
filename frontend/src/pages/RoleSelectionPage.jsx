@@ -2,7 +2,7 @@ import { memo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Heart, Sparkles, ArrowRight, BarChart3 } from "lucide-react";
 import { useSelector } from "react-redux";
-import { getDefaultMtssRoute, hasMtssAccess } from "@/utils/mtssAccess";
+import { getDefaultMtssRoute } from "@/utils/mtssAccess";
 import { hasPermission } from "@/utils/accessControl";
 import { PERMISSIONS } from "@/constants/permissions";
 import gsap from "gsap";
@@ -420,8 +420,8 @@ const RoleSelection = memo(() => {
   // both the Pilot Testing card below and hasNoMtssAccess. The
   // Support Hub button itself now lives in QuickLogoutButton.jsx's floating
   // menu (top-left corner), not on this page.
-  const hasSupportHubAccess = hasMtssAccess(user);
-  const hasNoMtssAccess = user && !mtssDashboardRoute && !hasSupportHubAccess;
+  const canOpenPilotTesting = hasPermission(user, PERMISSIONS.MTSS_READ);
+  const hasNoMtssAccess = user && !mtssDashboardRoute && !canOpenPilotTesting;
 
   return (
     <div ref={pageRef} className="rs-humanistic-shell rs-white-collage relative min-h-screen text-foreground overflow-hidden">
@@ -458,7 +458,7 @@ const RoleSelection = memo(() => {
                 isPremium={false} onClick={() => navigate(mtssDashboardRoute)} delay={0.35} />
             )}
 
-            {hasSupportHubAccess && (
+            {canOpenPilotTesting && (
               <MethodCard icon={Sparkles} title="Pilot Testing Hub"
                 desc="Try upcoming MTSS features before they roll out org-wide."
                 features={["Early access to new tools", "Feedback shapes the rollout", "Opt-in, no commitment", "Same login, no extra setup"]}

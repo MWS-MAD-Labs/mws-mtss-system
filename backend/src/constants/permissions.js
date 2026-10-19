@@ -15,6 +15,7 @@ const PERMISSIONS = Object.freeze({
     USERS_READ: 'users.read',
     SYNC_READ: 'sync.read',
     DEV_TOPOLOGY_READ: 'dev_topology.read',
+    HUB_SUPPORT_ACCESS: 'hub.support.access',
 });
 
 // What Central shows next to each permission. `requires` keeps a role from carrying a permission without the ones it
@@ -50,6 +51,7 @@ const PERMISSION_DETAILS = Object.freeze({
     [PERMISSIONS.USERS_READ]: { description: 'See the people of MTSS and what each may do' },
     [PERMISSIONS.SYNC_READ]: { description: 'See when MTSS last synced with Central' },
     [PERMISSIONS.DEV_TOPOLOGY_READ]: { description: 'Open the developer topology and health views' },
+    [PERMISSIONS.HUB_SUPPORT_ACCESS]: { description: 'Open the Support Hub from the quick menu' },
 });
 
 const PERMISSION_VALUES = Object.freeze(Object.values(PERMISSIONS));
