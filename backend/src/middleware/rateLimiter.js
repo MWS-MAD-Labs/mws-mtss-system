@@ -19,25 +19,17 @@ const DEFAULT_CHECKIN_MAX_REQUESTS = parseInt(
 const skipHealthAndAuth = (req) =>
     req.path === '/health' || req.path.startsWith('/v1/auth');
 
-// Only used to key the limiter, so the token is read without checking it. The Hub session cookie is the normal
-// case, a Bearer token is the Daily relay.
-const idFromToken = (token) => {
+// Only used to key the limiter, so the token is read without checking it. It is the Hub session cookie.
+const extractUserIdFromToken = (req) => {
+    const cookieName = accessCookieName() || 'hub_at';
+    const token = new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`).exec(req.headers.cookie || '')?.[1];
     if (!token) return null;
     try {
-        const decoded = jwt.decode(token);
+        const decoded = jwt.decode(decodeURIComponent(token));
         return decoded?.userId || decoded?.id || decoded?.sub || decoded?.email || null;
     } catch (error) {
         return null;
     }
-};
-
-const extractUserIdFromToken = (req) => {
-    const authHeader = req.headers.authorization || '';
-    const bearerId = authHeader.startsWith('Bearer ') ? idFromToken(authHeader.substring(7)) : null;
-    if (bearerId) return bearerId;
-    const cookieName = accessCookieName() || 'hub_at';
-    const cookieToken = new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`).exec(req.headers.cookie || '')?.[1];
-    return idFromToken(cookieToken);
 };
 
 const getClientIdentifier = (req) => {

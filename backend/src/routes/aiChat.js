@@ -1,41 +1,15 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const router = express.Router();
-const { authenticate, authenticateServiceRelay, requirePermission } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
 const { PERMISSIONS } = require('../constants/permissions');
 const aiChatController = require('../controllers/aiChatController');
 const devTopologyTelemetryService = require('../services/devTopologyTelemetryService');
 
-// All routes require authentication - either a real MTSS user session, or
-// (for now) a forwarded request from daily-checkin's AI-chat proxy, which
-// carries its own separately-signed service token instead of an MTSS
-// session cookie/JWT. Tries the user session first since that's the
-// overwhelmingly common caller; falls back to the service-relay check only
-// when there's no ordinary Bearer JWT to verify in the first place, so a
-// genuinely invalid user token still fails as "invalid token", not a
-// confusing "service token required".
-router.use((req, res, next) => {
-    const authHeader = req.headers.authorization || '';
-    if (!authHeader.startsWith('Bearer ')) {
-        return authenticate(req, res, next);
-    }
+// Every route needs the Hub session. Daily Check-in passes the person's Hub cookie along, so a call from there is the
+// same session as any other.
+router.use(authenticate);
 
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-        decoded = jwt.decode(token);
-    } catch (error) {
-        decoded = null;
-    }
-
-    if (decoded && decoded.source === 'daily-checkin') {
-        return authenticateServiceRelay(req, res, next);
-    }
-
-    return authenticate(req, res, next);
-});
-
-// Using the assistant is its own permission, for the people who sign in and for the Daily relay alike.
+// Using the assistant is its own permission.
 router.use(requirePermission(PERMISSIONS.AI_CHAT_USE));
 
 /**

@@ -250,17 +250,12 @@ const applyViewerScope = (filter = {}, viewer = {}) => {
         return filter;
     }
 
-    // Students can only access their own MTSS student record by identity fields.
+    // A student can only reach their own record, and only by the email Central verified. Names, nicknames and
+    // usernames are not unique, so two students could share them.
     if (isStudent(viewer)) {
-        const clauses = [];
-        if (viewer.email) clauses.push({ email: toExactRegex(viewer.email) });
-        if (viewer.username) clauses.push({ username: toExactRegex(viewer.username) });
-        if (viewer.nickname) clauses.push({ nickname: toExactRegex(viewer.nickname) });
-        if (viewer.name) clauses.push({ name: toExactRegex(viewer.name) });
-
         filter.$and = filter.$and || [];
-        if (clauses.length) {
-            filter.$and.push({ $or: clauses });
+        if (viewer.email) {
+            filter.$and.push({ email: toExactRegex(viewer.email) });
         } else {
             // Explicit deny-all fallback if we cannot identify the student user.
             filter.$and.push({ _id: null });

@@ -1,12 +1,9 @@
-const jwt = require('jsonwebtoken');
-const Person = require('../models/Person');
 const { sendError } = require('../utils/response');
 const { hubSession } = require('../utils/hubSession');
 const { resolveSessionUser } = require('../utils/hubSessionUser');
 const { resolveMtssScope } = require('../utils/accessScope');
 const { actorKind } = require('../utils/actorKind');
 const { PERMISSIONS } = require('../constants/permissions');
-const { CENTRAL_STATUS } = require('../constants/person');
 const { requirePermission, requireAnyPermission } = require('./permissionGuard');
 
 // What the rest of the code sees of the person behind a request. `permissions` is what Central allows here and is
@@ -72,52 +69,6 @@ const authenticate = async (req, res, next) => {
     }
 };
 
-// Service-to-service authentication for the daily-checkin AI-chat proxy.
-// daily-checkin and MTSS have separate MongoDBs (split 2026-09-08), so a
-// person's ObjectId in one is meaningless in the other. This verifies a
-// short-lived token signed with a dedicated shared secret (never a user
-// session) carrying only an email claim, and resolves the real MTSS person by
-// email instead - the one identifier that means the same person in both
-// databases. The person still needs the access Central gave them here.
-const authenticateServiceRelay = async (req, res, next) => {
-    try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return sendError(res, 'Service token required', 401);
-        }
-
-        const secret = process.env.AI_CHAT_PROXY_SECRET;
-        if (!secret) {
-            console.error('authenticateServiceRelay: AI_CHAT_PROXY_SECRET is not configured');
-            return sendError(res, 'Service relay is not configured', 500);
-        }
-
-        const token = authHeader.substring(7);
-        const decoded = jwt.verify(token, secret);
-
-        if (decoded.source !== 'daily-checkin' || !decoded.email) {
-            return sendError(res, 'Invalid service token', 401);
-        }
-
-        const person = await Person.findOne({ email: String(decoded.email).trim().toLowerCase() });
-        if (!person || !person.isActive || person.centralStatus !== CENTRAL_STATUS.ACTIVE) {
-            return sendError(res, 'User not found or inactive', 401);
-        }
-
-        req.user = buildRequestUser(person);
-        next();
-    } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return sendError(res, 'Service token expired', 401);
-        } else if (error.name === 'JsonWebTokenError') {
-            return sendError(res, 'Invalid service token', 401);
-        }
-
-        console.error('authenticateServiceRelay error:', error);
-        return sendError(res, 'Authentication failed', 500);
-    }
-};
-
 // MTSS is read, written and administered through three permissions that build on each other.
 const requireMtssRead = requirePermission(PERMISSIONS.MTSS_READ);
 const requireMtssWrite = requirePermission(PERMISSIONS.MTSS_WRITE);
@@ -125,7 +76,6 @@ const requireMtssAdmin = requirePermission(PERMISSIONS.MTSS_ADMIN);
 
 module.exports = {
     authenticate,
-    authenticateServiceRelay,
     buildRequestUser,
     requirePermission,
     requireAnyPermission,

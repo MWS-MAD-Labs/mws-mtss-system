@@ -37,6 +37,13 @@ describe('Central is the only source of access', () => {
         expect(source).not.toMatch(/isMtssAdminRole|isMtssAutomationRole|mtssAutomationRoleSet/);
     });
 
+    test('the Hub session is the only way in: no shared-secret relay is left', () => {
+        const hits = walk(SRC)
+            .filter((file) => /authenticateServiceRelay|AI_CHAT_PROXY_SECRET/.test(fs.readFileSync(file, 'utf8')))
+            .map((file) => path.relative(SRC, file));
+        expect(hits).toEqual([]);
+    });
+
     test('no stored role or access is kept on the person besides what Central sent', () => {
         const person = fs.readFileSync(path.join(SRC, 'models/Person.js'), 'utf8');
         // Top-level fields only: classes[].role is the class role Central sent (Homeroom Teacher and so on).
