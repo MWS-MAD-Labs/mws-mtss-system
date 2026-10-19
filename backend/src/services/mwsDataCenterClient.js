@@ -9,8 +9,6 @@ function buildCentralLookupError(message) {
 }
 
 function getCentralClient() {
-  // The names Central writes in its block come first. The older MWS_DATA_CENTER_API_* names are read only when
-  // those are empty, so an old value in an environment can no longer hide a new token.
   const baseUrl =
     process.env.CENTRAL_API_BASE_URL || process.env.MWS_DATA_CENTER_API_URL;
   const apiToken =
@@ -65,7 +63,8 @@ async function lookupEmployeeByPersonId(personId) {
     });
     return data.data;
   } catch (error) {
-    if (error.response?.status === 404 || error.response?.status === 400) return null;
+    if (error.response?.status === 404 || error.response?.status === 400)
+      return null;
     throw error;
   }
 }
@@ -177,12 +176,19 @@ const ENTITLEMENT_PAGE_SIZE = 100;
 // nothing for them. A retired application gives nobody access.
 async function lookupApplicationEntitlement(personId) {
   try {
-    const { data } = await getCentralClient().get("/application-entitlements/lookup", {
-      params: { person_id: personId, application_id: APP_ID },
-    });
+    const { data } = await getCentralClient().get(
+      "/application-entitlements/lookup",
+      {
+        params: { person_id: personId, application_id: APP_ID },
+      },
+    );
     return data.data ?? null;
   } catch (error) {
-    if (error.response?.status === 403 && error.response?.data?.code === "application_retired") return null;
+    if (
+      error.response?.status === 403 &&
+      error.response?.data?.code === "application_retired"
+    )
+      return null;
     throw error;
   }
 }
@@ -190,9 +196,12 @@ async function lookupApplicationEntitlement(personId) {
 // A short key that changes only when something MTSS keeps about a person's access changes (name, email, role,
 // permissions or who is a member). Asking for it is one small call, so it can be asked every minute.
 async function getApplicationEntitlementKey(applicationId = APP_ID) {
-  const { data } = await getCentralClient().get("/application-entitlements/version", {
-    params: { application_id: applicationId },
-  });
+  const { data } = await getCentralClient().get(
+    "/application-entitlements/version",
+    {
+      params: { application_id: applicationId },
+    },
+  );
   return data.data?.key ?? null;
 }
 
@@ -207,7 +216,11 @@ async function listApplicationEntitlements(applicationId = APP_ID) {
 
   do {
     const { data } = await client.get("/application-entitlements", {
-      params: { application_id: applicationId, page, size: ENTITLEMENT_PAGE_SIZE },
+      params: {
+        application_id: applicationId,
+        page,
+        size: ENTITLEMENT_PAGE_SIZE,
+      },
     });
     rows.push(...data.data);
     // A change between two pages gives a different key; the last one is the one to keep.
