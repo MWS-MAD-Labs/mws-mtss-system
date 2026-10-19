@@ -67,7 +67,8 @@ describe('permission sync', () => {
         const run = (args, env = {}) =>
             spawnSync('node', ['src/scripts/syncPermissions.js', ...args], {
                 cwd: require('path').resolve(__dirname, '../..'),
-                env: { PATH: process.env.PATH, DOTENV_CONFIG_PATH: '/nonexistent', MWS_DATA_CENTER_API_URL: 'http://127.0.0.1:1/api/internal', MWS_DATA_CENTER_API_TOKEN: 't', ...env },
+                // The CENTRAL_* names are blanked so a developer's own .env cannot answer for the test.
+                env: { PATH: process.env.PATH, CENTRAL_API_BASE_URL: '', CENTRAL_API_TOKEN: '', MWS_DATA_CENTER_API_URL: 'http://127.0.0.1:1/api/internal', MWS_DATA_CENTER_API_TOKEN: 't', ...env },
                 encoding: 'utf8',
             });
         const soft = run(['--soft']);

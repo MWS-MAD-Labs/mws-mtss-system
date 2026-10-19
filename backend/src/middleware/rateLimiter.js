@@ -3,6 +3,7 @@ const {
     ipKeyGenerator
 } = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const { accessCookieName } = require('../utils/hubSession');
 
 const DEFAULT_WINDOW_MINUTES = parseInt(process.env.RATE_LIMIT_WINDOW || '15', 10);
 const DEFAULT_MAX_REQUESTS = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '600', 10);
@@ -34,7 +35,8 @@ const extractUserIdFromToken = (req) => {
     const authHeader = req.headers.authorization || '';
     const bearerId = authHeader.startsWith('Bearer ') ? idFromToken(authHeader.substring(7)) : null;
     if (bearerId) return bearerId;
-    const cookieToken = /(?:^|;\s*)hub_at=([^;]+)/.exec(req.headers.cookie || '')?.[1];
+    const cookieName = accessCookieName() || 'hub_at';
+    const cookieToken = new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`).exec(req.headers.cookie || '')?.[1];
     return idFromToken(cookieToken);
 };
 

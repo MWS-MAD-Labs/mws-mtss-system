@@ -16,6 +16,7 @@ describe('mwsDataCenterClient configuration', () => {
     });
 
     test('reports a clear error when MWS_DATA_CENTER_API_URL is invalid', () => {
+        delete process.env.CENTRAL_API_BASE_URL;
         process.env.MWS_DATA_CENTER_API_URL = 'central/api/internal';
         process.env.MWS_DATA_CENTER_API_TOKEN = 'token.prefix';
 
@@ -31,6 +32,8 @@ describe('mwsDataCenterClient configuration', () => {
     });
 
     test('normalizes a valid base URL before creating the client', () => {
+        delete process.env.CENTRAL_API_BASE_URL;
+        delete process.env.CENTRAL_API_TOKEN;
         process.env.MWS_DATA_CENTER_API_URL = 'https://central.example.test/api/internal/';
         process.env.MWS_DATA_CENTER_API_TOKEN = 'token.prefix';
 
