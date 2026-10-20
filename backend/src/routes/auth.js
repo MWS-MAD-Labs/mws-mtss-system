@@ -4,6 +4,7 @@ const Person = require('../models/Person');
 const { sendSuccess, sendError } = require('../utils/response');
 const { PERMISSIONS } = require('../constants/permissions');
 const { authenticate, buildRequestUser } = require('../middleware/auth');
+const { ssoLandingUrl } = require('../utils/frontendUrl');
 
 // Signing in and out belong to the Hub. The Hub keeps a short access token in a cookie on the parent domain, every
 // request is checked against it (middleware/auth.js), and the page keeps it fresh (see the frontend keepFresh).
@@ -12,8 +13,7 @@ const { authenticate, buildRequestUser } = require('../middleware/auth');
 // Where the Hub's card opens MTSS. There is nothing to sign in to: the Hub's session is read from its cookie by
 // the pages and the API. This only sends the browser to the app.
 router.get('/sso', (req, res) => {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5176/mtss';
-    res.redirect(`${frontendUrl.replace(/\/$/, '')}/`);
+    res.redirect(ssoLandingUrl());
 });
 
 // Get current user info

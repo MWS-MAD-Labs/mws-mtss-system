@@ -73,7 +73,27 @@ const buildFrontendUrl = (path = '') => {
     return `${baseUrl}/${String(path).replace(/^\/+/, '')}`;
 };
 
+// Where the Hub's card (/mtss/auth/sso) sends the browser. A configured FRONTEND_URL wins (a bare origin gets the /mtss/
+// base path). In production the redirect is relative, so the browser stays on the gateway host it came from, which is
+// right for staging and production without any setting. Locally it is the dev server.
+const DEVELOPMENT_APP_URL = 'http://localhost:5176/mtss/';
+
+const ssoLandingUrl = () => {
+    const configured = String(process.env.FRONTEND_URL || '').trim();
+    if (configured) {
+        try {
+            const url = new URL(configured);
+            const path = url.pathname.replace(/\/+$/, '');
+            return `${url.origin}${path || '/mtss'}/`;
+        } catch {
+            // an unreadable value falls through to the defaults below
+        }
+    }
+    return process.env.NODE_ENV === 'production' ? '/mtss/' : DEVELOPMENT_APP_URL;
+};
+
 module.exports = {
     buildFrontendUrl,
+    ssoLandingUrl,
     resolveFrontendBaseUrl
 };
