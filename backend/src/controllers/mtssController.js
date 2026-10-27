@@ -21,8 +21,10 @@ const {
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit,
     normalizeClassLabel,
-    normalizeGradeLabel
+    normalizeGradeLabel,
+    studentInGradeScope
 } = require('../utils/mtssAccess');
+const { isMtssCoordinator, getCoordinatorGradeScope } = require('../utils/accessControl');
 const {
     buildAssignmentPairings,
     buildMentorSubjectCoverageRows,
@@ -319,6 +321,11 @@ const isAssignmentOwnerOrAdmin = ({ viewer = {}, assignment = {} }) => {
 };
 
 const canViewerSeeAssignment = ({ viewer = {}, assignment = {}, students = [] }) => {
+    // A Coordinator sees a plan when any of its students is in their grades.
+    if (isMtssCoordinator(viewer)) {
+        const scope = getCoordinatorGradeScope(viewer);
+        return students.some((student) => studentInGradeScope(student, scope));
+    }
     if (isMTSSAdminRole(viewer?.role)) return true;
     const viewerId = resolveActorId(viewer?.id || viewer?._id || viewer);
     const mentorId = resolveActorId(assignment?.mentorId);

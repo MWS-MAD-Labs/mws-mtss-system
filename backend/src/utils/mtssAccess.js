@@ -220,8 +220,21 @@ const classNameMatchesAllowed = (className = '', allowedClasses = []) => {
     });
 };
 
+// Whether a student's current grade is one of the grades in a scope (a list such as ['Kindergarten', 'Grade 2']).
+// An empty scope matches nobody.
+const studentInGradeScope = (student = {}, gradeScope = []) => {
+    const grade = (student?.currentGrade || student?.grade || '').toString();
+    if (!grade || !Array.isArray(gradeScope) || !gradeScope.length) return false;
+    return expandGradeLabels(gradeScope).some((label) => {
+        const regex = buildGradeRegex(label);
+        return [].concat(regex || []).some((entry) => entry.test(grade));
+    });
+};
+
 module.exports = {
     KINDERGARTEN_GRADES,
+    studentInGradeScope,
+    expandGradeLabels,
     normalizeClassLabel,
     normalizeGradeLabel,
     buildGradeFilterClauses,

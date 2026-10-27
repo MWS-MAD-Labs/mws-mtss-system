@@ -545,7 +545,7 @@ export const ratingOptions = [1, 2, 3, 4, 5];
 
 export const buildPilotAdminBaseRoute = (user) => {
     const profile = getMtssAccessProfile(user);
-    if (profile.accessLevel === "observer") {
+    if (profile.accessLevel === "observer" || profile.accessLevel === "coordinator") {
         return "/mtss/observer";
     }
 

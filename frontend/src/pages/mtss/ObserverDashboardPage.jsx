@@ -30,6 +30,7 @@ import {
     ArrowDownRight, AlertCircle, ClipboardCheck,
 } from "lucide-react";
 import useAdminDashboardData from "./hooks/useAdminDashboardData";
+import { getCoordinatorGradeScope } from "@/utils/mtssAccess";
 import { useAdminDashboardState } from "./hooks/useAdminDashboardState";
 import { overviewIcons } from "./data/adminDashboardContent";
 
@@ -172,6 +173,7 @@ const ActivityItem = ({ item, index }) => (
 /* ── Main Page ────────────────────────────────────────────────────── */
 const ObserverDashboardPage = memo(() => {
     const { user } = useSelector((state) => state.auth);
+    const coordinatorGrades = getCoordinatorGradeScope(user);
     const navigate = useNavigate();
     const pageRef  = useRef(null);
     const heroRef  = useRef(null);
@@ -387,7 +389,9 @@ const ObserverDashboardPage = memo(() => {
                                     MTSS Executive Overview
                                 </h1>
                                 <p className="text-sm text-white/82 mt-1.5 font-medium">
-                                    All units · Kindergarten → Junior High · View-only access
+                                    {coordinatorGrades.length
+                                        ? `Your grades · ${coordinatorGrades.join(", ")} · View-only access`
+                                        : "All units · Kindergarten → Junior High · View-only access"}
                                 </p>
                             </div>
 

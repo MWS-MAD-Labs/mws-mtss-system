@@ -18,6 +18,7 @@ const {
     deriveAllowedClassNamesForUser,
     deriveGradesForUnit
 } = require('../utils/mtssAccess');
+const { isMtssCoordinator, getCoordinatorGradeScope } = require('../utils/accessControl');
 const {
     buildAssignmentPairings,
     getMentorAssignmentFocusLabels
@@ -240,6 +241,14 @@ const sanitizeStudentPayload = (payload = {}) => {
 };
 
 const applyViewerScope = (filter = {}, viewer = {}) => {
+    // A Coordinator sees the students of their own grades, whatever role their account carries. No grades, no students.
+    if (isMtssCoordinator(viewer)) {
+        const gradeClauses = buildGradeFilterClauses(getCoordinatorGradeScope(viewer));
+        filter.$and = filter.$and || [];
+        filter.$and.push(gradeClauses.length ? { $or: gradeClauses } : { _id: null });
+        return filter;
+    }
+
     // Directorate, admin, superadmin see all students
     if (!viewer || PRIVILEGED_ROLES.has(viewer.role)) {
         return filter;

@@ -94,14 +94,25 @@ export const getMtssAccessProfile = (user = null) => {
 
 export const hasMtssAccess = (user = null) => getMtssAccessProfile(user).hasAccess === true;
 
-export const isMtssObserver = (user = null) => getMtssAccessProfile(user).accessLevel === "observer";
+// Observers and Coordinators both only look. A Coordinator is cut to their own grades by the server.
+export const isMtssObserver = (user = null) => {
+    const level = getMtssAccessProfile(user).accessLevel;
+    return level === "observer" || level === "coordinator";
+};
+
+export const isMtssCoordinator = (user = null) => getMtssAccessProfile(user).accessLevel === "coordinator";
+
+export const getCoordinatorGradeScope = (user = null) => {
+    const profile = getMtssAccessProfile(user);
+    return profile.accessLevel === "coordinator" && Array.isArray(profile.gradeScope) ? profile.gradeScope : [];
+};
 
 export const canAccessMtssAdmin = (user = null) => getMtssAccessProfile(user).canAccessAdmin === true;
 
 export const getDefaultMtssRoute = (user = null) => {
     const profile = getMtssAccessProfile(user);
     if (!profile.hasAccess) return null;
-    if (profile.accessLevel === "observer") return "/mtss/observer";
+    if (profile.accessLevel === "observer" || profile.accessLevel === "coordinator") return "/mtss/observer";
     if (profile.canAccessAdmin) return "/mtss/admin";
     return "/mtss/teacher";
 };

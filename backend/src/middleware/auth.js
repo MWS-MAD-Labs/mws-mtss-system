@@ -8,7 +8,8 @@ const {
     buildMtssAccessProfile,
     hasMtssAccess,
     hasMtssAdminAccess,
-    hasMtssWriteAccess
+    hasMtssWriteAccess,
+    isMtssCoordinator
 } = require('../utils/accessControl');
 
 const buildRequestUser = (user) => {
@@ -46,6 +47,18 @@ const buildRequestUser = (user) => {
         mtssRole: mtssAccess.effectiveRole,
         mtssAccess
     };
+};
+
+// A Coordinator watches MTSS and changes nothing. Whatever router a request comes in on, they may only read the MTSS
+// data (which is cut to their grades) and their notifications, and use the sign-in routes. The AI helpers, the user
+// list and sync read by role, not by their grades, so they stay closed.
+const COORDINATOR_OPEN = /\/v1\/(mtss|notifications)(\/|\?|$)/;
+const COORDINATOR_SIGN_IN = /\/v1\/auth(\/|\?|$)/;
+const coordinatorMayCall = (req) => {
+    const url = req.originalUrl || '';
+    if (COORDINATOR_SIGN_IN.test(url)) return true;
+    const isRead = ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    return isRead && COORDINATOR_OPEN.test(url);
 };
 
 const resolveUserByRoleAndId = async (role, userId) => {
@@ -100,6 +113,10 @@ const authenticate = async (req, res, next) => {
         // Attach user to request object
         req.user = buildRequestUser(user);
 
+        if (isMtssCoordinator(req.user) && !coordinatorMayCall(req)) {
+            return sendError(res, 'Coordinators have view-only access to MTSS.', 403);
+        }
+
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
@@ -148,6 +165,9 @@ const authenticateServiceRelay = async (req, res, next) => {
         }
 
         req.user = buildRequestUser(user);
+        if (isMtssCoordinator(req.user)) {
+            return sendError(res, 'Coordinators have view-only access to MTSS.', 403);
+        }
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
@@ -237,5 +257,6 @@ module.exports = {
     requireStaffOrTeacher,
     requireTeacherAccess,
     requireAuthenticated,
-    buildRequestUser
+    buildRequestUser,
+    coordinatorMayCall
 };

@@ -162,8 +162,13 @@ const userSchema = new mongoose.Schema({
         },
         accessLevel: {
             type: String,
-            enum: ['observer', 'teacher', 'leader', 'admin'],
+            enum: ['observer', 'coordinator', 'teacher', 'leader', 'admin'],
             default: null
+        },
+        // Only read for accessLevel 'coordinator': the grades whose students they may see.
+        gradeScope: {
+            type: [String],
+            default: undefined
         },
         note: {
             type: String,

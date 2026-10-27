@@ -339,6 +339,7 @@ const useAdminDashboardData = () => {
             return clone;
         });
     }, [withinSegments]);
+    const isCoordinator = user?.mtssAccess?.accessLevel === "coordinator";
     const loadDashboard = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -361,7 +362,8 @@ const useAdminDashboardData = () => {
             const [studentResponse, assignmentResponse, mentorResponse] = await Promise.all([
                 fetchMtssStudents(studentParams),
                 fetchMentorAssignments(),
-                fetchMtssMentors(mentorParams),
+                // The mentor list is for admins. A Coordinator does not get it, and the other two still load.
+                isCoordinator ? Promise.resolve({ mentors: [] }) : fetchMtssMentors(mentorParams),
             ]);
 
             const roster = studentResponse.students || [];
@@ -392,7 +394,7 @@ const useAdminDashboardData = () => {
         } finally {
             setLoading(false);
         }
-    }, [classQueryValues, effectiveSegments, gradeQueryValues, mentorMatchesSegments, transformStudent, withinSegments]);
+    }, [classQueryValues, effectiveSegments, gradeQueryValues, isCoordinator, mentorMatchesSegments, transformStudent, withinSegments]);
     useEffect(() => {
         loadDashboard();
     }, [loadDashboard]);

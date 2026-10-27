@@ -89,6 +89,20 @@ const getMtssAccessLevelConfig = (level = '', user = {}) => {
                 effectiveRole: 'observer',
                 accessLevel: 'observer'
             };
+        // A staff member who watches MTSS for some grades and can change nothing. The grades come from the person's own
+        // override (gradeScope), and an empty list sees no student.
+        case 'coordinator':
+            return {
+                hasAccess: true,
+                isReadOnly: true,
+                canAccessAdmin: false,
+                canManageConfig: false,
+                effectiveRole: 'coordinator',
+                accessLevel: 'coordinator',
+                gradeScope: Array.isArray(user?.mtssAccess?.gradeScope)
+                    ? user.mtssAccess.gradeScope.map((grade) => String(grade).trim()).filter(Boolean)
+                    : []
+            };
         case 'teacher':
             return {
                 hasAccess: true,
@@ -246,6 +260,14 @@ const hasMtssAdminAccess = (user) => {
     return profile.hasAccess === true && profile.canAccessAdmin === true;
 };
 
+// A request user whose MTSS access is the view-only Coordinator level.
+const isMtssCoordinator = (user) => {
+    const profile = user?.mtssAccess;
+    return Boolean(profile) && profile.hasAccess === true && profile.accessLevel === 'coordinator';
+};
+
+const getCoordinatorGradeScope = (user) => (isMtssCoordinator(user) ? user.mtssAccess.gradeScope || [] : []);
+
 const hasMtssWriteAccess = (user) => {
     if (!user) return false;
     const profile = user.mtssAccess || buildMtssAccessProfile(user);
@@ -261,5 +283,7 @@ module.exports = {
     buildMtssAccessProfile,
     hasMtssAccess,
     hasMtssAdminAccess,
-    hasMtssWriteAccess
+    hasMtssWriteAccess,
+    isMtssCoordinator,
+    getCoordinatorGradeScope
 };
