@@ -22,7 +22,7 @@ const OPEN = new Set([
 const SCREEN_ONLY = new Set([
     'mtss.scope.unit',
     'mtss.scope.all',
-    'emotional_dashboard.read',
+    'emotional-dashboard.read',
     'hub.support.access',
 ]);
 

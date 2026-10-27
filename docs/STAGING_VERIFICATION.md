@@ -43,7 +43,7 @@ Pick one person and one student in Central and check each field in MTSS.
 - [ ] A DOCX download writes an `[AuditLog]` line with the signed-in person as actor.
 
 ## 7. Nothing else broke
-- [ ] The AI chat opened from Daily Check-in still works: Daily passes the person's Hub cookie to MTSS, so both need the same `HUB_ACCESS_COOKIE_NAME`, and the person needs `ai_chat.use` in MTSS. Without MTSS access Daily shows "AI chat is not available for this account yet".
+- [ ] The AI chat opened from Daily Check-in still works: Daily passes the person's Hub cookie to MTSS, so both need the same `HUB_ACCESS_COOKIE_NAME`, and the person needs `ai-chat.use` in MTSS. Without MTSS access Daily shows "AI chat is not available for this account yet".
 - [ ] Notifications arrive in the bell and, for those who opted in, in Slack.
 - [ ] Exima and Daily staging still open from the Hub card with the new cookie name.
 

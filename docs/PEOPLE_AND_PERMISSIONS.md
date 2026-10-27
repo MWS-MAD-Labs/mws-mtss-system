@@ -31,13 +31,13 @@ The list lives in `backend/src/constants/permissions.js`. `npm run permissions:s
 | `mtss.admin` | Tiers and strategies, creating and changing students, the mentor list, pilot feedback, reassigning a plan |
 | `mtss.scope.unit` | Students in the person's own unit |
 | `mtss.scope.all` | Every student |
-| `emotional_dashboard.read` | The emotional dashboard |
-| `ai_chat.use` | The AI assistant |
-| `ai_insights.read`, `ai_insights.write` | AI insights and alerts |
+| `emotional-dashboard.read` | The emotional dashboard |
+| `ai-chat.use` | The AI assistant |
+| `ai-insights.read`, `ai-insights.write` | AI insights and alerts |
 | `notifications.broadcast` | Sending system notifications |
 | `users.read` | The people list under User Management |
 | `sync.read` | The sync status line |
-| `dev_topology.read` | The developer topology page |
+| `dev-topology.read` | The developer topology page |
 | `hub.support.access` | The Support Hub shortcut in the quick menu |
 
 `mtss.write` and `mtss.admin` need `mtss.read`. Without either scope permission, a person sees the classes they teach plus the students they support, as Central assigns them. A student sees only their own record.

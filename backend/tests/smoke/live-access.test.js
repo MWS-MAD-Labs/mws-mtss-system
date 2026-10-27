@@ -40,9 +40,9 @@ describe('live rooms (socket access)', () => {
         expect(canJoin('mtss-live', user([]), 'all')).toBe(false);
     });
 
-    test('the topology needs dev_topology.read, and an unknown room is refused', () => {
+    test('the topology needs dev-topology.read, and an unknown room is refused', () => {
         expect(canJoin('dev-topology', user(['mtss.admin']))).toBe(false);
-        expect(canJoin('dev-topology', user(['dev_topology.read']))).toBe(true);
+        expect(canJoin('dev-topology', user(['dev-topology.read']))).toBe(true);
         expect(canJoin('something-else', user(['mtss.admin']), 'p1')).toBe(false);
         expect(canJoin('personal', null, 'p1')).toBe(false);
     });
