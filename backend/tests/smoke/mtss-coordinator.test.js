@@ -153,6 +153,16 @@ describe('seed of the Coordinators', () => {
         expect(byEmail['dummyteacher@millennia21.id']).toEqual(LOWER);
     });
 
+    test('one user that cannot be saved is reported and the others are still granted', async () => {
+        const broken = { mtssAccess: undefined, save: jest.fn().mockRejectedValue(new Error('User validation failed: gender')) };
+        const fine = fakeUser(undefined);
+        jest.spyOn(User, 'findOne').mockImplementation(async ({ email }) => (email === 'putri.fitriyani@millennia21.id' ? broken : email === 'roma@millennia21.id' ? fine : null));
+        const results = await applyCoordinators();
+        expect(results.find((row) => row.email === 'putri.fitriyani@millennia21.id')).toMatchObject({ status: 'failed', message: 'User validation failed: gender' });
+        expect(results.find((row) => row.email === 'roma@millennia21.id').status).toBe('updated');
+        expect(fine.save).toHaveBeenCalledTimes(1);
+    });
+
     test('writes the override, reports what is missing, and is safe to run again', async () => {
         const stored = {
             'putri.fitriyani@millennia21.id': fakeUser(undefined),
@@ -173,6 +183,8 @@ describe('seed of the Coordinators', () => {
         expect(putri.save).toHaveBeenCalledTimes(1);
         expect(putri.mtssAccess).toMatchObject({ enabled: true, accessLevel: 'coordinator', gradeScope: LOWER });
         expect(stored['roma@millennia21.id'].save).not.toHaveBeenCalled();
+        // Only the access field is validated, so an old value elsewhere on the user cannot block the grant.
+        expect(putri.save).toHaveBeenCalledWith({ validateModifiedOnly: true });
 
         const again = await applyCoordinators();
         expect(again.find((row) => row.email === 'putri.fitriyani@millennia21.id').status).toBe('unchanged');

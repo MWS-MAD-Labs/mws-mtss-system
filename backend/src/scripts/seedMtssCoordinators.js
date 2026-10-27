@@ -35,7 +35,9 @@ const COORDINATORS = [
 const sameList = (a = [], b = []) =>
   a.length === b.length && a.every((entry, index) => entry === b[index]);
 
-// Returns what happened per entry: 'updated', 'unchanged' or 'not_found'. Writes only when dryRun is false.
+// Returns what happened per entry: 'updated', 'unchanged', 'not_found' or 'failed'. Writes only when dryRun is false.
+// Only the mtssAccess field is validated: an old value elsewhere on the user (for example a gender typed in lower
+// case) must not stop the grant, and one user failing must not stop the others.
 const applyCoordinators = async ({
   entries = COORDINATORS,
   dryRun = false,
@@ -66,7 +68,12 @@ const applyCoordinators = async ({
         note: entry.note,
         grantedAt: now,
       };
-      await user.save();
+      try {
+        await user.save({ validateModifiedOnly: true });
+      } catch (error) {
+        results.push({ email, status: "failed", message: error.message });
+        continue;
+      }
     }
     results.push({ email, status: "updated", gradeScope: entry.gradeScope });
   }
@@ -80,10 +87,12 @@ const main = async () => {
     const results = await applyCoordinators({ dryRun });
     results.forEach((row) => {
       const scope = row.gradeScope ? ` -> ${row.gradeScope.join(", ")}` : "";
+      const detail = row.message ? ` (${row.message})` : "";
       console.log(
-        `${dryRun && row.status === "updated" ? "would update" : row.status}: ${row.email}${scope}`,
+        `${dryRun && row.status === "updated" ? "would update" : row.status}: ${row.email}${scope}${detail}`,
       );
     });
+    if (results.some((row) => row.status === "failed")) process.exitCode = 1;
     if (results.some((row) => row.status === "not_found")) {
       console.log(
         "Some users were not found. They need to exist in MTSS (sign in once, or be in the roster) first.",
