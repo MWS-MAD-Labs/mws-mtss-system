@@ -9,6 +9,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 const BASE_PATH = process.env.VITE_BASE_PATH || '/mtss/'
 const BUILD_ID = process.env.VITE_BUILD_ID || 'dev'
 
+// The MTSS backend. One place, so every proxy route points at the same app.
+const API_TARGET = process.env.VITE_API_PROXY_TARGET || 'http://localhost:3004'
+
 export default defineConfig({
     base: BASE_PATH,
     plugins: [
@@ -223,6 +226,7 @@ export default defineConfig({
     },
     server: {
         port: 5176,
+        strictPort: true,
         proxy: {
             // The app is served under BASE_PATH ('/mtss/'), so the client calls
             // /mtss/api, /mtss/auth and /mtss/socket.io. Mirror the production
@@ -230,13 +234,13 @@ export default defineConfig({
             // forwarding to the backend. Keep the unprefixed entries below for
             // standalone dev (VITE_BASE_PATH='/').
             '/mtss/api': {
-                target: 'http://localhost:3004',
+                target: API_TARGET,
                 changeOrigin: true,
                 secure: false,
                 rewrite: (p) => p.replace(/^\/mtss/, '')
             },
             '/mtss/auth': {
-                target: 'http://localhost:3004',
+                target: API_TARGET,
                 changeOrigin: true,
                 secure: false,
                 // /mtss/auth/callback is an SPA route, not a backend route.
@@ -245,24 +249,24 @@ export default defineConfig({
                 rewrite: (p) => p.replace(/^\/mtss/, '')
             },
             '/mtss/socket.io': {
-                target: 'http://localhost:3004',
+                target: API_TARGET,
                 changeOrigin: true,
                 secure: false,
                 ws: true,
                 rewrite: (p) => p.replace(/^\/mtss/, '')
             },
             '/api': {
-                target: 'http://localhost:3004',
+                target: API_TARGET,
                 changeOrigin: true,
                 secure: false
             },
             '/auth': {
-                target: 'http://localhost:3004',
+                target: API_TARGET,
                 changeOrigin: true,
                 secure: false
             },
             '/socket.io': {
-                target: 'http://localhost:3004',
+                target: API_TARGET,
                 changeOrigin: true,
                 secure: false,
                 ws: true
