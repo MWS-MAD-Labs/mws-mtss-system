@@ -150,7 +150,7 @@ describe('seed of the Coordinators', () => {
         const byEmail = Object.fromEntries(COORDINATORS.map((entry) => [entry.email, entry.gradeScope]));
         expect(byEmail['putri.fitriyani@millennia21.id']).toEqual(LOWER);
         expect(byEmail['roma@millennia21.id']).toEqual(UPPER);
-        expect(byEmail['dummyteacher@gmail.com']).toEqual(LOWER);
+        expect(byEmail['dummyteacher@millennia21.id']).toEqual(LOWER);
     });
 
     test('writes the override, reports what is missing, and is safe to run again', async () => {
@@ -164,7 +164,7 @@ describe('seed of the Coordinators', () => {
         expect(dry.map((row) => [row.email, row.status])).toEqual([
             ['putri.fitriyani@millennia21.id', 'updated'],
             ['roma@millennia21.id', 'unchanged'],
-            ['dummyteacher@gmail.com', 'not_found']
+            ['dummyteacher@millennia21.id', 'not_found']
         ]);
         expect(stored['putri.fitriyani@millennia21.id'].save).not.toHaveBeenCalled();
 
