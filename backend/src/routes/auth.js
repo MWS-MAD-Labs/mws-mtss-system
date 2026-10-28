@@ -9,6 +9,7 @@ const { sendSuccess, sendError } = require("../utils/response");
 const { hasDashboardAccess, hasMtssAccess } = require("../utils/accessControl");
 const { buildRequestUser } = require("../middleware/auth");
 const { verifyHubRelayToken } = require("../utils/hubSsoRelay");
+const { exchangeHubCode } = require("../utils/hubCodeExchange");
 const { resolveOrProvisionSsoUser } = require("../utils/ssoUserResolution");
 const { createUserAwareRateLimiter } = require("../middleware/rateLimiter");
 const { setAuthCookie, clearAuthCookie, COOKIE_NAME } = require("../utils/authCookie");
@@ -60,7 +61,18 @@ router.get(
   async (req, res) => {
     const frontendUrl =
       process.env.FRONTEND_URL || "http://localhost:5176/mtss";
-    const { token } = req.query;
+    const { code, state } = req.query;
+    let { token } = req.query;
+
+    // Hub sends a one-time code; the token itself is fetched from Hub, never carried in the URL.
+    if (typeof code === "string" && code) {
+      try {
+        token = await exchangeHubCode(code, typeof state === "string" ? state : undefined);
+      } catch (error) {
+        console.error("❌ MTSS Hub SSO code exchange failed:", error.message);
+        return res.redirect(`${frontendUrl}/?error=sso_invalid_token`);
+      }
+    }
 
     if (!token || typeof token !== "string") {
       return res.redirect(`${frontendUrl}/?error=sso_missing_token`);
