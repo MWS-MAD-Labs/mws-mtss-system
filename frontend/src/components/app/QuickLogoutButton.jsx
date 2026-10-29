@@ -6,14 +6,11 @@
  * - Navigation shortcuts + dark mode toggle + logout
  */
 import { memo, useState, useCallback, useRef, useEffect } from "react";
-import { ExternalLink, LogOut, Moon, Sun, User } from "lucide-react";
+import { LogOut, Moon, Sun, User } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { leaveToHub } from "@/store/slices/authSlice";
 import { applyThemePreference, emitThemeSpell, persistTheme } from "@/lib/theme";
-import { goToHubSupport } from "@/utils/hubConfig";
-import { hasPermission } from "@/utils/accessControl";
-import { PERMISSIONS } from "@/constants/permissions";
 import gsap from "gsap";
 import { animate } from "animejs";
 import "./quick-menu.css";
@@ -141,20 +138,6 @@ const QuickMenu = memo(() => {
         }, 120);
     }, [close, navigate]);
 
-    /* Support Hub - opens/focuses Hub's app launcher in a separate tab,
-       not an in-app route, so this can't reuse handleNav's navigate(path). */
-    const handleSupportHub = useCallback((e) => {
-        animate(e.currentTarget, {
-            scale: [1, 0.93, 1],
-            duration: 220,
-            ease: "outElastic(1, .7)",
-        });
-        setTimeout(() => {
-            close();
-            goToHubSupport();
-        }, 120);
-    }, [close]);
-
     /* Dark mode toggle */
     const handleDarkMode = useCallback((e) => {
         const next = isDark ? "light" : "dark";
@@ -243,21 +226,6 @@ const QuickMenu = memo(() => {
                                 </button>
                             );
                         })}
-
-                        {hasPermission(user, PERMISSIONS.HUB_SUPPORT_ACCESS) && (
-                            <button
-                                ref={(el) => (itemsRef.current[idx++] = el)}
-                                type="button"
-                                className="qm-item qm-item--btn"
-                                onClick={handleSupportHub}
-                                role="menuitem"
-                            >
-                                <div className="qm-item-icon">
-                                    <ExternalLink size={14} />
-                                </div>
-                                <span className="qm-item-label">Support Hub</span>
-                            </button>
-                        )}
 
                         <div className="qm-divider" role="separator" />
 
