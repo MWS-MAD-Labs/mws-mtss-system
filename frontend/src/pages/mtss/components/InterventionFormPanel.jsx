@@ -1,3 +1,4 @@
+import { findStudentById } from "../utils/studentSelection";
 import { memo, useEffect, useMemo, useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { fetchStrategies } from "@/services/mtssService";
@@ -66,7 +67,7 @@ const InterventionFormPanel = memo(({
     const filteredStrategies = strategyFallbackActive ? strategies : strategyMatchesType;
 
     const selectedStudent = useMemo(
-        () => students.find((student) => student.id === formState.studentId || student._id === formState.studentId),
+        () => findStudentById(students, formState.studentId),
         [students, formState.studentId],
     );
 
@@ -77,7 +78,7 @@ const InterventionFormPanel = memo(({
 
     const handleStudentChange = (event) => {
         const value = event.target.value;
-        const student = students.find((candidate) => candidate.id === value || candidate._id === value);
+        const student = findStudentById(students, value);
         const nextAllowed = resolveAllowedSubjectKeys(user, student || null);
         onChange("studentId", value);
         onChange("studentName", student?.name || "");
