@@ -1,3 +1,4 @@
+import { normalizeStudentId } from "../utils/studentSelection";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -360,7 +361,7 @@ export const useTeacherDashboardState = (tabs, { onSaveSuccess, viewerUser } = {
                     await createMentorAssignment({
                         ...payload,
                         mentorId,
-                        studentIds: [currentForm.studentId],
+                        studentIds: [normalizeStudentId(currentForm.studentId)],
                     });
                 }
 

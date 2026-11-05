@@ -19,6 +19,7 @@ import {
     MAX_CUSTOM_DURATION_DAYS,
     getInterventionFormErrors,
 } from "../config/interventionFormConfig";
+import { getStudentOptions, normalizeStudentId } from "../utils/studentSelection";
 
 const SCORE_CAPPED_UNITS = new Set(["%", "pts", "score"]);
 
@@ -128,8 +129,8 @@ const InterventionFormFields = memo(({
                         Student Name
                     </label>
                     <Dropdown
-                        options={students.map((student) => ({ value: student.id, label: student.name }))}
-                        value={formState.studentId}
+                        options={getStudentOptions(students)}
+                        value={normalizeStudentId(formState.studentId)}
                         onChange={(value) => onStudentChange({ target: { value } })}
                         placeholder="Select student"
                         searchPlaceholder="Search students..."

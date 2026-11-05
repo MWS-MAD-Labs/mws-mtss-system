@@ -1,3 +1,4 @@
+import { findStudentById } from "../utils/studentSelection";
 import { memo, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Loader2, PencilLine, Save, ShieldAlert } from "lucide-react";
 import { fetchStrategies } from "@/services/mtssService";
@@ -47,13 +48,13 @@ const EditInterventionPanel = memo(({
     const filteredStrategies = strategyFallbackActive ? strategies : strategyMatchesType;
 
     const selectedStudent = useMemo(
-        () => students.find((student) => student.id === formState.studentId || student._id === formState.studentId),
+        () => findStudentById(students, formState.studentId),
         [students, formState.studentId],
     );
 
     const handleStudentChange = (event) => {
         const value = event.target.value;
-        const student = students.find((candidate) => candidate.id === value || candidate._id === value);
+        const student = findStudentById(students, value);
         onChange("studentId", value);
         onChange("studentName", student?.name || "");
         onChange("grade", student?.grade || student?.currentGrade || "");
