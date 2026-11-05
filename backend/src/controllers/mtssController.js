@@ -147,6 +147,51 @@ const extractAssignmentSubjectKeys = (assignment = {}) => {
     return subjectKeys.length ? subjectKeys : ['universal'];
 };
 
+// The one-intervention-per-subject rule. The subjects are the ones the teacher picked in the form: SEL, English, Math,
+// Behavior, Attendance, Bahasa Indonesia. SEL and Behavior are two subjects here as they are in the form, and a word
+// only counts when it stands alone ("bi" is not in "binder"). Nothing else (a strategy name, the "Universal" default)
+// makes two interventions conflict, and a subject that is none of these counts as its own.
+const CONFLICT_SUBJECT_ALIASES = {
+    sel: ['sel', 'social emotional', 'social emotional learning'],
+    english: ['english', 'bahasa inggris', 'ela', 'ela reading', 'literacy', 'reading'],
+    math: ['math', 'mathematics', 'numeracy'],
+    behavior: ['behavior', 'behaviour', 'behavioral', 'conduct', 'discipline'],
+    attendance: ['attendance', 'engagement'],
+    indonesian: ['indonesian', 'bahasa indonesia', 'indonesian language', 'bahasa', 'bi']
+};
+
+const CONFLICT_ALIAS_LIST = Object.entries(CONFLICT_SUBJECT_ALIASES)
+    .flatMap(([subject, aliases]) => aliases.map((alias) => ({ subject, alias })))
+    .sort((a, b) => b.alias.length - a.alias.length);
+
+const UNIVERSAL_SUBJECT_TOKENS = new Set(['universal', 'universal supports', 'all', 'whole school', 'schoolwide']);
+
+const subjectKeysForConflict = (rawValue = '') => {
+    const normalized = normalizeSubjectToken(rawValue);
+    if (!normalized || UNIVERSAL_SUBJECT_TOKENS.has(normalized)) return [];
+
+    // Longest words first and used up once matched, so "bahasa inggris" is English and not also Bahasa Indonesia.
+    let rest = ` ${normalized} `;
+    const found = new Set();
+    CONFLICT_ALIAS_LIST.forEach(({ subject, alias }) => {
+        const spaced = ` ${alias} `;
+        if (!rest.includes(spaced)) return;
+        found.add(subject);
+        rest = rest.split(spaced).join(' ');
+    });
+    if (found.size) return Array.from(found);
+    return [slugifyName(normalized)].filter(Boolean);
+};
+
+const extractConflictSubjectKeys = (assignment = {}) =>
+    Array.from(
+        new Set(
+            (Array.isArray(assignment.focusAreas) ? assignment.focusAreas : []).flatMap((value) =>
+                subjectKeysForConflict(value)
+            )
+        )
+    );
+
 const normalizeComparableText = (value = '') =>
     value
         .toString()
@@ -503,7 +548,7 @@ const findSubjectConflicts = async ({
     const conflicts = [];
 
     assignments.forEach((assignment) => {
-        const existingSubjectKeys = extractAssignmentSubjectKeys(assignment);
+        const existingSubjectKeys = extractConflictSubjectKeys(assignment);
         const overlappingSubjects = existingSubjectKeys.filter((key) => requestedSet.has(key));
         if (!overlappingSubjects.length) return;
 
@@ -1278,10 +1323,7 @@ const createMentorAssignment = async (req, res) => {
         const resolvedFocusAreas = normalizedFocusAreas.length ? normalizedFocusAreas : ['Universal Supports'];
 
         const cleanedStrategyName = strategyName?.trim() || undefined;
-        const requestedSubjectKeys = extractAssignmentSubjectKeys({
-            focusAreas: resolvedFocusAreas,
-            strategyName: cleanedStrategyName
-        });
+        const requestedSubjectKeys = extractConflictSubjectKeys({ focusAreas: resolvedFocusAreas });
         const conflicts = await findSubjectConflicts({
             studentIds,
             subjectKeys: requestedSubjectKeys
@@ -1624,10 +1666,7 @@ const updateMentorAssignment = async (req, res) => {
         if (hasFocusAreasUpdate || hasStrategyNameUpdate || isReopening) {
             const conflicts = await findSubjectConflicts({
                 studentIds: assignment.studentIds || [],
-                subjectKeys: extractAssignmentSubjectKeys({
-                    focusAreas: nextFocusAreas,
-                    strategyName: nextStrategyName || undefined
-                }),
+                subjectKeys: extractConflictSubjectKeys({ focusAreas: nextFocusAreas }),
                 excludeAssignmentId: assignment._id
             });
             if (conflicts.length) {
@@ -2442,6 +2481,8 @@ const getKindergartenInterventionBank = async (_req, res) => {
 };
 
 module.exports = {
+    subjectKeysForConflict,
+    extractConflictSubjectKeys,
     isAssignmentOwnerOrAdmin,
     isAssignmentInViewerTeachingScope,
     canViewerSeeAssignment,
