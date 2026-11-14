@@ -1,6 +1,5 @@
 import { memo } from "react";
 import HeroAuthCard from "@/components/ui/HeroAuthCard";
-import Logo from "./Millennia.webp";
 import { Sparkles, ShieldCheck, Smartphone } from "lucide-react";
 import useHubSignIn from "@/hooks/useHubSignIn";
 
@@ -33,8 +32,8 @@ const HeroSection = memo(() => {
             <div className="relative w-20 h-20 md:w-28 md:h-28 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary via-gold to-gold p-[2px] shadow-2xl">
               <div className="w-full h-full rounded-2xl md:rounded-3xl bg-card flex items-center justify-center overflow-hidden">
                 <img
-                  src={Logo}
-                  alt="Millennia Logo"
+                  src={`${import.meta.env.BASE_URL}MTSS.svg`}
+                  alt="MTSS Logo"
                   className="w-24 h-24 md:w-32 md:h-32 object-contain"
                   loading="eager"
                   fetchPriority="high"

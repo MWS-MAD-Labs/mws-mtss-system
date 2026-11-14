@@ -20,7 +20,7 @@ export default defineConfig({
             strategies: 'generateSW',
             registerType: 'autoUpdate',
             filename: 'mws-sw.js',
-            includeAssets: ['vite.svg', 'Millennia.webp'],
+            includeAssets: ['vite.svg', 'MTSS.svg'],
             manifest: {
                 name: 'MWS IntegraLearn - Premium Education Platform',
                 short_name: 'MWS IntegraLearn',
@@ -33,16 +33,10 @@ export default defineConfig({
                 start_url: BASE_PATH,
                 icons: [
                     {
-                        src: 'Millennia.webp',
-                        sizes: '192x192',
-                        type: 'image/webp',
-                        purpose: 'any maskable'
-                    },
-                    {
-                        src: 'Millennia.webp',
-                        sizes: '512x512',
-                        type: 'image/webp',
-                        purpose: 'any maskable'
+                        src: 'MTSS.svg',
+                        sizes: 'any',
+                        type: 'image/svg+xml',
+                        purpose: 'any'
                     }
                 ],
                 categories: ['education', 'productivity'],
