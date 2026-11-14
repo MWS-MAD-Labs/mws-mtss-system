@@ -37,14 +37,12 @@ import {
 } from "@/components/ui/dialog";
 import ThemeToggle from "@/components/ThemeToggle";
 import { getCheckinHistory, getPersonalDashboard } from "../store/slices/checkinSlice";
-import { logoutUser } from "../store/slices/authSlice";
+import { leaveToHub } from "../store/slices/authSlice";
 import { useToast } from "@/components/ui/use-toast";
-import {
-    hasEmotionalDashboardAccess,
-    getEmotionalDashboardRole,
-    hasDelegatedDashboardAccess,
-    getDelegatedDashboardDetails
-} from "@/utils/accessControl";
+import { hasEmotionalDashboardAccess, hasPermission, isStudent as isStudentUser } from "@/utils/accessControl";
+import { PERMISSIONS } from "@/constants/permissions";
+import { SCOPE_MODE } from "@/constants/enums";
+import { canAccessMtssAdmin } from "@/utils/mtssAccess";
 import useThrottledCallback from "@/hooks/useThrottledCallback";
 
 /* ---------------------- Helpers ---------------------- */
@@ -784,7 +782,7 @@ const StudentProfileView = memo(function StudentProfileView({
                         </div>
                     </motion.div>
 
-                    {/* ── Sign out ── */}
+                    {/* ── Back to the Hub ── */}
                     <motion.div
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -796,7 +794,7 @@ const StudentProfileView = memo(function StudentProfileView({
                             className="sp-card w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/60 dark:bg-white/[0.04] backdrop-blur-sm border border-rose-200/50 dark:border-rose-500/15 text-rose-600 dark:text-rose-400 hover:bg-rose-50/80 dark:hover:bg-rose-500/10 hover:shadow-md transition-all duration-200 text-sm font-extrabold"
                         >
                             <LogOut className="w-4 h-4" />
-                            Sign Out
+                            Back to Hub
                         </button>
                     </motion.div>
 
@@ -822,16 +820,12 @@ const ProfilePage = memo(function ProfilePage() {
     const dispatch = useDispatch();
     const { toast } = useToast();
     const { user: currentUser } = useSelector((state) => state.auth);
-    const isAdminPrincipal = useMemo(
-        () => currentUser && ['admin', 'superadmin', 'head_unit', 'directorate'].includes(currentUser.role),
-        [currentUser],
-    );
+    const isAdminPrincipal = useMemo(() => canAccessMtssAdmin(currentUser), [currentUser]);
+    const canSeeUsers = hasPermission(currentUser, PERMISSIONS.USERS_READ);
+    const isUnitScoped = currentUser?.mtssScope?.mode === SCOPE_MODE.UNIT;
 
     // Redux state
     const canAccessDashboard = currentUser && hasEmotionalDashboardAccess(currentUser);
-    const dashboardRole = useMemo(() => getEmotionalDashboardRole(currentUser), [currentUser]);
-    const delegatedDashboardAccess = hasDelegatedDashboardAccess(currentUser);
-    const delegatedDashboardDetails = getDelegatedDashboardDetails(currentUser);
     const {
         todayCheckin,
         checkinHistory,
@@ -937,7 +931,7 @@ const ProfilePage = memo(function ProfilePage() {
         const updated = { ...snapshot, count: snapshot.count + 1 };
         persistCheckinUsageSnapshot(updated);
         setCheckinUsage({ ...updated, ready: true });
-        const isStudent = currentUser?.role === 'student';
+        const isStudent = isStudentUser(currentUser);
         navigate(isStudent ? "/mtss/student/support-hub" : "/mtss/support-hub");
     }, [navigate, toast, currentUser]);
 
@@ -1003,7 +997,7 @@ const ProfilePage = memo(function ProfilePage() {
     }), []);
 
     // Menu configuration
-    const isStudent = currentUser?.role === 'student';
+    const isStudent = isStudentUser(currentUser);
     const menuItems = useMemo(() => {
         const emotionalBadge = checkinUsage.ready
             ? checkinLimitReached
@@ -1027,21 +1021,20 @@ const ProfilePage = memo(function ProfilePage() {
             { key: "notif", icon: Bell, title: "Notification Settings", to: "/mtss/notifications/settings" },
         ];
 
-        const shouldShowPersonalMenu = currentUser && !['directorate', 'admin', 'superadmin'].includes(currentUser.role);
-        const isAdminMenu = currentUser && ['directorate', 'admin', 'superadmin', 'head_unit'].includes(currentUser.role);
+        const shouldShowPersonalMenu = currentUser && !isAdminPrincipal;
+        const isAdminMenu = isAdminPrincipal;
         const dashboardMenuItem = {
             key: "dashboard",
             icon: BarChart3,
-            title: dashboardRole === 'head_unit' ? "Unit Dashboard" : "Emotional Dashboard",
-            to: "/emotional-checkin/dashboard",
-            badge: delegatedDashboardAccess ? "Delegated" : undefined
+            title: isUnitScoped ? "Unit Dashboard" : "Emotional Dashboard",
+            to: "/emotional-checkin/dashboard"
         };
 
         if (isAdminMenu) {
-            baseItems.splice(1, 0,
-                dashboardMenuItem,
-                { key: "user-mgmt", icon: UserCog, title: "User Management", to: "/mtss/user-management" }
-            );
+            baseItems.splice(1, 0, dashboardMenuItem);
+            if (canSeeUsers) {
+                baseItems.splice(2, 0, { key: "user-mgmt", icon: UserCog, title: "User Management", to: "/mtss/user-management" });
+            }
         } else {
             if (canAccessDashboard) {
                 baseItems.splice(1, 0, dashboardMenuItem);
@@ -1058,23 +1051,18 @@ const ProfilePage = memo(function ProfilePage() {
         }
 
         return baseItems;
-    }, [currentUser, isStudent, handleEmotionalCheckin, checkinDescription, checkinLimitReached, checkinUsage.ready, remainingCheckins, canAccessDashboard, dashboardRole, delegatedDashboardAccess]);
+    }, [currentUser, isStudent, handleEmotionalCheckin, checkinDescription, checkinLimitReached, checkinUsage.ready, remainingCheckins, canAccessDashboard, isAdminPrincipal, isUnitScoped, canSeeUsers]);
 
     // Quick actions
     const quickActions = useMemo(() => {
-        const isAdminRole = currentUser && ['directorate', 'admin', 'superadmin'].includes(currentUser.role);
-        const isHeadUnitRole = currentUser && currentUser.role === 'head_unit';
-        const dashboardLabel = dashboardRole === 'head_unit' ? "Unit Dashboard" : "Emotional Dashboard";
-        const dashboardHint = delegatedDashboardAccess && delegatedDashboardDetails
-            ? `Mirrors ${delegatedDashboardDetails.delegatedFromName || delegatedDashboardDetails.delegatedFromEmail}`
-            : dashboardRole === 'head_unit'
-                ? "Monitor team wellness"
-                : "Monitor & analyze";
+        const isHeadUnitRole = isUnitScoped && !isAdminPrincipal;
+        const dashboardLabel = isUnitScoped ? "Unit Dashboard" : "Emotional Dashboard";
+        const dashboardHint = isUnitScoped ? "Monitor team wellness" : "Monitor & analyze";
 
-        if (isAdminRole) {
+        if (isAdminPrincipal) {
             return [
                 { title: dashboardLabel, hint: dashboardHint, icon: BarChart3, to: "/emotional-checkin/dashboard" },
-                { title: "User Management", hint: "Manage users", icon: UserCog, to: "/mtss/user-management" },
+                ...(canSeeUsers ? [{ title: "User Management", hint: "See the people from Central", icon: UserCog, to: "/mtss/user-management" }] : []),
             ];
         }
 
@@ -1098,20 +1086,12 @@ const ProfilePage = memo(function ProfilePage() {
             { title: "Emotional History", hint: "Reflection & thoughts", icon: Calendar, to: "/mtss/profile/emotional-history" },
             { title: "Emotional Patterns", hint: "Insights & patterns", icon: Activity, to: "/mtss/profile/emotional-patterns" },
         ];
-    }, [user.completed, currentUser, dashboardRole, delegatedDashboardAccess, delegatedDashboardDetails, canAccessDashboard]);
+    }, [user.completed, canAccessDashboard, isAdminPrincipal, isUnitScoped, canSeeUsers]);
 
     // Logout handler
-    const handleLogout = async () => {
-        try {
-            const result = await dispatch(logoutUser()).unwrap();
-            // If a Hub redirect is already navigating the tab away, don't
-            // also push a local route - that races the Hub nav.
-            if (!result?.redirectedToHub) navigate("/mtss/");
-        } catch (error) {
-            console.error('Logout failed:', error);
-            // Still navigate to landing page even if logout API fails
-            navigate("/mtss/");
-        }
+    // Signing out lives in the Hub, so this goes to its front page.
+    const handleLogout = () => {
+        dispatch(leaveToHub());
     };
 
     const handleStudentBack = useCallback(() => {
@@ -1146,10 +1126,10 @@ const ProfilePage = memo(function ProfilePage() {
                             <DialogHeader className="space-y-3">
                                 <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
                                     <LogOut className="h-5 w-5 text-destructive" />
-                                    Sign Out
+                                    Back to Hub
                                 </DialogTitle>
                                 <DialogDescription className="text-foreground/70 leading-relaxed">
-                                    Are you sure you want to sign out? You can log in again anytime.
+                                    Signing out happens in the Hub and ends your session in every app at once.
                                 </DialogDescription>
                             </DialogHeader>
                             <DialogFooter className="flex gap-3 mt-6">
@@ -1165,7 +1145,7 @@ const ProfilePage = memo(function ProfilePage() {
                                     onClick={handleLogout}
                                     className="flex-1 bg-destructive hover:bg-destructive/90 text-primary"
                                 >
-                                    Sign Out
+                                    Back to Hub
                                 </Button>
                             </DialogFooter>
                         </GlassCard>
@@ -1563,7 +1543,7 @@ const ProfilePage = memo(function ProfilePage() {
                             >
                                 <span className="inline-flex items-center gap-2 justify-center">
                                     <LogOut className="h-4 w-4" />
-                                    Sign Out
+                                    Back to Hub
                                 </span>
                             </button>
                         </motion.div>
@@ -1583,10 +1563,10 @@ const ProfilePage = memo(function ProfilePage() {
                         <DialogHeader className="space-y-3">
                             <DialogTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
                                 <LogOut className="h-5 w-5 text-destructive" />
-                                Sign Out
+                                Back to Hub
                             </DialogTitle>
                             <DialogDescription className="text-foreground/70 leading-relaxed">
-                                Are you sure you want to sign out of MWS APP? You'll need to sign in again to access your account.
+                                Signing out happens in the Hub and ends your session in every app at once.
                             </DialogDescription>
                         </DialogHeader>
                         <DialogFooter className="flex gap-3 mt-6">
@@ -1602,7 +1582,7 @@ const ProfilePage = memo(function ProfilePage() {
                                 onClick={handleLogout}
                                 className="flex-1 bg-destructive hover:bg-destructive/90 text-primary"
                             >
-                                Sign Out
+                                Back to Hub
                             </Button>
                         </DialogFooter>
                     </GlassCard>

@@ -8,7 +8,7 @@ const STATIC_ASSETS = [
     '/',
     '/manifest.json',
     '/vite.svg',
-    '/Millennia.webp',
+    '/MTSS.svg',
     '/index.html',
     '/src/main.jsx',
     '/src/index.css'
@@ -131,7 +131,7 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: event.data ? event.data.text() : 'New notification from MWS IntegraLearn',
-        icon: '/Millennia.webp',
+        icon: '/MTSS.svg',
         badge: '/vite.svg',
         vibrate: [100, 50, 100],
         data: {

@@ -173,7 +173,7 @@ const deriveAllowedGradesForUser = (user = {}) => {
 // Every homeroom/supporting-homeroom/subject-teacher role is scoped by
 // real class name only now (see applyViewerScope in
 // mtssStudentController.js) - user.classes is empty exactly when Central
-// (via teacherClassAssignmentSync.js, which authoritatively overwrites it
+// (via jobs/centralSync.js, which authoritatively overwrites it
 // every 15 minutes, including clearing it to [] for someone Central shows
 // no active assignment for) confirms this person has no active
 // assignment. A caller finding this empty should deny, not fall back to

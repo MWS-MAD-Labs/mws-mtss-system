@@ -14,28 +14,7 @@
 const handleDashboardConnection = (io, socket) => {
     console.log(`Dashboard client connected: ${socket.id}`);
 
-    // Room membership only - `dashboard-${userId}` is also the room
-    // mtssRealtimeService.js broadcasts pilot-feedback updates to
-    // (usePilotFeedbackDashboardData.js on the frontend uses this same
-    // join/leave call for that, unrelated to check-ins).
-    socket.on('join-dashboard', (userId) => {
-        socket.join(`dashboard-${userId}`);
-        console.log(`User ${userId} joined dashboard room`);
-
-        // try {
-        //     // Send initial dashboard data
-        //     await sendDashboardUpdate(socket, userId);
-        // } catch (error) {
-        //     console.error('Error joining dashboard room:', error);
-        //     socket.emit('error', { message: 'Failed to join dashboard' });
-        // }
-    });
-
-    // Leave dashboard room
-    socket.on('leave-dashboard', (userId) => {
-        socket.leave(`dashboard-${userId}`);
-        console.log(`User ${userId} left dashboard room`);
-    });
+    // The dashboard room is joined in config/socket.js, where it is checked against the signed-in person.
 
     // Request dashboard refresh - no frontend caller emits 'refresh-dashboard'.
     // socket.on('refresh-dashboard', async (userId) => {

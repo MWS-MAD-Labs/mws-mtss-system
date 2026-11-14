@@ -3,12 +3,12 @@ const mongoose = require('mongoose');
 const emotionalCheckinSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: true
     },
     legacyResolvedUserId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'Person'
     },
     legacyResolutionSource: {
         type: String,
@@ -96,15 +96,15 @@ const emotionalCheckinSchema = new mongoose.Schema({
     // Support contact preference (User ID reference)
     supportContactUserId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: false,
         validate: {
             validator: async function (v) {
                 if (!v) return true; // Optional field
                 try {
-                    const User = mongoose.model('User');
-                    const user = await User.findById(v);
-                    return user && ['directorate', 'superadmin', 'admin', 'teacher', 'staff', 'support_staff', 'se_teacher', 'head_unit'].includes(user.role);
+                    const Person = mongoose.model('Person');
+                    const person = await Person.findById(v).select('personType isActive').lean();
+                    return Boolean(person && person.personType === 'employee' && person.isActive);
                 } catch (error) {
                     return false;
                 }
@@ -227,7 +227,7 @@ const emotionalCheckinSchema = new mongoose.Schema({
         },
         contactId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
+            ref: 'Person'
         },
         respondedAt: {
             type: Date

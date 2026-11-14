@@ -1,5 +1,5 @@
 const winston = require('winston');
-const User = require('../models/User');
+const Person = require('../models/Person');
 const TeacherNotificationPreference = require('../models/TeacherNotificationPreference');
 const MentorAssignment = require('../models/MentorAssignment');
 const notificationService = require('./notificationService');
@@ -107,7 +107,7 @@ class TeacherNotifierService {
 
     async getTeacherContext(teacherId) {
         const [user, pref] = await Promise.all([
-            User.findById(teacherId).select('name email').lean(),
+            Person.findById(teacherId).select('name email').lean(),
             TeacherNotificationPreference.findOne({ teacherId }).lean()
         ]);
         if (!user?.email) return null;

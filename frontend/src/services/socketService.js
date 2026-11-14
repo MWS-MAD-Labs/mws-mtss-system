@@ -72,6 +72,8 @@ class SocketService {
         this.socket = io({
             path: `${basePrefix}/socket.io`,
             transports: ['websocket', 'polling'],
+            // The Hub session cookie is what the server checks on connect.
+            withCredentials: true,
             timeout: 20000,
         });
 

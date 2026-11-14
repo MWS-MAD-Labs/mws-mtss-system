@@ -1,3 +1,5 @@
+import { PERSON_TYPE } from "@/constants/enums";
+
 const PENDING_AUTH_REDIRECT_KEY = "pending_auth_redirect";
 
 export const sanitizeRedirectPath = (value) => {
@@ -5,10 +7,6 @@ export const sanitizeRedirectPath = (value) => {
 
     const trimmed = value.trim();
     if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
-        return null;
-    }
-
-    if (trimmed.startsWith("/mtss/auth/callback")) {
         return null;
     }
 
@@ -41,17 +39,11 @@ export const consumePendingRedirect = () => {
     return redirect;
 };
 
-export const getDefaultPostLoginPath = (userOrRole) => {
-    const user = userOrRole && typeof userOrRole === "object" ? userOrRole : null;
-    const normalizedRole = String(user?.role || userOrRole || "").trim().toLowerCase();
-
-    if (normalizedRole === "student") {
+export const getDefaultPostLoginPath = (user) => {
+    if (user?.personType === PERSON_TYPE.STUDENT) {
         return "/mtss/student/support-hub";
     }
 
-    // Every staff/teacher role lands on /mtss/home first, same as
-    // daily-checkin's own getDefaultPostLoginPath - not a per-role
-    // dashboard route (getDefaultMtssRoute), which is only for the
-    // dashboard card RoleSelectionPage itself renders once there.
+    // Staff land on /mtss/home first, which shows the dashboard card the person may open.
     return "/mtss/home";
 };

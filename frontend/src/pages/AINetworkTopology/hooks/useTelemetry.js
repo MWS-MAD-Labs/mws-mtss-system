@@ -2,24 +2,25 @@ import { useState, useEffect, useMemo } from 'react';
 import socketService from '@/services/socketService';
 import { getApiBaseUrl } from '@/lib/apiBase';
 import { getStoredAuthToken as readStoredAuthToken, getStoredAuthUserRaw } from '@/utils/authStorage';
+import { hasPermission } from '@/utils/accessControl';
+import { PERMISSIONS } from '@/constants/permissions';
 import { NODE_META } from '../constants/nodes';
 import { SIM_FLOWS } from '../constants/simFlows';
 
 const API_BASE = getApiBaseUrl();
-const ALLOWED_TELEMETRY_ROLES = new Set(['admin', 'superadmin', 'directorate', 'head_unit']);
 
 function getStoredAuthToken() {
   return readStoredAuthToken();
 }
 
-function getStoredAuthRole() {
+// Whether the cached person may read the topology. Unknown (nothing cached yet) lets the request decide.
+function storedAccessDenied() {
   const raw = getStoredAuthUserRaw();
-  if (!raw) return null;
+  if (!raw) return false;
   try {
-    const parsed = JSON.parse(raw);
-    return String(parsed?.role || '').toLowerCase() || null;
+    return !hasPermission(JSON.parse(raw), PERMISSIONS.DEV_TOPOLOGY_READ);
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -48,8 +49,7 @@ export function useTelemetry() {
     (async () => {
       try {
         const token = getStoredAuthToken();
-        const role = getStoredAuthRole();
-        if (!token || (role && !ALLOWED_TELEMETRY_ROLES.has(role))) {
+        if (!token || storedAccessDenied()) {
           if (!cancelled) setDataSource('simulator');
           return;
         }
@@ -73,8 +73,7 @@ export function useTelemetry() {
   /* Socket subscription */
   useEffect(() => {
     const token = getStoredAuthToken();
-    const role = getStoredAuthRole();
-    if (!token || (role && !ALLOWED_TELEMETRY_ROLES.has(role))) {
+    if (!token || storedAccessDenied()) {
       return undefined;
     }
 

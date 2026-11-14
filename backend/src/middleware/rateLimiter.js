@@ -3,6 +3,7 @@ const {
     ipKeyGenerator
 } = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const { accessCookieName } = require('../utils/hubSession');
 
 const DEFAULT_WINDOW_MINUTES = parseInt(process.env.RATE_LIMIT_WINDOW || '15', 10);
 const DEFAULT_MAX_REQUESTS = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '600', 10);
@@ -18,34 +19,14 @@ const DEFAULT_CHECKIN_MAX_REQUESTS = parseInt(
 const skipHealthAndAuth = (req) =>
     req.path === '/health' || req.path.startsWith('/v1/auth');
 
+// Only used to key the limiter, so the token is read without checking it. It is the Hub session cookie.
 const extractUserIdFromToken = (req) => {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return null;
-    }
-
-    const token = authHeader.substring(7);
-
-    if (!token) {
-        return null;
-    }
-
+    const cookieName = accessCookieName() || 'hub_at';
+    const token = new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`).exec(req.headers.cookie || '')?.[1];
+    if (!token) return null;
     try {
-        if (process.env.JWT_SECRET) {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET, {
-                ignoreExpiration: true
-            });
-
-            return decoded?.userId || decoded?.id || decoded?.sub || null;
-        }
-    } catch (error) {
-        // Ignore verification errors and fall back to decode.
-    }
-
-    try {
-        const decoded = jwt.decode(token);
-        return decoded?.userId || decoded?.id || decoded?.sub || null;
+        const decoded = jwt.decode(decodeURIComponent(token));
+        return decoded?.userId || decoded?.id || decoded?.sub || decoded?.email || null;
     } catch (error) {
         return null;
     }

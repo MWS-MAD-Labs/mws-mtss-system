@@ -8,7 +8,7 @@ const teacherAlertSchema = new mongoose.Schema({
     // Student information
     studentId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: true,
         index: true
     },
@@ -126,7 +126,7 @@ const teacherAlertSchema = new mongoose.Schema({
     assignedTo: [{
         teacherId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
+            ref: 'Person'
         },
         teacherName: String,
         role: String              // 'mentor', 'subject_teacher', 'homeroom'
@@ -135,7 +135,7 @@ const teacherAlertSchema = new mongoose.Schema({
     readBy: [{
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
+            ref: 'Person'
         },
         readAt: Date
     }],
@@ -143,7 +143,7 @@ const teacherAlertSchema = new mongoose.Schema({
     actionsTaken: [{
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
+            ref: 'Person'
         },
         userName: String,
         action: String,

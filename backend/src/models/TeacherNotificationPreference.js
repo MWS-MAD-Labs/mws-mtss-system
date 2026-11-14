@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const teacherNotificationPreferenceSchema = new mongoose.Schema({
     teacherId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Person',
         required: true,
         unique: true,
         index: true

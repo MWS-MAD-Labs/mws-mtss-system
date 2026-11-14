@@ -40,9 +40,9 @@ const evidenceUpload = multer({
 
 const {
     authenticate,
-    requireMTSSAccess,
-    requireMTSSWriteAccess,
-    requireScopedMTSSAdmin
+    requireMtssRead,
+    requireMtssWrite,
+    requireMtssAdmin
 } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const {
@@ -56,35 +56,35 @@ const {
 
 router.use(authenticate);
 
-router.get('/tiers', requireMTSSAccess, getTierMetadata);
-router.post('/tiers', requireScopedMTSSAdmin, upsertTier);
+router.get('/tiers', requireMtssRead, getTierMetadata);
+router.post('/tiers', requireMtssAdmin, upsertTier);
 
-router.get('/strategies', requireMTSSAccess, getStrategies);
-router.get('/strategies/:id', requireMTSSAccess, getStrategyById);
-router.post('/strategies', requireScopedMTSSAdmin, validate(mtssStrategyCreateSchema), createStrategy);
-router.put('/strategies/:id', requireScopedMTSSAdmin, validate(mtssStrategyUpdateSchema), updateStrategy);
-router.delete('/strategies/:id', requireScopedMTSSAdmin, deleteStrategy);
+router.get('/strategies', requireMtssRead, getStrategies);
+router.get('/strategies/:id', requireMtssRead, getStrategyById);
+router.post('/strategies', requireMtssAdmin, validate(mtssStrategyCreateSchema), createStrategy);
+router.put('/strategies/:id', requireMtssAdmin, validate(mtssStrategyUpdateSchema), updateStrategy);
+router.delete('/strategies/:id', requireMtssAdmin, deleteStrategy);
 
-router.get('/students', requireMTSSAccess, listStudents);
-router.get('/students/:id', requireMTSSAccess, getStudent);
-router.post('/students', requireScopedMTSSAdmin, validate(mtssStudentCreateSchema), createStudent);
-router.put('/students/:id', requireScopedMTSSAdmin, validate(mtssStudentUpdateSchema), updateStudent);
+router.get('/students', requireMtssRead, listStudents);
+router.get('/students/:id', requireMtssRead, getStudent);
+router.post('/students', requireMtssAdmin, validate(mtssStudentCreateSchema), createStudent);
+router.put('/students/:id', requireMtssAdmin, validate(mtssStudentUpdateSchema), updateStudent);
 
-router.get('/mentors', requireScopedMTSSAdmin, listMentors);
+router.get('/mentors', requireMtssAdmin, listMentors);
 
-router.post('/pilot-feedback', requireMTSSAccess, upsertPilotFeedbackSession);
-router.get('/pilot-feedback', requireScopedMTSSAdmin, listPilotFeedbackSessions);
+router.post('/pilot-feedback', requireMtssRead, upsertPilotFeedbackSession);
+router.get('/pilot-feedback', requireMtssAdmin, listPilotFeedbackSessions);
 
-router.post('/upload-evidence', requireMTSSWriteAccess, evidenceUpload.array('evidence', MAX_FILES), uploadEvidence);
+router.post('/upload-evidence', requireMtssWrite, evidenceUpload.array('evidence', MAX_FILES), uploadEvidence);
 
-router.get('/mentor-assignments', requireMTSSAccess, getMentorAssignments);
+router.get('/mentor-assignments', requireMtssRead, getMentorAssignments);
 // Must come before the /:id route below - same path shape, and Express
 // matches registration order, so /:id would otherwise swallow this first.
-router.get('/mentor-assignments/needs-reassignment', requireScopedMTSSAdmin, getAssignmentsNeedingReassignment);
-router.get('/mentor-assignments/:id', requireMTSSAccess, getMentorAssignmentById);
+router.get('/mentor-assignments/needs-reassignment', requireMtssAdmin, getAssignmentsNeedingReassignment);
+router.get('/mentor-assignments/:id', requireMtssRead, getMentorAssignmentById);
 // Allow teachers to create intervention plans for students (they must assign themselves as mentor)
-router.post('/mentor-assignments', requireMTSSWriteAccess, validate(mentorAssignmentCreateSchema), createMentorAssignment);
-router.put('/mentor-assignments/:id', requireMTSSWriteAccess, validate(mentorAssignmentUpdateSchema), updateMentorAssignment);
-router.get('/mentor-assignments/my/students', requireMTSSAccess, getMyAssignedStudents);
+router.post('/mentor-assignments', requireMtssWrite, validate(mentorAssignmentCreateSchema), createMentorAssignment);
+router.put('/mentor-assignments/:id', requireMtssWrite, validate(mentorAssignmentUpdateSchema), updateMentorAssignment);
+router.get('/mentor-assignments/my/students', requireMtssRead, getMyAssignedStudents);
 
 module.exports = router;

@@ -10,7 +10,8 @@ const {
     // createSupportRequestNotification, // Feature 2 disabled 2026-09-07 - see below
     // handleSlackAction, // Feature 2 disabled 2026-09-07 - see below
 } = require('../controllers/notificationController');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../constants/permissions');
 const { validateQuery } = require('../middleware/validation');
 const {
     getNotificationPreferences,
@@ -41,13 +42,13 @@ router.patch('/read-all', markAllAsRead);
 // Delete a notification
 router.delete('/:notificationId', deleteNotification);
 
-// Admin-only routes for creating notifications
-router.post('/system', requireAdmin, createSystemNotification);
+// Sending notifications to other people needs its own permission. Reading your own needs only to be signed in.
+router.post('/system', requirePermission(PERMISSIONS.NOTIFICATIONS_BROADCAST), createSystemNotification);
 // Feature 2 disabled 2026-09-07: support-request notifications reference
 // EmotionalCheckin/StudentEmotionalCheckin, which MTSS shouldn't read
 // directly (Central-source-of-truth rule) - see routes/index.js for the
 // fuller note.
-// router.post('/support-request', requireAdmin, createSupportRequestNotification);
+// router.post('/support-request', requirePermission(PERMISSIONS.NOTIFICATIONS_BROADCAST), createSupportRequestNotification);
 
 // Notification preferences (teacher alert delivery settings)
 router.get('/preferences', getNotificationPreferences);

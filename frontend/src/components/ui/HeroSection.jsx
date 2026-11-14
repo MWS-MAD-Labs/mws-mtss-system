@@ -1,14 +1,7 @@
-import { memo, useCallback, useState } from "react";
-import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { memo } from "react";
 import HeroAuthCard from "@/components/ui/HeroAuthCard";
-import Logo from "./Millennia.webp";
 import { Sparkles, ShieldCheck, Smartphone } from "lucide-react";
-import { env } from "@/config/env";
-import { attemptSilentHubLogin } from "@/utils/hubSilentLogin";
-import { fetchCurrentUser } from "@/store/slices/authSlice";
-import { consumePendingRedirect, getDefaultPostLoginPath } from "@/utils/authRedirect";
-import { useToast } from "@/components/ui/use-toast";
+import useHubSignIn from "@/hooks/useHubSignIn";
 
 const FEATURES = [
   { icon: "🧠", label: "AI Emotional Wellness" },
@@ -24,55 +17,8 @@ const TRUST = [
 ];
 
 const HeroSection = memo(() => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [isCheckingHub, setIsCheckingHub] = useState(false);
-
-  // Google sign-in goes through Hub, not a Google OAuth flow of our own: Hub
-  // owns the identity/role source of truth (Central) and hands MTSS a
-  // short-lived relay token via /auth/sso. This is the same "one door" every
-  // other satellite app uses - MTSS must not keep a parallel login path that
-  // can drift from Central.
-  const handleGoogleSignIn = useCallback(async () => {
-    const hubBaseUrl = env.hubBaseUrl.replace(/\/$/, "");
-
-    // Try a silent relogin first (hidden iframe through the same relay a
-    // visible click-through uses) - if Hub's own session is still valid,
-    // this logs the user in without ever bouncing them to Hub's login
-    // screen. Only falls through to the full redirect when Hub genuinely
-    // has no session of its own to hand back.
-    setIsCheckingHub(true);
-    try {
-      const result = await attemptSilentHubLogin(hubBaseUrl, "mtss");
-
-      if (result.status === "success") {
-        const action = await dispatch(fetchCurrentUser());
-        if (fetchCurrentUser.fulfilled.match(action)) {
-          const userData = action.payload?.user || action.payload?.data?.user;
-          const pendingRedirect = consumePendingRedirect();
-          navigate(pendingRedirect || getDefaultPostLoginPath(userData), { replace: true });
-          return;
-        }
-        // Success signal fired but /auth/me still disagrees - fall through
-        // to the full redirect below, same as a timeout.
-      } else if (result.status === "error") {
-        // Hub is logged in but refused this launch for a specific reason
-        // (no access, maintenance, etc) - show that here instead of
-        // bouncing to Hub's own tab just to display the same message there.
-        toast({
-          title: result.title,
-          description: result.description,
-          variant: "destructive",
-        });
-        return;
-      }
-    } finally {
-      setIsCheckingHub(false);
-    }
-
-    window.location.href = `${hubBaseUrl}/apps/mtss/launch`;
-  }, [dispatch, navigate, toast]);
+  // A visit without a session goes to the Hub, which gives it back when the person still has one.
+  const { handleHubSignIn, isCheckingHub } = useHubSignIn({ redirectToHub: true });
 
   return (
     <section className="landing-pointer-shell relative min-h-screen flex items-center justify-center px-4 py-10 md:py-16">
@@ -86,8 +32,8 @@ const HeroSection = memo(() => {
             <div className="relative w-20 h-20 md:w-28 md:h-28 rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary via-gold to-gold p-[2px] shadow-2xl">
               <div className="w-full h-full rounded-2xl md:rounded-3xl bg-card flex items-center justify-center overflow-hidden">
                 <img
-                  src={Logo}
-                  alt="Millennia Logo"
+                  src={`${import.meta.env.BASE_URL}MTSS.svg`}
+                  alt="MTSS Logo"
                   className="w-24 h-24 md:w-32 md:h-32 object-contain"
                   loading="eager"
                   fetchPriority="high"
@@ -148,7 +94,7 @@ const HeroSection = memo(() => {
           data-landing-depth="10"
         >
           <div className="w-full max-w-md">
-            <HeroAuthCard onGoogleSignIn={handleGoogleSignIn} isCheckingHub={isCheckingHub} />
+            <HeroAuthCard onGoogleSignIn={handleHubSignIn} isCheckingHub={isCheckingHub} />
           </div>
         </div>
       </div>

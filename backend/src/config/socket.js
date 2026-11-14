@@ -2,6 +2,7 @@ const socketIo = require('socket.io');
 const winston = require('winston');
 const { createCorsOriginChecker } = require('./cors');
 const devTopologyTelemetryService = require('../services/devTopologyTelemetryService');
+const { canJoin, userFromHandshake } = require('../utils/socketAccess');
 
 let io;
 let devTopologyBridgeInitialized = false;
@@ -15,13 +16,35 @@ const initSocket = (server) => {
         }
     });
 
+    // A connection is the Hub's session, like any request. No cookie, no connection.
+    io.use(async (socket, next) => {
+        try {
+            const user = await userFromHandshake(socket.handshake);
+            if (!user) return next(new Error('unauthorized'));
+            socket.data.user = user;
+            return next();
+        } catch (error) {
+            winston.warn(`Socket authentication failed: ${error.message}`);
+            return next(new Error('unauthorized'));
+        }
+    });
+
     io.on('connection', (socket) => {
         winston.info(`User connected: ${socket.id}`);
 
+        // Joins a room only when this person may be in it (utils/socketAccess.js).
+        const joinIfAllowed = (kind, room, arg) => {
+            if (!canJoin(kind, socket.data.user, arg)) {
+                winston.warn(`Socket ${socket.id} was refused the ${kind} room`);
+                return false;
+            }
+            socket.join(room);
+            return true;
+        };
+
         // Join dashboard room for real-time updates
         socket.on('join-dashboard', (userId) => {
-            socket.join(`dashboard-${userId}`);
-            winston.info(`User ${userId} joined dashboard room`);
+            if (joinIfAllowed('dashboard', `dashboard-${userId}`, userId)) winston.info(`User ${userId} joined dashboard room`);
         });
 
         // Leave dashboard room
@@ -32,8 +55,7 @@ const initSocket = (server) => {
 
         // Join personal room for real-time personal updates
         socket.on('join-personal', (userId) => {
-            socket.join(`personal-${userId}`);
-            winston.info(`User ${userId} joined personal room`);
+            if (joinIfAllowed('personal', `personal-${userId}`, userId)) winston.info(`User ${userId} joined personal room`);
         });
 
         // Leave personal room
@@ -44,8 +66,7 @@ const initSocket = (server) => {
 
         // Notification stream room (separate from generic personal room)
         socket.on('join-notifications', (userId) => {
-            socket.join(`notifications-${userId}`);
-            winston.info(`User ${userId} joined notifications room`);
+            if (joinIfAllowed('notifications', `notifications-${userId}`, userId)) winston.info(`User ${userId} joined notifications room`);
         });
 
         socket.on('leave-notifications', (userId) => {
@@ -54,8 +75,7 @@ const initSocket = (server) => {
         });
 
         socket.on('join-mtss-admin', () => {
-            socket.join('mtss-admin');
-            winston.info(`Socket ${socket.id} joined mtss-admin room`);
+            if (joinIfAllowed('mtss-admin', 'mtss-admin')) winston.info(`Socket ${socket.id} joined mtss-admin room`);
         });
 
         socket.on('leave-mtss-admin', () => {
@@ -65,8 +85,7 @@ const initSocket = (server) => {
 
         socket.on('join-mtss-mentor', (mentorId) => {
             if (!mentorId) return;
-            socket.join(`mtss-mentor-${mentorId}`);
-            winston.info(`Mentor ${mentorId} joined MTSS mentor room`);
+            if (joinIfAllowed('mtss-mentor', `mtss-mentor-${mentorId}`, mentorId)) winston.info(`Mentor ${mentorId} joined MTSS mentor room`);
         });
 
         socket.on('leave-mtss-mentor', (mentorId) => {
@@ -77,8 +96,7 @@ const initSocket = (server) => {
 
         socket.on('join-mtss-live', (scope = 'all') => {
             const normalizedScope = String(scope || 'all').trim() || 'all';
-            socket.join(`mtss-live-${normalizedScope}`);
-            winston.info(`Socket ${socket.id} joined mtss-live-${normalizedScope} room`);
+            if (joinIfAllowed('mtss-live', `mtss-live-${normalizedScope}`, normalizedScope)) winston.info(`Socket ${socket.id} joined mtss-live-${normalizedScope} room`);
         });
 
         socket.on('leave-mtss-live', (scope = 'all') => {
@@ -88,7 +106,7 @@ const initSocket = (server) => {
         });
 
         socket.on('join-dev-topology', () => {
-            socket.join(devTopologyTelemetryService.getRoomName());
+            if (!joinIfAllowed('dev-topology', devTopologyTelemetryService.getRoomName())) return;
             try {
                 devTopologyTelemetryService.noteViewerSubscribed();
                 socket.emit(

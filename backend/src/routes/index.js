@@ -10,6 +10,8 @@ const aiChatRoutes = require('./aiChat');
 const aiInsightRoutes = require('./aiInsights');
 const devTopologyRoutes = require('./devTopology');
 const syncRoutes = require('./sync');
+const configRoutes = require('./config');
+const { authenticate, requireMtssRead } = require('../middleware/auth');
 
 // Feature 2 (Slack support-request confirmation) disabled 2026-09-07: the
 // only action_id this route ever handled was 'mark_handled', which reads
@@ -174,14 +176,16 @@ router.use('/v1/ai-chat', aiChatRoutes);
 router.use('/v1/ai-insights', aiInsightRoutes);
 router.use('/v1/dev/topology', devTopologyRoutes);
 router.use('/v1/sync', syncRoutes);
+router.use('/v1/config', configRoutes);
 
 // OAuth routes are now mounted directly in app.js
 // router.use('/auth', authRoutes);
 
-// AI-16: Client-side audit event sink (docx downloads, exports, etc.)
-router.post('/v1/audit/events', (req, res) => {
+// AI-16: Client-side audit event sink (docx downloads, exports, etc.). The actor is the signed-in person, never what
+// the page says about itself.
+router.post('/v1/audit/events', authenticate, requireMtssRead, (req, res) => {
     try {
-        const { event, filename, reportTitle, sourcePage, actorId, actorName, actorRole, timestamp } = req.body || {};
+        const { event, filename, reportTitle, sourcePage, timestamp } = req.body || {};
         const ALLOWED_EVENTS = new Set(['docx_download']);
         if (!event || !ALLOWED_EVENTS.has(event)) {
             return res.status(400).json({ success: false, message: 'Invalid event type' });
@@ -191,9 +195,9 @@ router.post('/v1/audit/events', (req, res) => {
             filename,
             reportTitle,
             sourcePage,
-            actorId,
-            actorName,
-            actorRole,
+            actorId: String(req.user.id),
+            actorName: req.user.name,
+            actorRole: req.user.entitlementRole,
             timestamp,
             serverTimestamp: new Date().toISOString(),
             ip: req.ip,
@@ -211,7 +215,9 @@ router.get('/health', (req, res) => {
         success: true,
         message: 'MWS MTSS System Backend API is running',
         timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.0.0',
+        // The commit this image was built from. A deploy waits for it.
+        buildId: process.env.BUILD_ID || 'dev'
     });
 });
 

@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, X, Plus, Download } from "lucide-react";
+import { Search, Filter, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
-const UserFilters = memo(({ filters, onFiltersChange, onAddUser }) => {
+const UserFilters = memo(({ filters, onFiltersChange }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const handleFilterChange = (key, value) => {
@@ -49,7 +49,9 @@ const UserFilters = memo(({ filters, onFiltersChange, onAddUser }) => {
     const formatFilterLabel = (key, value) => {
         switch (key) {
             case 'role':
-                return `Role: ${value.charAt(0).toUpperCase() + value.slice(1).replace('_', ' ')}`;
+                return `Role: ${value}`;
+            case 'personType':
+                return `Type: ${value === 'student' ? 'Student' : 'Staff'}`;
             case 'department':
                 return `Department: ${value}`;
             case 'unit':
@@ -89,14 +91,6 @@ const UserFilters = memo(({ filters, onFiltersChange, onAddUser }) => {
                     >
                         <Filter className="w-4 h-4 mr-2" />
                         {isExpanded ? 'Collapse' : 'Expand'}
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onAddUser}
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add User
                     </Button>
                     <Button
                         variant="outline"
@@ -164,24 +158,19 @@ const UserFilters = memo(({ filters, onFiltersChange, onAddUser }) => {
                     exit={{ opacity: 0, height: 0 }}
                     className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-border/50"
                 >
-                    {/* Role Filter */}
+                    {/* Type Filter */}
                     <div>
-                        <label className="text-sm font-medium mb-2 block">Role</label>
+                        <label className="text-sm font-medium mb-2 block">Type</label>
                         <Select
-                            value={filters.role || ''}
-                            onValueChange={(value) => handleFilterChange('role', value)}
+                            value={filters.personType || ''}
+                            onValueChange={(value) => handleFilterChange('personType', value)}
                         >
                             <SelectTrigger>
-                                <SelectValue placeholder="All Roles" />
+                                <SelectValue placeholder="All Types" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all_roles">All Roles</SelectItem>
-                                <SelectItem value="directorate">Directorate</SelectItem>
-                                <SelectItem value="head_unit">Head Unit</SelectItem>
-                                <SelectItem value="teacher">Teacher</SelectItem>
-                                <SelectItem value="se_teacher">SE Teacher</SelectItem>
-                                <SelectItem value="staff">Staff</SelectItem>
-                                <SelectItem value="support_staff">Support Staff</SelectItem>
+                                <SelectItem value="all_types">All Types</SelectItem>
+                                <SelectItem value="employee">Staff</SelectItem>
                                 <SelectItem value="student">Student</SelectItem>
                             </SelectContent>
                         </Select>

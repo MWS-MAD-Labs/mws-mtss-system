@@ -3,23 +3,18 @@ import { useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { Helmet } from "react-helmet";
 import AnimatedPage from "@/components/AnimatedPage";
-import { useToast } from "@/components/ui/use-toast";
 import {
     fetchUsers,
     fetchOrganizationStructure,
-    createUser,
-    updateUser,
-    deleteUser,
     setFilters,
     clearError
 } from "../store/slices/userSlice";
+import SyncStatusLine from "./user-management/components/SyncStatusLine";
 
 // Lazy load components for better performance
 const UserStatsOverview = lazy(() => import(/* webpackChunkName: "user-stats" */ "./user-management/components/UserStatsOverview"));
 const UserTable = lazy(() => import(/* webpackChunkName: "user-table" */ "./user-management/components/UserTable"));
 const UserFilters = lazy(() => import(/* webpackChunkName: "user-filters" */ "./user-management/components/UserFilters"));
-const UserForm = lazy(() => import(/* webpackChunkName: "user-form" */ "./user-management/components/UserForm"));
-const OrganizationChart = lazy(() => import(/* webpackChunkName: "org-chart" */ "./user-management/components/OrganizationChart"));
 const UserDetailsModal = lazy(() => import(/* webpackChunkName: "user-details" */ "./user-management/components/UserDetailsModal"));
 
 // Loading fallback component
@@ -37,7 +32,6 @@ LoadingFallback.displayName = 'LoadingFallback';
 
 const UserManagementDashboard = memo(() => {
     const dispatch = useDispatch();
-    const { toast } = useToast();
 
     // Redux state
     const {
@@ -50,98 +44,20 @@ const UserManagementDashboard = memo(() => {
         lastUpdated
     } = useSelector((state) => state.users);
 
-    const { user: currentUser } = useSelector((state) => state.auth);
-
     // Local state
-    const [showUserForm, setShowUserForm] = useState(false);
-    const [editingUser, setEditingUser] = useState(null);
     const [selectedUser, setSelectedUser] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
 
-    // Check if user has admin access
-    const hasAdminAccess = currentUser && (
-        currentUser.role === 'directorate' ||
-        currentUser.role === 'superadmin' ||
-        currentUser.role === 'admin'
-    );
-
-    // Load initial data
+    // Load initial data. The route only opens for people holding users.read.
     useEffect(() => {
-        if (hasAdminAccess) {
-            dispatch(fetchUsers(filters));
-            dispatch(fetchOrganizationStructure());
-        }
-    }, [dispatch, hasAdminAccess, filters]);
+        dispatch(fetchUsers(filters));
+        dispatch(fetchOrganizationStructure());
+    }, [dispatch, filters]);
 
     // Handle filter changes
     const handleFiltersChange = useCallback((newFilters) => {
         dispatch(setFilters(newFilters));
     }, [dispatch]);
-
-    // Handle user creation
-    const handleCreateUser = useCallback(async (userData) => {
-        try {
-            await dispatch(createUser(userData)).unwrap();
-            toast({
-                title: "Success",
-                description: "User created successfully",
-            });
-            setShowUserForm(false);
-            // Refresh data after creation
-            dispatch(fetchUsers(filters));
-            dispatch(fetchOrganizationStructure());
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: error || "Failed to create user",
-                variant: "destructive"
-            });
-        }
-    }, [dispatch, toast, filters]);
-
-    // Handle user update
-    const handleUpdateUser = useCallback(async (userId, userData) => {
-        try {
-            await dispatch(updateUser({ userId, userData })).unwrap();
-            toast({
-                title: "Success",
-                description: "User updated successfully",
-            });
-            setEditingUser(null);
-            setShowUserForm(false);
-            // Refresh data after update
-            dispatch(fetchUsers(filters));
-            dispatch(fetchOrganizationStructure());
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: error || "Failed to update user",
-                variant: "destructive"
-            });
-        }
-    }, [dispatch, toast, filters]);
-
-    // Handle user deletion
-    const handleDeleteUser = useCallback(async (userId) => {
-        if (window.confirm('Are you sure you want to deactivate this user?')) {
-            try {
-                await dispatch(deleteUser(userId)).unwrap();
-                toast({
-                    title: "Success",
-                    description: "User deactivated successfully",
-                });
-                // Refresh data after deletion
-                dispatch(fetchUsers(filters));
-                dispatch(fetchOrganizationStructure());
-            } catch (error) {
-                toast({
-                    title: "Error",
-                    description: error || "Failed to deactivate user",
-                    variant: "destructive"
-                });
-            }
-        }
-    }, [dispatch, toast, filters]);
 
     // Handle pagination
     const handlePageChange = useCallback((page) => {
@@ -154,22 +70,6 @@ const UserManagementDashboard = memo(() => {
             dispatch(clearError());
         };
     }, [dispatch]);
-
-    // Show access denied if not admin
-    if (!hasAdminAccess) {
-        return (
-            <AnimatedPage>
-                <div className="min-h-screen flex items-center justify-center">
-                    <div className="glass glass-card p-8 text-center">
-                        <h2 className="text-2xl font-bold text-destructive mb-4">Access Denied</h2>
-                        <p className="text-muted-foreground">
-                            You don't have permission to access the User Management Dashboard.
-                        </p>
-                    </div>
-                </div>
-            </AnimatedPage>
-        );
-    }
 
     return (
         <AnimatedPage>
@@ -194,8 +94,9 @@ const UserManagementDashboard = memo(() => {
                     >
                         <h1 className="text-3xl font-bold mb-2">User Management Dashboard</h1>
                         <p className="text-muted-foreground">
-                            Manage users, roles, and organizational structure
+                            The people Central lists for MTSS. Who they are and what they may do is set in Central.
                         </p>
+                        <SyncStatusLine />
                     </motion.div>
 
                     {/* Error Display */}
@@ -218,7 +119,6 @@ const UserManagementDashboard = memo(() => {
                             {[
                                 { id: 'overview', label: 'Overview', icon: '📊' },
                                 { id: 'users', label: 'Users', icon: '👥' },
-                                { id: 'organization', label: 'Organization', icon: '🏢' },
                                 { id: 'analytics', label: 'Analytics', icon: '📈' }
                             ].map((tab) => (
                                 <button
@@ -270,7 +170,6 @@ const UserManagementDashboard = memo(() => {
                                         <UserFilters
                                             filters={filters}
                                             onFiltersChange={handleFiltersChange}
-                                            onAddUser={() => setShowUserForm(true)}
                                         />
                                     </Suspense>
 
@@ -281,29 +180,10 @@ const UserManagementDashboard = memo(() => {
                                             loading={loading}
                                             pagination={pagination}
                                             onPageChange={handlePageChange}
-                                            onEditUser={setEditingUser}
-                                            onDeleteUser={handleDeleteUser}
                                             onViewUser={setSelectedUser}
                                         />
                                     </Suspense>
                                 </div>
-                            </motion.div>
-                        )}
-
-                        {activeTab === 'organization' && (
-                            <motion.div
-                                key="organization"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                transition={{ duration: 0.3 }}
-                            >
-                                <Suspense fallback={<LoadingFallback />}>
-                                    <OrganizationChart
-                                        organizationStructure={organizationStructure}
-                                        users={users}
-                                    />
-                                </Suspense>
                             </motion.div>
                         )}
 
@@ -332,7 +212,7 @@ const UserManagementDashboard = memo(() => {
 
                                     {/* Role Distribution */}
                                     <div className="glass glass-card p-6">
-                                        <h3 className="text-xl font-semibold mb-4">Role Distribution</h3>
+                                        <h3 className="text-xl font-semibold mb-4">Roles in Central</h3>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                             {organizationStructure?.stats?.byRole?.map((role) => (
                                                 <div key={role._id} className="text-center p-4 bg-muted/20 rounded-lg">
@@ -355,28 +235,6 @@ const UserManagementDashboard = memo(() => {
                                             ))}
                                         </div>
                                     </div>
-
-                                    {/* Management Hierarchy Insights */}
-                                    <div className="glass glass-card p-6">
-                                        <h3 className="text-xl font-semibold mb-4">Management Insights</h3>
-                                        <div className="space-y-4">
-                                            <div className="p-4 bg-blue/10 rounded-lg">
-                                                <h4 className="font-semibold text-blue-700 dark:text-blue-400 mb-2">Leadership Structure</h4>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Directorate members oversee {organizationStructure?.stats?.totalUsers || 0} total users
-                                                    across {organizationStructure?.stats?.byDepartment?.length || 0} departments.
-                                                </p>
-                                            </div>
-                                            <div className="p-4 bg-green/10 rounded-lg">
-                                                <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">Teaching Staff</h4>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {organizationStructure?.stats?.byRole?.find(r => r._id === 'teacher')?.count || 0} teachers
-                                                    and {organizationStructure?.stats?.byRole?.find(r => r._id === 'se_teacher')?.count || 0} SE teachers
-                                                    are actively managing classroom assignments.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </motion.div>
                         )}
@@ -384,19 +242,6 @@ const UserManagementDashboard = memo(() => {
 
                     {/* Modals */}
                     <AnimatePresence>
-                        {(showUserForm || editingUser) && (
-                            <Suspense fallback={null}>
-                                <UserForm
-                                    user={editingUser}
-                                    onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
-                                    onCancel={() => {
-                                        setShowUserForm(false);
-                                        setEditingUser(null);
-                                    }}
-                                />
-                            </Suspense>
-                        )}
-
                         {selectedUser && (
                             <Suspense fallback={null}>
                                 <UserDetailsModal

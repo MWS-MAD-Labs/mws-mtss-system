@@ -1,6 +1,6 @@
 import React, { memo, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Edit, Trash2, Eye, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { Eye, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Table,
@@ -40,38 +40,12 @@ const StatusBadge = memo(({ status, employmentStatus }) => {
 
 StatusBadge.displayName = 'StatusBadge';
 
-const RoleBadge = memo(({ role }) => {
-    const getRoleColor = (role) => {
-        switch (role) {
-            case 'directorate': return 'gold';
-            case 'head_unit': return 'purple';
-            case 'teacher':
-            case 'se_teacher': return 'blue';
-            case 'staff': return 'green';
-            case 'support_staff': return 'orange';
-            case 'student': return 'gray';
-            default: return 'secondary';
-        }
-    };
-
-    const formatRole = (role) => {
-        switch (role) {
-            case 'directorate': return 'Directorate';
-            case 'head_unit': return 'Head Unit';
-            case 'teacher': return 'Teacher';
-            case 'se_teacher': return 'SE Teacher';
-            case 'support_staff': return 'Support Staff';
-            case 'student': return 'Student';
-            default: return role?.charAt(0).toUpperCase() + role?.slice(1);
-        }
-    };
-
-    return (
-        <Badge variant={getRoleColor(role)} className="text-xs">
-            {formatRole(role)}
-        </Badge>
-    );
-});
+// The name of the role Central gave the person in MTSS.
+const RoleBadge = memo(({ role }) => (
+    <Badge variant="secondary" className="text-xs">
+        {role || 'No role'}
+    </Badge>
+));
 
 RoleBadge.displayName = 'RoleBadge';
 
@@ -80,8 +54,6 @@ const UserTable = memo(({
     loading,
     pagination,
     onPageChange,
-    onEditUser,
-    onDeleteUser,
     onViewUser
 }) => {
     const [sortField, setSortField] = useState('name');
@@ -215,7 +187,7 @@ const UserTable = memo(({
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <RoleBadge role={user.role} />
+                                            <RoleBadge role={user.centralEntitlementRole} />
                                         </TableCell>
                                         <TableCell>
                                             <StatusBadge
@@ -237,17 +209,6 @@ const UserTable = memo(({
                                                     <DropdownMenuItem onClick={() => onViewUser(user)}>
                                                         <Eye className="w-4 h-4 mr-2" />
                                                         View Details
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => onEditUser(user)}>
-                                                        <Edit className="w-4 h-4 mr-2" />
-                                                        Edit User
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => onDeleteUser(user._id || user.id)}
-                                                        className="text-destructive"
-                                                    >
-                                                        <Trash2 className="w-4 h-4 mr-2" />
-                                                        Deactivate
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>

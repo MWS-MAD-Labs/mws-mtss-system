@@ -1,8 +1,7 @@
 import api from './authService';
 
-// skipGlobalLoading: the status check fires silently every time the quick
-// menu opens - without this it flashes the app-wide loading overlay on
-// every single open, which reads as the whole page flickering.
-export const getSyncStatus = () => api.get('/sync/status', { skipGlobalLoading: true });
-
-export const triggerSync = () => api.post('/sync/trigger', {}, { skipGlobalLoading: true });
+// The sync with Central runs by itself on the server. This only reads how it is doing.
+export const getSyncStatus = async () => {
+    const response = await api.get('/sync/status', { skipGlobalLoading: true });
+    return response.data?.data || null;
+};

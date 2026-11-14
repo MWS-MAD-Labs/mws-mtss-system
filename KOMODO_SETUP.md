@@ -24,17 +24,22 @@ Use the existing staging stack if it already exists:
 | Gateway hostname | `https://app-stg.mws.web.id` |
 | Path | `/mtss/` |
 
-Compose reference is also available in the gateway repo:
-`mws-gateway/deploy/mtss-system.compose.yml`.
+The staging stack runs `deploy/staging.compose.yml` (not the `docker-compose.yml` at the repo root, which is only a
+local reference). In the Komodo stack: Run Directory `deploy`, File Path `staging.compose.yml`, branch `staging`.
+
+What matters in it: the frontend container is named `mtss-system-fe` and joins the external network `mws-unified`. The
+gateway finds MTSS by that name on that network. A stack that only sits on its own network (for example the root
+`docker-compose.yml`, which publishes port 8082) is invisible to the gateway, and every address under `/mtss/` answers
+`502` from Cloudflare, including `/mtss/auth/sso` from the Hub card, even though both containers show as running.
+Check with `https://app-stg.mws.web.id/mtss/api/health`: it must answer 200 and show a `buildId`.
 
 Required GitHub Actions secrets:
 
 | Secret name | Notes |
 |---|---|
-| `KOMODO_STAGING_WEBHOOK_URL` | Preferred staging webhook URL |
-| `KOMODO_STAGING_WEBHOOK_SECRET` | Preferred staging webhook secret |
-| `KOMODO_WEBHOOK_URL` | Legacy fallback, currently supported |
-| `KOMODO_WEBHOOK_SECRET` | Legacy fallback, currently supported |
+| `KOMODO_WEBHOOK_URL_STAGING` | The Deploy webhook of the staging stack in Komodo. Not read from `KOMODO_WEBHOOK_URL`, so staging can never trigger another stack |
+| `KOMODO_WEBHOOK_SECRET_STAGING` | The staging webhook secret. The shared `KOMODO_WEBHOOK_SECRET` is read when this is empty |
+| `KOMODO_STAGING_WEBHOOK_URL` / `KOMODO_STAGING_WEBHOOK_SECRET` | The older names of the two, still read |
 
 ## Production Stack
 
@@ -74,11 +79,6 @@ Set these in the Komodo stack Environment field. Keep secrets out of the repo.
 
 ```env
 MONGODB_URI=mongodb+srv://...
-JWT_SECRET=...
-SESSION_SECRET=...
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URL=https://app-stg.mws.web.id/mtss/auth/google/callback
 GOOGLE_AI_API_KEY=...
 GOOGLE_AI_MODEL=gemini-flash-latest
 AI_ANALYSIS_ENABLED=true
@@ -97,6 +97,7 @@ AGENT_ROUTER_MODEL=glm-4.6
 CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
+# FRONTEND_URL is optional: the Hub card (/mtss/auth/sso) stays on the gateway host without it
 FRONTEND_URL=https://app-stg.mws.web.id
 CORS_ORIGINS=https://app-stg.mws.web.id
 SLACK_BOT_TOKEN=xoxb-...
@@ -105,17 +106,16 @@ SLACK_SIGNING_SECRET=...
 SMTP_USER=no-reply@millennia21.id
 SMTP_PASS=...
 SMTP_FROM=no-reply@millennia21.id
+HUB_BASE_URL=https://app-stg.mws.web.id
+CENTRAL_API_BASE_URL=https://db-stg.mws.web.id/api/internal
+CENTRAL_API_TOKEN=...
+CENTRAL_ORGANIZATION_ID=org_...
 ```
 
 ### Production
 
 ```env
 MONGODB_URI=mongodb+srv://...
-JWT_SECRET=...
-SESSION_SECRET=...
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URL=https://app.millenniaws.sch.id/mtss/auth/google/callback
 GOOGLE_AI_API_KEY=...
 GOOGLE_AI_MODEL=gemini-flash-latest
 AI_ANALYSIS_ENABLED=true
@@ -142,7 +142,39 @@ SLACK_SIGNING_SECRET=...
 SMTP_USER=no-reply@millennia21.id
 SMTP_PASS=...
 SMTP_FROM=no-reply@millennia21.id
+HUB_BASE_URL=https://app.mws.web.id
+CENTRAL_API_BASE_URL=https://db.mws.web.id/api/internal
+CENTRAL_API_TOKEN=...
+CENTRAL_ORGANIZATION_ID=org_...
 ```
+
+The four Central lines come from the block Central shows when MTSS is added there. The token is shown once. `JWT_SECRET`, `SESSION_SECRET`, `GOOGLE_*`, `HUB_SSO_PUBLIC_KEY` and `HUB_INTERNAL_SECRET` are not used any more and can be removed from the Environment field.
+
+`HUB_ACCESS_COOKIE_NAME` is optional (default `hub_at`). Staging and production Hubs share the parent domain `mws.web.id`, so give staging its own name (for example `hub_at_stg`) on the staging Hub and on every staging app. Deploy the apps first, then set it everywhere together and sign in again.
+
+MTSS reads the Hub's session cookie on the parent domain, so the app and the Hub must be under the same registrable domain. Staging (`app-stg.mws.web.id`) is. Production is not yet: the Hub is on `app.mws.web.id` and MTSS on `app.millenniaws.sch.id`. Do not merge the shared session to `main` until MTSS is served under the Hub's domain.
+
+## Before the First Deploy
+
+1. In Central, add MTSS with its launch address (staging: `https://app-stg.mws.web.id/mtss`) and copy the block into the Komodo Environment field. The application id must be `mtss`.
+2. In the GitHub repository open Settings, then Secrets and variables, then Actions, and add these repository secrets: `STAGING_CENTRAL_API_BASE_URL`, `STAGING_CENTRAL_API_TOKEN` and `STAGING_CENTRAL_ORGANIZATION_ID`, and the same three with `PRODUCTION_` in front. The deploy workflow sends the permission list to Central with them, and stops before deploying if Central says no. Names without the prefix are read too, when the prefixed one is missing.
+3. Remove `MWS_DATA_CENTER_API_URL` and `MWS_DATA_CENTER_API_TOKEN` from the Komodo Environment if they are still there. The app reads the `CENTRAL_API_*` names first, but the old ones are used if the new ones are empty.
+4. In Central, give the roles of MTSS the permissions they need (the list is in `docs/PEOPLE_AND_PERMISSIONS.md`). Until a role holds `mtss.read`, nobody gets in.
+5. Back up the database, then move the old users over once, BEFORE the new version starts for the first time (the script needs `CENTRAL_API_*` in `backend/.env` because it asks Central for each person's id):
+
+```bash
+cd backend
+npm run migrate:people          # dry-run, prints what it would do
+npm run migrate:people:apply    # writes
+```
+
+Each person keeps their `_id`, so nothing else has to change, and going back is deploying the old version. If the new version already ran, see `docs/PEOPLE_AND_PERMISSIONS.md` for the emergency tool.
+
+## After a Deploy
+
+The webhook only starts the deploy in Komodo. If the stack fails there (a wrong file path, a bad env), the webhook still answered and the pipeline would be green. The last step of the deploy job asks the health address which build it runs and waits until it is the commit that was just built. If the old version keeps running, the job turns red and says to read the last update of the stack in Komodo.
+
+It needs the public address of the backend health route as `STAGING_HEALTH_URL` (and `PRODUCTION_HEALTH_URL` for main) in the repository secrets or variables, for example `https://app-stg.mws.web.id/mtss/api/health`. Open it in a browser first to check that the gateway passes it on and that it shows `buildId`. Without the address the step only warns.
 
 ## Deploy Flow
 

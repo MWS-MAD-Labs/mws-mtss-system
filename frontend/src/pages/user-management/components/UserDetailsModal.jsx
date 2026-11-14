@@ -1,4 +1,4 @@
-import React, { memo, useState } from "react";
+import React, { memo } from "react";
 import { motion } from "framer-motion";
 import {
     X,
@@ -8,8 +8,6 @@ import {
     Calendar,
     Clock,
     User,
-    Users,
-    GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,10 +17,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import OrganizationAssignmentModal from "./OrganizationAssignmentModal";
 
 const UserDetailsModal = memo(({ user, onClose }) => {
-    const [showOrganizationModal, setShowOrganizationModal] = useState(false);
 
     if (!user) return null;
 
@@ -41,44 +37,6 @@ const UserDetailsModal = memo(({ user, onClose }) => {
         return `${years} years, ${months} months, ${days} days`;
     };
 
-    const getRoleColor = (role) => {
-        switch (role) {
-            case "directorate":
-                return "gold";
-            case "head_unit":
-                return "purple";
-            case "teacher":
-            case "se_teacher":
-                return "blue";
-            case "staff":
-                return "green";
-            case "support_staff":
-                return "orange";
-            case "student":
-                return "gray";
-            default:
-                return "secondary";
-        }
-    };
-
-    const formatRole = (role) => {
-        switch (role) {
-            case "directorate":
-                return "Directorate";
-            case "head_unit":
-                return "Head Unit";
-            case "teacher":
-                return "Teacher";
-            case "se_teacher":
-                return "SE Teacher";
-            case "support_staff":
-                return "Support Staff";
-            case "student":
-                return "Student";
-            default:
-                return role?.charAt(0).toUpperCase() + role?.slice(1);
-        }
-    };
 
     return (
         <>
@@ -128,8 +86,8 @@ const UserDetailsModal = memo(({ user, onClose }) => {
                                 <label className="text-sm font-medium text-muted-foreground">
                                     Role
                                 </label>
-                                <Badge variant={getRoleColor(user.role)} className="text-sm">
-                                    {formatRole(user.role)}
+                                <Badge variant="secondary" className="text-sm">
+                                    {user.centralEntitlementRole || "No role"}
                                 </Badge>
                             </div>
                         </div>
@@ -360,60 +318,6 @@ const UserDetailsModal = memo(({ user, onClose }) => {
                                 </div>
                             )}
 
-                        {/* Department Overview */}
-                        {user.role === "head_unit" && user.department && (
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold">Department Overview</h3>
-                                <div className="p-4 bg-muted/30 rounded-lg">
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                        As Head Unit of {user.department}, you oversee:
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <span className="font-medium">Department:</span>
-                                            <p className="text-muted-foreground">{user.department}</p>
-                                        </div>
-                                        <div>
-                                            <span className="font-medium">Unit:</span>
-                                            <p className="text-muted-foreground">{user.unit || "N/A"}</p>
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                        * Full member details available in the main dashboard
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Organization Assignment */}
-                        {(user.role === "teacher" ||
-                            user.role === "se_teacher" ||
-                            user.role === "head_unit" ||
-                            user.role === "student") && (
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold flex items-center">
-                                        <Users className="w-4 h-4 mr-2" />
-                                        Organization Assignments
-                                    </h3>
-                                    <div className="p-4 bg-muted/30 rounded-lg">
-                                        <p className="text-sm text-muted-foreground mb-3">
-                                            {user.role === "teacher" || user.role === "se_teacher"
-                                                ? "Manage this teacher's class assignments, subjects, and homeroom responsibilities."
-                                                : user.role === "head_unit"
-                                                    ? "View and manage department members under this head unit's supervision."
-                                                    : "View this student's class assignments and academic group memberships."}
-                                        </p>
-                                        <Button
-                                            onClick={() => setShowOrganizationModal(true)}
-                                            className="w-full"
-                                        >
-                                            <Users className="w-4 h-4 mr-2" />
-                                            Manage Assignments
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-
                         {/* Actions */}
                         <div className="flex justify-end pt-6 border-t">
                             <Button onClick={onClose}>Close</Button>
@@ -422,12 +326,6 @@ const UserDetailsModal = memo(({ user, onClose }) => {
                 </DialogContent>
             </Dialog>
 
-            {showOrganizationModal && (
-                <OrganizationAssignmentModal
-                    user={user}
-                    onClose={() => setShowOrganizationModal(false)}
-                />
-            )}
         </>
     );
 });
