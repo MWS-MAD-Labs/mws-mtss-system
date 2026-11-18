@@ -184,3 +184,106 @@ describe('mtssStudentRosterSync - genuinely empty vs. a failed fetch', () => {
         expect(doc.status).toBe('ACTIVE');
     });
 });
+
+describe('mtssStudentRosterSync - a student is kept by the Central person id, not by the email', () => {
+    const at = (name) => `${name}@roster-sync-test.millennia21.id`;
+    const student = (personId, email, over = {}) => ({
+        person_id: personId,
+        email,
+        full_name: `Person ${personId}`,
+        current_grade: 'Grade 5',
+        current_class: 'Grade 5 - Orion',
+        ...over,
+    });
+    const clean = () => MTSSStudent.deleteMany({ $or: [{ email: TEST_EMAIL_RE }, { centralPersonId: /^rs-test-/ }] });
+
+    beforeAll(async () => {
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/integra-learn-test');
+    });
+
+    afterAll(async () => {
+        await clean();
+        await mongoose.connection.close();
+    });
+
+    beforeEach(async () => {
+        jest.clearAllMocks();
+        await clean();
+    });
+
+    test('a record from before the person id existed gets it, found by its email', async () => {
+        await MTSSStudent.create({ name: 'Person rs-test-1', email: at('older'), status: 'ACTIVE', currentGrade: 'Grade 5', className: 'Grade 5 - Orion' });
+        mockCentralStatuses({ ACTIVE: [student('rs-test-1', at('older'))] });
+
+        const result = await syncStudentRoster();
+
+        expect(result).toMatchObject({ created: 0, updated: 1, errors: 0, orphaned: 0 });
+        expect((await MTSSStudent.findOne({ email: at('older') })).centralPersonId).toBe('rs-test-1');
+    });
+
+    test('a new email in Central changes the label of the same record instead of starting an empty one', async () => {
+        const record = await MTSSStudent.create({
+            name: 'Person rs-test-2', email: at('before'), centralPersonId: 'rs-test-2', status: 'ACTIVE', currentGrade: 'Grade 5', className: 'Grade 5 - Orion',
+        });
+        mockCentralStatuses({ ACTIVE: [student('rs-test-2', at('after'))] });
+
+        const result = await syncStudentRoster();
+
+        expect(result).toMatchObject({ created: 0, updated: 1, errors: 0, orphaned: 0, needsReview: 0, possibleDuplicates: [] });
+        const kept = await MTSSStudent.find({ centralPersonId: 'rs-test-2' });
+        expect(kept).toHaveLength(1);
+        expect(String(kept[0]._id)).toBe(String(record._id));
+        expect(kept[0].email).toBe(at('after'));
+        expect(kept[0].orphanedAt).toBeFalsy();
+        expect(await MTSSStudent.countDocuments({ email: at('before') })).toBe(0);
+    });
+
+    test('keeps the old email and asks for a look when another record already has the new one', async () => {
+        const mine = await MTSSStudent.create({ name: 'Person rs-test-3', email: at('mine'), centralPersonId: 'rs-test-3', status: 'ACTIVE', currentGrade: 'Grade 5', className: 'Grade 5 - Orion' });
+        await MTSSStudent.create({ name: 'Someone else', email: at('taken'), status: 'ACTIVE', currentGrade: 'Grade 5', className: 'Grade 5 - Orion' });
+        mockCentralStatuses({ ACTIVE: [student('rs-test-3', at('taken'))] });
+
+        const result = await syncStudentRoster();
+
+        expect(result.needsReview).toBe(1);
+        expect(result.errors).toBe(0);
+        expect((await MTSSStudent.findById(mine._id)).email).toBe(at('mine'));
+    });
+
+    test('does not take over an email that belongs to another person, and settles on the next run', async () => {
+        await MTSSStudent.create({ name: 'Person rs-test-4', email: at('shared'), centralPersonId: 'rs-test-4', status: 'ACTIVE', currentGrade: 'Grade 5', className: 'Grade 5 - Orion' });
+        // Central gave the old email of person 4 to person 5, and person 4 got a new one.
+        mockCentralStatuses({ ACTIVE: [student('rs-test-5', at('shared')), student('rs-test-4', at('moved'))] });
+
+        const first = await syncStudentRoster();
+        expect(first.needsReview).toBe(1);
+        expect(await MTSSStudent.countDocuments({ centralPersonId: 'rs-test-5' })).toBe(0);
+        expect((await MTSSStudent.findOne({ centralPersonId: 'rs-test-4' })).email).toBe(at('moved'));
+
+        const second = await syncStudentRoster();
+        expect(second).toMatchObject({ created: 1, needsReview: 0 });
+        expect((await MTSSStudent.findOne({ centralPersonId: 'rs-test-5' })).email).toBe(at('shared'));
+        expect(await MTSSStudent.countDocuments({ centralPersonId: 'rs-test-4' })).toBe(1);
+    });
+
+    test('a record matched by its person id is not flagged as orphaned even when Central shows another email', async () => {
+        await MTSSStudent.create({ name: 'Person rs-test-6', email: at('gone'), centralPersonId: 'rs-test-6', status: 'ACTIVE', currentGrade: 'Grade 5', className: 'Grade 5 - Orion', orphanedAt: new Date() });
+        mockCentralStatuses({ ACTIVE: [student('rs-test-6', at('now'))] });
+
+        const result = await syncStudentRoster();
+
+        expect(result.unorphaned).toBe(1);
+        expect((await MTSSStudent.findOne({ centralPersonId: 'rs-test-6' })).orphanedAt).toBeNull();
+    });
+
+    test('warns about a likely duplicate when a new record shares the name of an unmatched older one', async () => {
+        const older = await MTSSStudent.create({ name: 'Same Name Student', email: at('typo'), status: 'ACTIVE', currentGrade: 'Grade 5', className: 'Grade 5 - Orion' });
+        mockCentralStatuses({ ACTIVE: [student('rs-test-7', at('correct'), { full_name: 'Same Name Student' })] });
+
+        const result = await syncStudentRoster();
+
+        expect(result.created).toBe(1);
+        expect(result.orphaned).toBe(1);
+        expect(result.possibleDuplicates).toEqual([{ email: at('correct'), existing: [{ id: String(older._id), email: at('typo') }] }]);
+    });
+});

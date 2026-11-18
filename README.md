@@ -50,6 +50,12 @@ MTSS for Kindergarten is **qualitative** — no scores. Use `mode: 'qualitative'
 
 Both products share the same Google OAuth users. A user signing in here without MTSS access is redirected to `mws-daily-checkin` (configured at deployment time).
 
+## Students and their email in Central
+
+A student record (`MTSSStudent`) is tied to the Central person id (`centralPersonId`), and the email is only a label. The roster sync (`jobs/mtssStudentRosterSync.js`) finds a record by the person id first. A record from before the id existed is found by its email and gets the id on the first run, so after the first sync every enrolled student is tied. When Central gives a student a new email, the same record takes it, with its tiers, interventions and mentor assignments.
+
+Things the sync leaves for a person to look at, and reports: a new email that another record already has, an email Central gave to a different person, and a new record that shares a name with an unmatched older one (the older one is flagged `orphanedAt` and probably holds the history; join them by hand, the way `src/scripts/mergeDuplicateStudentEmails.js` did). The manual scripts `applyCentralStudentSync.js` and `dryRunCentralStudentSync.js` still match by email only, so do not run them after emails changed in Central; the scheduled sync does the same work by person id.
+
 ## Deployment
 
 Komodo deployment is image-based and driven by GitHub Actions:
