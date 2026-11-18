@@ -229,6 +229,15 @@ const studentSchema = new mongoose.Schema(
             type: Date,
             default: null
         },
+        // Central's Person.id of the student. The email is only a label that Central can change; this is what ties
+        // the record to the person, so a new email does not start an empty record. mtssStudentRosterSync.js fills it,
+        // by email the first time for a record made before it existed.
+        centralPersonId: {
+            type: String,
+            trim: true,
+            unique: true,
+            sparse: true
+        },
         email: {
             type: String,
             trim: true,
