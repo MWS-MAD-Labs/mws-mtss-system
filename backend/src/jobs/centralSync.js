@@ -174,44 +174,56 @@ const sameIds = (a = [], b = []) => {
     return left.every((value, index) => value === right[index]);
 };
 
-function classesByEmail(assignments) {
-    const map = new Map();
+// Who teaches what, by the teacher's Central person id, and by email for an answer that has no person id. The person
+// id is what finds a teacher whose email changed in Central.
+function classesByTeacher(assignments) {
+    const byPersonId = new Map();
+    const byEmail = new Map();
+    const add = (map, key, entries) => {
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(...entries);
+    };
     for (const assignment of assignments) {
-        const email = normalizeEmail(assignment.employee_email);
-        if (!email) continue;
-        if (!map.has(email)) map.set(email, []);
+        const personId = assignment.workforce_member?.person_id || null;
+        const email = normalizeEmail(assignment.employee_email || assignment.workforce_member?.email);
         // A mixed-age room holds students of more than one grade: one entry per grade the class teaches.
         const grades = [assignment.grade_name, ...(assignment.additional_grade_names || [])].filter(Boolean);
-        grades.forEach((grade) => {
-            map.get(email).push({
-                grade,
-                className: assignment.class_name || undefined,
-                subject: assignment.subject || undefined,
-                role: CLASS_ROLE_LABELS[assignment.role] || undefined,
-            });
-        });
+        const entries = grades.map((grade) => ({
+            grade,
+            className: assignment.class_name || undefined,
+            subject: assignment.subject || undefined,
+            role: CLASS_ROLE_LABELS[assignment.role] || undefined,
+        }));
+        if (personId) add(byPersonId, personId, entries);
+        else if (email) add(byEmail, email, entries);
     }
-    return map;
+    return { byPersonId, byEmail };
 }
 
-// The students each special education teacher supports, as MTSS student ids, by the teacher's email.
-async function supportedIdsByEmail(assignments) {
-    const studentEmailsByEmployee = new Map();
+// The students each special education teacher supports, as MTSS student ids, by the teacher's Central person id (by
+// email for an answer without one). The students are found by their email in Central now, which the roster sync keeps
+// on the MTSS record.
+async function supportedIdsByTeacher(assignments) {
+    const studentEmailsByKey = { byPersonId: new Map(), byEmail: new Map() };
     for (const assignment of assignments) {
-        const employeeEmail = normalizeEmail(assignment.employee_email);
+        const personId = assignment.workforce_member?.person_id || null;
+        const employeeEmail = normalizeEmail(assignment.employee_email || assignment.workforce_member?.email);
         const studentEmail = normalizeEmail(assignment.student_email);
-        if (!employeeEmail || !studentEmail) continue;
-        if (!studentEmailsByEmployee.has(employeeEmail)) studentEmailsByEmployee.set(employeeEmail, new Set());
-        studentEmailsByEmployee.get(employeeEmail).add(studentEmail);
+        if (!studentEmail || (!personId && !employeeEmail)) continue;
+        const map = personId ? studentEmailsByKey.byPersonId : studentEmailsByKey.byEmail;
+        const key = personId || employeeEmail;
+        if (!map.has(key)) map.set(key, new Set());
+        map.get(key).add(studentEmail);
     }
-    const allStudentEmails = [...new Set([...studentEmailsByEmployee.values()].flatMap((set) => [...set]))];
+    const allStudentEmails = [...new Set([...studentEmailsByKey.byPersonId.values(), ...studentEmailsByKey.byEmail.values()].flatMap((set) => [...set]))];
     const students = allStudentEmails.length ? await MTSSStudent.find({ email: { $in: allStudentEmails } }).select('_id email') : [];
     const idByEmail = new Map(students.map((student) => [normalizeEmail(student.email), student._id]));
-    const result = new Map();
-    for (const [employeeEmail, emails] of studentEmailsByEmployee) {
-        result.set(employeeEmail, [...emails].map((email) => idByEmail.get(email)).filter(Boolean));
-    }
-    return result;
+    const resolve = (map) => {
+        const result = new Map();
+        for (const [key, emails] of map) result.set(key, [...emails].map((email) => idByEmail.get(email)).filter(Boolean));
+        return result;
+    };
+    return { byPersonId: resolve(studentEmailsByKey.byPersonId), byEmail: resolve(studentEmailsByKey.byEmail) };
 }
 
 const differs = (person, fields) => Object.entries(fields).some(([key, value]) => value !== undefined && String(person[key] ?? '') !== String(value ?? ''));
@@ -220,7 +232,7 @@ const differs = (person, fields) => Object.entries(fields).some(([key, value]) =
 // active there. Each list is read on its own. A list that cannot be read in full is skipped and never used to
 // deactivate anyone, and the other carries on.
 async function syncProfiles(api = central) {
-    const summary = { updated: 0, deactivated: 0, reactivated: 0, skipped: false, warnings: [] };
+    const summary = { updated: 0, deactivated: 0, reactivated: 0, emailsChanged: 0, emailsHeld: 0, skipped: false, warnings: [] };
     const warnings = new Set();
     const read = async (label, load) => {
         try {
@@ -234,40 +246,48 @@ async function syncProfiles(api = central) {
     const employees = await read('Employees', () => api.listActiveEmployees());
     const students = await read('Students', async () => {
         const byEmail = new Map();
+        const byPersonId = new Map();
         for (const status of ENROLLED_STUDENT_STATUSES) {
             for (const student of await api.listStudentsByStatus(status)) {
                 const email = normalizeEmail(student.email);
                 if (email) byEmail.set(email, student);
+                if (student.person_id) byPersonId.set(student.person_id, student);
             }
         }
-        return byEmail;
+        return { byEmail, byPersonId };
     });
     const classAssignments = await read('Class assignments', () => api.listClassTeacherAssignments());
     const supportAssignments = await read('Student support assignments', () => api.listStudentSupportAssignments());
     summary.warnings = [...warnings];
     if (!employees && !students && !classAssignments && !supportAssignments) return { ...summary, skipped: true };
 
-    const teachingClasses = classAssignments ? classesByEmail(classAssignments) : null;
-    const supportedStudents = supportAssignments ? await supportedIdsByEmail(supportAssignments) : null;
+    const teachingClasses = classAssignments ? classesByTeacher(classAssignments) : null;
+    const supportedStudents = supportAssignments ? await supportedIdsByTeacher(supportAssignments) : null;
 
     const employeesByPersonId = employees ? new Map(employees.map((e) => [e.person_id, e])) : null;
     const people = await Person.find({ personType: { $exists: true } });
+    // Who holds each email now, so a person is not given an email that is another person's.
+    const holderOf = new Map(people.map((person) => [normalizeEmail(person.email), String(person._id)]));
 
     for (const person of people) {
         let next = null;
+        // The email Central has for this person now. Looked up by person id, so it is found after a change of email.
+        let centralEmail = null;
         if (person.personType === PERSON_TYPE.EMPLOYEE && employeesByPersonId) {
             const employee = employeesByPersonId.get(person.centralPersonId);
             if (!employee) {
                 next = { isActive: false };
             } else {
+                centralEmail = normalizeEmail(employee.email);
                 const { name, gender, employeeId, jobPosition, jobLevel, isTeachingRole, employmentStatus, department, unit } = mapCentralEmployee(employee);
                 next = { name, gender, employeeId, jobPosition, jobLevel, isTeachingRole, employmentStatus, department, unit, isActive: true };
             }
         } else if (person.personType === PERSON_TYPE.STUDENT && students) {
-            const student = students.get(normalizeEmail(person.email));
+            const student = (person.centralPersonId && students.byPersonId.get(person.centralPersonId)) || students.byEmail.get(normalizeEmail(person.email));
             if (!student) {
                 next = { isActive: false };
             } else {
+                centralEmail = normalizeEmail(student.email);
                 const { name, nickname, gender, status, currentGrade, className, unit, department } = mapCentralStudent(student);
                 next = { name, nickname, gender, status, currentGrade, className, unit, department, isActive: true };
             }
@@ -276,9 +296,25 @@ async function syncProfiles(api = central) {
         // Who teaches which class, and which students a special education teacher supports. A list that could not be
         // read leaves what is stored as it is.
         const isEmployee = person.personType === PERSON_TYPE.EMPLOYEE;
-        const email = normalizeEmail(person.email);
-        const classes = isEmployee && teachingClasses ? teachingClasses.get(email) || [] : null;
-        const supported = isEmployee && supportedStudents ? supportedStudents.get(email) || [] : null;
+
+        // The email follows Central, unless another person already has it (then somebody has to look).
+        if (centralEmail && centralEmail !== normalizeEmail(person.email)) {
+            const holder = holderOf.get(centralEmail);
+            if (holder && holder !== String(person._id)) {
+                summary.emailsHeld += 1;
+                warnings.add(`${centralEmail} already belongs to another person here, the old email of ${person.centralPersonId} was kept`);
+            } else {
+                holderOf.delete(normalizeEmail(person.email));
+                holderOf.set(centralEmail, String(person._id));
+                next = { ...(next || {}), email: centralEmail };
+                summary.emailsChanged += 1;
+            }
+        }
+
+        const email = centralEmail || normalizeEmail(person.email);
+        const pick = (lists) => lists.byPersonId.get(person.centralPersonId) || lists.byEmail.get(email) || [];
+        const classes = isEmployee && teachingClasses ? pick(teachingClasses) : null;
+        const supported = isEmployee && supportedStudents ? pick(supportedStudents) : null;
         const classesChanged = classes && !sameClasses(person.classes || [], classes);
         const supportChanged = supported && !sameIds(person.supportedStudentIds || [], supported);
         if (!(next && differs(person, next)) && !classesChanged && !supportChanged) continue;
@@ -292,6 +328,7 @@ async function syncProfiles(api = central) {
         else if (next?.isActive && !wasActive) summary.reactivated += 1;
         else summary.updated += 1;
     }
+    summary.warnings = [...warnings];
     return summary;
 }
 
