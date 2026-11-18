@@ -61,14 +61,17 @@ async function syncStudentRoster() {
         byStatus = await fetchCentralStudentsByStatus();
     } catch (error) {
         winston.warn(`mtssStudentRosterSync: failed to fetch Central roster, skipping this run: ${error.message}`);
-        return { created: 0, updated: 0, errors: 0, orphaned: 0, unorphaned: 0, skipped: true };
+        return { created: 0, updated: 0, errors: 0, orphaned: 0, unorphaned: 0, needsReview: 0, possibleDuplicates: [], skipped: true };
     }
 
-    const centralByEmail = new Map();
+    // One entry per student, by Central's person id (by email for an answer that has none). A later status
+    // replaces an earlier one, as before.
+    const centralStudents = new Map();
     for (const status of ALL_STATUSES) {
         for (const student of byStatus[status]) {
             const email = normalizeEmail(student.email);
-            if (email) centralByEmail.set(email, { ...student, status });
+            const key = student.person_id || email;
+            if (key) centralStudents.set(key, { ...student, status });
         }
     }
 
@@ -80,12 +83,17 @@ async function syncStudentRoster() {
     // right thing with that: every existing MTSSStudent gets flagged as
     // orphaned, matching "not in Central means not here either."
 
-    const mtssStudents = await MTSSStudent.find({}).select('name email gender currentGrade className status orphanedAt');
+    const mtssStudents = await MTSSStudent.find({}).select('name email centralPersonId gender currentGrade className status orphanedAt');
     const mtssByEmail = new Map();
+    const mtssByPersonId = new Map();
     mtssStudents.forEach((doc) => {
         const email = normalizeEmail(doc.email);
         if (email) mtssByEmail.set(email, doc);
+        if (doc.centralPersonId) mtssByPersonId.set(doc.centralPersonId, doc);
     });
+    const matchedIds = new Set();
+    const createdRecords = [];
+    let needsReview = 0;
 
     let created = 0;
     let updated = 0;
@@ -93,26 +101,39 @@ async function syncStudentRoster() {
     let orphaned = 0;
     let unorphaned = 0;
 
-    for (const [email, central] of centralByEmail) {
+    for (const central of centralStudents.values()) {
+        const email = normalizeEmail(central.email);
+        const personId = central.person_id || null;
         const isEnrolled = ENROLLED_STATUSES.has(central.status);
         // Direct pass-through - MTSSStudent.status stores Central's exact
         // StudentStatus value, no local narrowing table needed.
         const targetStatus = central.status;
 
-        const existing = mtssByEmail.get(email);
+        // The person decides who this is. A record from before the person id existed is found by its email and
+        // gets the id now. An email the record has but Central gave to another person is not taken over.
+        let existing = (personId && mtssByPersonId.get(personId)) || (email ? mtssByEmail.get(email) : undefined);
+        if (existing && personId && existing.centralPersonId && existing.centralPersonId !== personId) {
+            needsReview += 1;
+            winston.warn(`mtssStudentRosterSync: ${email} belongs to another person in this roster, left alone`);
+            continue;
+        }
+        if (existing) matchedIds.add(String(existing._id));
 
         if (!existing) {
             if (!isEnrolled) continue; // no MTSS record and not currently enrolled - nothing to create
+            if (!email) continue;
             try {
-                await MTSSStudent.create({
+                const record = await MTSSStudent.create({
                     name: central.full_name,
                     email,
+                    ...(personId ? { centralPersonId: personId } : {}),
                     gender: normalizeGender(central.gender),
                     status: targetStatus,
                     currentGrade: central.current_grade || undefined,
                     className: central.current_class || undefined,
                 });
                 created += 1;
+                createdRecords.push({ id: String(record._id), email, name: central.full_name });
                 winston.info(`mtssStudentRosterSync: created ${email} (${central.full_name})`);
             } catch (error) {
                 errors += 1;
@@ -122,6 +143,17 @@ async function syncStudentRoster() {
         }
 
         const update = {};
+        if (personId && !existing.centralPersonId) update.centralPersonId = personId;
+        // The email follows Central, unless another record already has it (then a person has to look).
+        if (email && normalizeEmail(existing.email) !== email) {
+            const holder = mtssByEmail.get(email);
+            if (holder && String(holder._id) !== String(existing._id)) {
+                needsReview += 1;
+                winston.warn(`mtssStudentRosterSync: Central's new email ${email} already belongs to another record, kept the old one`);
+            } else {
+                update.email = email;
+            }
+        }
         if (existing.status !== targetStatus) {
             update.status = targetStatus;
         }
@@ -178,21 +210,38 @@ async function syncStudentRoster() {
     // touching its data. Central being fully unreachable this run already
     // returned early above, so reaching here means Central genuinely
     // answered and genuinely doesn't know this email.
-    for (const [email, doc] of mtssByEmail) {
-        if (centralByEmail.has(email)) continue;
+    const orphanedDocs = [];
+    for (const doc of mtssStudents) {
+        if (matchedIds.has(String(doc._id))) continue;
+        if (!normalizeEmail(doc.email) && !doc.centralPersonId) continue;
+        orphanedDocs.push(doc);
         if (doc.orphanedAt) continue;
         try {
             await MTSSStudent.findByIdAndUpdate(doc._id, { orphanedAt: new Date() });
             orphaned += 1;
-            winston.info(`mtssStudentRosterSync: flagged ${email} as orphaned (no Central match)`);
+            winston.info(`mtssStudentRosterSync: flagged ${doc.email || doc.centralPersonId} as orphaned (no Central match)`);
         } catch (error) {
             errors += 1;
-            winston.error(`mtssStudentRosterSync: failed to flag ${email} as orphaned: ${error.message}`);
+            winston.error(`mtssStudentRosterSync: failed to flag ${doc.email || doc.centralPersonId} as orphaned: ${error.message}`);
         }
     }
 
-    winston.info(`mtssStudentRosterSync: checked ${centralByEmail.size}, created ${created}, updated ${updated}, ${orphaned} newly orphaned, ${unorphaned} un-orphaned, ${errors} error(s)`);
-    return { created, updated, errors, orphaned, unorphaned, skipped: false };
+    // A student who got a new record while an unmatched record has the same name is probably one person whose email
+    // changed before the records carried the person id. Nothing is joined by itself: the older record may hold the
+    // history, and two students can share a name.
+    const possibleDuplicates = [];
+    for (const record of createdRecords) {
+        const name = String(record.name || '').trim().toLowerCase();
+        if (!name) continue;
+        const alike = orphanedDocs.filter((doc) => !doc.centralPersonId && String(doc.name || '').trim().toLowerCase() === name);
+        if (alike.length) {
+            possibleDuplicates.push({ email: record.email, existing: alike.map((doc) => ({ id: String(doc._id), email: doc.email })) });
+            winston.warn(`mtssStudentRosterSync: ${record.email} was made new, but an unmatched record has the same name (${alike.map((doc) => doc.email).join(', ')}). If it is the same student, the history is on the older record`);
+        }
+    }
+
+    winston.info(`mtssStudentRosterSync: checked ${centralStudents.size}, created ${created}, updated ${updated}, ${orphaned} newly orphaned, ${unorphaned} un-orphaned, ${needsReview} need a look, ${errors} error(s)`);
+    return { created, updated, errors, orphaned, unorphaned, needsReview, possibleDuplicates, skipped: false };
 }
 
 let intervalHandle = null;
