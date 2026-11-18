@@ -216,3 +216,80 @@ describe('sync with Central', () => {
         expect(syncIntervalMs('abc')).toBe(60000);
     });
 });
+
+describe('profile sync follows the Central person id when an email changed', () => {
+    const NEW = 'two-new@sync-test.id';
+    const OLD = 'two-old@sync-test.id';
+    const teacher = (over = {}) => employee({ person_id: 'p-4', email: NEW, full_name: 'Teacher Four', employee_id: '01.01.004', ...over });
+    const member = { person_id: 'p-4', email: NEW };
+
+    beforeAll(async () => {
+        process.env.CENTRAL_ORGANIZATION_ID = 'org-test';
+        await mongoose.connect(process.env.MONGODB_URI);
+    });
+    afterAll(async () => {
+        await Person.deleteMany({ email: /@sync-test\.id$/ });
+        await MTSSStudent.deleteMany({ email: /@sync-test\.id$/ });
+        await mongoose.connection.close();
+    });
+    beforeEach(async () => {
+        await Person.deleteMany({ email: /@sync-test\.id$/ });
+        await MTSSStudent.deleteMany({ email: /@sync-test\.id$/ });
+    });
+
+    const localTeacher = (over = {}) => Person.create({
+        centralPersonId: 'p-4', email: OLD, name: 'Teacher Four', personType: 'employee', unit: 'Elementary', isActive: true, centralStatus: 'active',
+        classes: [{ grade: 'Grade 4', className: 'Orion', role: 'Homeroom Teacher' }], ...over,
+    });
+
+    it('keeps a teacher\'s classes and supported students and takes the new email', async () => {
+        const kid = await MTSSStudent.create({ name: 'Kid', email: 'kid-two@sync-test.id', status: 'ACTIVE', currentGrade: 'Grade 4' });
+        await localTeacher({ supportedStudentIds: [kid._id] });
+        const api = fakeApi({
+            listActiveEmployees: jest.fn().mockResolvedValue([teacher()]),
+            listClassTeacherAssignments: jest.fn().mockResolvedValue([
+                { employee_email: NEW, workforce_member: member, grade_name: 'Grade 4', class_name: 'Orion', role: 'HOMEROOM' },
+            ]),
+            listStudentSupportAssignments: jest.fn().mockResolvedValue([
+                { employee_email: NEW, workforce_member: member, student_email: 'kid-two@sync-test.id' },
+            ]),
+        });
+
+        const result = await syncProfiles(api);
+
+        const person = await Person.findOne({ centralPersonId: 'p-4' });
+        expect(person.email).toBe(NEW);
+        expect(person.classes.map((c) => `${c.grade}|${c.className}`)).toEqual(['Grade 4|Orion']);
+        expect(person.supportedStudentIds.map(String)).toEqual([String(kid._id)]);
+        expect(result.emailsChanged).toBe(1);
+    });
+
+    it('keeps a student active and takes the new email when Central changed it', async () => {
+        await Person.create({ centralPersonId: 'p-5', email: 'kid-old@sync-test.id', name: 'Kid', personType: 'student', isActive: true, centralStatus: 'active', unit: 'Elementary' });
+        const api = fakeApi({
+            listActiveEmployees: jest.fn().mockResolvedValue([]),
+            listStudentsByStatus: jest.fn().mockImplementation(async (status) => (status === 'ACTIVE' ? [student({ person_id: 'p-5', email: 'kid-new@sync-test.id', full_name: 'Kid' })] : [])),
+        });
+
+        const result = await syncProfiles(api);
+
+        const kid = await Person.findOne({ centralPersonId: 'p-5' });
+        expect(kid.isActive).toBe(true);
+        expect(kid.email).toBe('kid-new@sync-test.id');
+        expect(result.deactivated).toBe(0);
+    });
+
+    it('does not give a person an email another person here already has, and says so', async () => {
+        await localTeacher();
+        await Person.create({ centralPersonId: 'p-6', email: NEW, name: 'Teacher Six', personType: 'employee', isActive: true, centralStatus: 'active' });
+        const api = fakeApi({
+            listActiveEmployees: jest.fn().mockResolvedValue([teacher(), employee({ person_id: 'p-6', email: 'six-moved@sync-test.id', full_name: 'Teacher Six', employee_id: '01.01.006' })]),
+        });
+
+        const result = await syncProfiles(api);
+
+        expect((await Person.findOne({ centralPersonId: 'p-4' })).email).toBe(OLD);
+        expect(result.emailsHeld).toBe(1);
+        expect(result.warnings.join(' ')).toContain('already belongs to another person');
+    });
+});
